@@ -1,2 +1,5 @@
 [workspace]
-members = ["exception-handler"]
+members = ["exception-handler", "minidumper", "uctx"]
+
+[profile.dev]
+debug = 2
