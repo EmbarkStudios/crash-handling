@@ -1,0 +1,15 @@
+[package]
+name = "uctx"
+description = "libc independent implementation of ucontext"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+cfg-if = "1.0"
+
+[build-dependencies]
+cc = { version = "1.0", features = ["parallel"] }
+
+[dev-dependencies]
+libc = "0.2"
