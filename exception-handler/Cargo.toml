@@ -9,3 +9,25 @@ license = "MIT OR Apache-2.0"
 documentation = "https://docs.rs/exception-handler"
 homepage = "https://github.com/EmbarkStudios/crash-handling/tree/main/exception-handler"
 keywords = ["breakpad", "minidump", "crash", "signal", "exception"]
+
+[dependencies]
+# Nicer handling of complex cfg expressions
+cfg-if = "1.0"
+# Nicer sync primitives
+parking_lot = "0.11"
+
+[target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
+# Wrapper around libc
+libc = "0.2"
+# Defines a few things not in libc
+nix = "0.23"
+# Portable ucontext replacement, particularly for musl
+uctx = { path = "../uctx" }
+
+[build-dependencies]
+# We use https://github.com/kaniini/libucontext to provide a full ucontext implementation
+# that also works when targetting musl, but it's C and asm so we need to build it
+cc = { version = "1.0", features = ["parallel"] }
+
+[dev-dependencies]
+minidump_writer_linux = { path = "../../minidump_writer_linux" }
