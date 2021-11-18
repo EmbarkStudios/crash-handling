@@ -64,33 +64,18 @@ fn main() {
             break client;
         }
 
-        // let exe = std::env::current_exe().expect("unable to find ourselves");
+        let exe = std::env::current_exe().expect("unable to find ourselves");
 
-        // _server_proc = Some(
-        //     std::process::Command::new(exe)
-        //         .arg("--server")
-        //         .spawn()
-        //         .expect("unable to spawn server process"),
-        // );
+        _server_proc = Some(
+            std::process::Command::new(exe)
+                .arg("--server")
+                .spawn()
+                .expect("unable to spawn server process"),
+        );
 
-        // // Give it time to start
-        // std::thread::sleep(std::time::Duration::from_millis(100));
+        // Give it time to start
+        std::thread::sleep(std::time::Duration::from_millis(100));
     };
-
-    // Makes a sad
-    fn sigsegv() {
-        let s: &u32 = unsafe {
-            // avoid deref_nullptr lint
-            #[inline]
-            fn get_ptr() -> *const u32 {
-                std::ptr::null()
-            }
-            &*get_ptr()
-        };
-
-        log::info!("backtrace: {:#?}", backtrace::Backtrace::new());
-        println!("we are crashing by accessing a null reference: {}", *s);
-    }
 
     // Register our exception handler
     cfg_if::cfg_if! {
@@ -106,11 +91,7 @@ fn main() {
                 dbg!(client.request_dump(crash_context).is_ok())
             })).expect("failed to attach signal handler");
 
-            std::thread::spawn(move ||{
-                sigsegv();
-            }).join().unwrap();
-
-            _handler.simulate_signal(exception_handler::Signal::Segv);
+            handler.simulate_signal(exception_handler::Signal::Segv);
         } else {
             unimplemented!("target is not currently implemented");
         }

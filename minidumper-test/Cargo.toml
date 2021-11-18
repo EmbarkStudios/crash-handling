@@ -1,0 +1,15 @@
+[package]
+name = "minidumper-test"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "minidumper-test"
+path = "src/bin.rs"
+
+[dependencies]
+clap = "3.0.0-beta.5"
+exception-handler = { path = "../exception-handler" }
+minidumper = { path = "../minidumper" }
+sadness-generator = { path = "../sadness-generator" }
