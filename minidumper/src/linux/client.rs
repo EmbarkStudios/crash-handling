@@ -1,4 +1,5 @@
 use crate::Error;
+use std::io::IoSlice;
 
 pub struct Client {
     socket: uds::UnixSeqpacketConn,
@@ -24,19 +25,40 @@ impl Client {
     /// of the stack and heap to avoid that complication, but you may of course
     /// generate one however you like.
     pub fn request_dump(&self, crash_context: &super::CrashContext) -> Result<(), Error> {
-        // This is fine since all members of the context are Sized
-        #[allow(unsafe_code)]
-        let buffer = unsafe {
-            std::slice::from_raw_parts(
-                (crash_context as *const super::CrashContext).cast::<u8>(),
-                std::mem::size_of::<super::CrashContext>(),
-            )
+        let crash_ctx_buffer = crash_context.as_bytes();
+
+        let header = crate::Header {
+            kind: 0,
+            size: crash_ctx_buffer.len() as u32,
         };
 
-        self.socket.send(buffer)?;
+        let header_buf = header.as_bytes();
+
+        let io_bufs = [IoSlice::new(header_buf), IoSlice::new(crash_ctx_buffer)];
+        self.socket.send_vectored(&io_bufs)?;
 
         let mut ack = [0u8; 1];
         self.socket.recv(&mut ack)?;
+
+        Ok(())
+    }
+
+    /// Sends a message to the server.
+    pub fn send_message(
+        &self,
+        kind: std::num::NonZeroU32,
+        buf: impl AsRef<[u8]>,
+    ) -> Result<(), Error> {
+        let buffer = buf.as_ref();
+
+        let header = crate::Header {
+            kind: kind.get(),
+            size: buffer.len() as u32,
+        };
+
+        let io_bufs = [IoSlice::new(header.as_bytes()), IoSlice::new(buffer)];
+
+        self.socket.send_vectored(&io_bufs)?;
 
         Ok(())
     }

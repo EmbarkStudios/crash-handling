@@ -8,5 +8,5 @@ pub enum Error {
     UnknownClientPid,
     #[cfg(any(target_os = "linux", target_os = "android"))]
     #[error(transparent)]
-    Writer(#[from] minidump_writer_linux::errors::WriterError),
+    Writer(#[from] minidump_writer::errors::WriterError),
 }

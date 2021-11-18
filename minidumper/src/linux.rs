@@ -4,4 +4,4 @@ mod server;
 pub use client::Client;
 pub use server::Server;
 
-pub use minidump_writer_linux::crash_context::CrashContext;
+pub use minidump_writer::crash_context::CrashContext;

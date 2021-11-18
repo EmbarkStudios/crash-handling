@@ -1,9 +1,41 @@
 use crate::Error;
 
-use uds::nonblocking::UnixSeqpacketListener;
+use uds::nonblocking::{UnixSeqpacketConn, UnixSeqpacketListener};
 
 pub struct Server {
     socket: UnixSeqpacketListener,
+}
+
+struct ClientConn {
+    /// The actual socket connection we established with accept
+    socket: UnixSeqpacketConn,
+    /// The token we associated with the socket with the mio registry
+    token: mio::Token,
+}
+
+impl ClientConn {
+    #[inline]
+    fn new(socket: UnixSeqpacketConn, token: mio::Token) -> Self {
+        Self { socket, token }
+    }
+
+    fn recv(&mut self) -> Option<(u32, Vec<u8>)> {
+        use std::io::IoSliceMut;
+
+        let mut hdr_buf = [0u8; std::mem::size_of::<crate::Header>()];
+        let (_len, _trunc) = self.socket.peek(&mut hdr_buf).ok()?;
+
+        let header = crate::Header::from_bytes(&hdr_buf)?;
+        let mut buffer = Vec::new();
+        buffer.resize(header.size as usize, 0);
+
+        let (_len, _trunc) = self
+            .socket
+            .recv_vectored(&mut [IoSliceMut::new(&mut hdr_buf), IoSliceMut::new(&mut buffer)])
+            .ok()?;
+
+        Some((header.kind, buffer))
+    }
 }
 
 impl Server {
@@ -51,28 +83,39 @@ impl Server {
                             poll.registry()
                                 .register(&mut accepted, token, Interest::READABLE)?;
 
-                            clients.push((accepted, token));
+                            clients.push(ClientConn::new(accepted, token));
                         }
                         Err(err) => {
-                            println!("failed to accept socket connection: {}", err);
+                            log::error!("failed to accept socket connection: {}", err);
                         }
                     }
-                } else {
-                    if let Some(pos) = clients
-                        .iter()
-                        .position(|(_, token)| *token == event.token())
-                    {
-                        let (mut socket, _) = clients.swap_remove(pos);
+                } else if let Some(pos) = clients.iter().position(|cc| cc.token == event.token()) {
+                    match clients[pos].recv() {
+                        Some((0, crash_context)) => {
+                            let mut cc = clients.swap_remove(pos);
 
-                        if let Err(err) = Self::handle_crash_request(&socket, handler.as_ref()) {
-                            println!("failed to capture minidump: {}", err);
-                        } else {
-                            println!("captured minidump");
-                        }
+                            if let Err(err) = Self::handle_crash_request(
+                                &cc.socket,
+                                crash_context,
+                                handler.as_ref(),
+                            ) {
+                                log::error!("failed to capture minidump: {}", err);
+                            } else {
+                                log::info!("captured minidump");
+                            }
 
-                        if let Err(e) = poll.registry().deregister(&mut socket) {
-                            println!("failed to deregister socket: {}", e);
+                            if let Err(e) = poll.registry().deregister(&mut cc.socket) {
+                                log::error!("failed to deregister socket: {}", e);
+                            }
+
+                            if let Err(e) = cc.socket.send(&[1]) {
+                                log::error!("failed to send ack: {}", e);
+                            }
                         }
+                        Some((kind, buffer)) => {
+                            handler.on_message(kind, buffer);
+                        }
+                        None => continue,
                     }
                 }
             }
@@ -82,32 +125,25 @@ impl Server {
     }
 
     fn handle_crash_request(
-        socket: &uds::nonblocking::UnixSeqpacketConn,
+        socket: &UnixSeqpacketConn,
+        buffer: Vec<u8>,
         handler: &dyn crate::ServerHandler,
     ) -> Result<(), Error> {
-        let mut crash_context_buffer = [0u8; std::mem::size_of::<super::CrashContext>()];
-
-        let (len, _all) = socket.recv(&mut crash_context_buffer)?;
-
-        if len != crash_context_buffer.len() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "client sent an incorrectly sized buffer",
-            )
-            .into());
-        }
-
         let peer_creds = socket.initial_peer_credentials()?;
 
-        let pid = peer_creds.pid().ok_or_else(|| Error::UnknownClientPid)?;
+        let pid = peer_creds.pid().ok_or(Error::UnknownClientPid)?;
 
-        #[allow(unsafe_code)]
-        let cc = unsafe { (*crash_context_buffer.as_ptr().cast::<super::CrashContext>()).clone() };
+        let cc = super::CrashContext::from_bytes(&buffer).ok_or_else(|| {
+            Error::from(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "client sent an incorrectly sized buffer",
+            ))
+        })?;
 
-        let mut minidump_file = handler.create_minidump_file()?;
+        let (mut minidump_file, minidump_path) = handler.create_minidump_file()?;
 
         let mut writer =
-            minidump_writer_linux::minidump_writer::MinidumpWriter::new(pid.get() as i32, cc.tid);
+            minidump_writer::minidump_writer::MinidumpWriter::new(pid.get() as i32, cc.tid);
         writer.set_crash_context(cc);
 
         let result = writer.dump(&mut minidump_file);
@@ -115,7 +151,11 @@ impl Server {
         // Notify the user handler about the minidump, even if we failed to write it
         handler.on_minidump_created(
             result
-                .map(|vec| (minidump_file, vec))
+                .map(|contents| crate::MinidumpBinary {
+                    file: minidump_file,
+                    path: minidump_path,
+                    contents,
+                })
                 .map_err(crate::Error::from),
         );
 

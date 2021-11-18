@@ -13,28 +13,39 @@ fn main() {
         impl minidumper::ServerHandler for Handler {
             /// Called when a crash has been received and a backing file needs to be
             /// created to store it.
-            fn create_minidump_file(&self) -> Result<std::fs::File, std::io::Error> {
+            fn create_minidump_file(
+                &self,
+            ) -> Result<(std::fs::File, std::path::PathBuf), std::io::Error> {
                 let uuid = uuid::Uuid::new_v4();
 
-                std::fs::File::create(format!("dumps/{}.dmp", uuid))
+                let pb = std::path::PathBuf::from(format!("dumps/{}.dmp", uuid));
+                Ok((std::fs::File::create(&pb)?, pb))
             }
 
             /// Called when a crash has been fully written as a minidump to the provided
             /// file. Also returns the full heap buffer as well.
             fn on_minidump_created(
                 &self,
-                result: Result<(std::fs::File, Vec<u8>), minidumper::Error>,
+                result: Result<minidumper::MinidumpBinary, minidumper::Error>,
             ) {
                 match result {
-                    Ok((mut file, _)) => {
+                    Ok(mut md_bin) => {
                         use std::io::Write;
-                        let _ = file.flush();
+                        let _ = md_bin.file.flush();
                         log::info!("wrote minidump to disk");
                     }
                     Err(e) => {
                         log::error!("failed to write minidump: {:#}", e);
                     }
                 }
+            }
+
+            fn on_message(&self, kind: u32, buffer: Vec<u8>) {
+                log::info!(
+                    "kind: {}, message: {}",
+                    kind,
+                    String::from_utf8(buffer).unwrap()
+                );
             }
         }
 
@@ -66,8 +77,8 @@ fn main() {
         // std::thread::sleep(std::time::Duration::from_millis(100));
     };
 
-    /// Makes a sad
-    fn sigsev() {
+    // Makes a sad
+    fn sigsegv() {
         let s: &u32 = unsafe {
             // avoid deref_nullptr lint
             #[inline]
@@ -77,25 +88,29 @@ fn main() {
             &*get_ptr()
         };
 
-        println!("backtrace: {:#?}", backtrace::Backtrace::new());
+        log::info!("backtrace: {:#?}", backtrace::Backtrace::new());
         println!("we are crashing by accessing a null reference: {}", *s);
     }
 
     // Register our exception handler
     cfg_if::cfg_if! {
         if #[cfg(any(target_os = "linux", target_os = "android"))] {
-            let _handler = exception_handler::linux::ExceptionHandler::attach(Box::new(move |crash_context: &exception_handler::linux::CrashContext| {
-                println!("OH NO");
-                let cc: &minidumper::CrashContext = unsafe {
-                    &*(crash_context as *const exception_handler::linux::CrashContext).cast()
-                };
+            client.send_message(std::num::NonZeroU32::new(1).unwrap(), "mistakes will be made").unwrap();
 
-                dbg!(client.request_dump(cc).is_ok())
+            let _handler = exception_handler::linux::ExceptionHandler::attach(Box::new(move |crash_context: &exception_handler::CrashContext| {
+                log::error!("OH NO");
+
+                // Before we request the crash, send a message to the server
+                client.send_message(std::num::NonZeroU32::new(2).unwrap(), "mistakes were made").unwrap();
+
+                dbg!(client.request_dump(crash_context).is_ok())
             })).expect("failed to attach signal handler");
 
-            std::thread::spawn(move || {
-                sigsev();
+            std::thread::spawn(move ||{
+                sigsegv();
             }).join().unwrap();
+
+            _handler.simulate_signal(exception_handler::Signal::Segv);
         } else {
             unimplemented!("target is not currently implemented");
         }

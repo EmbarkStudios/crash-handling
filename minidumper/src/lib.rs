@@ -83,6 +83,7 @@
 mod errors;
 
 pub use errors::Error;
+use std::{fs::File, path::PathBuf};
 
 cfg_if::cfg_if! {
     if #[cfg(any(target_os = "linux", target_os = "android"))] {
@@ -92,12 +93,71 @@ cfg_if::cfg_if! {
     }
 }
 
+pub struct MinidumpBinary {
+    /// The file the minidump was written to, as provided by [`ServerHandler::create_minidump_file`]
+    pub file: File,
+    /// The path to the file as provided by [`ServerHandler::create_minidump_file`].
+    pub path: PathBuf,
+    /// The in-memory contents of the minidump
+    pub contents: Vec<u8>,
+}
+
 /// Allows user code to hook into the server to avoid hardcoding too many details
 pub trait ServerHandler: Send + Sync {
     /// Called when a crash has been received and a backing file needs to be
     /// created to store it.
-    fn create_minidump_file(&self) -> Result<std::fs::File, std::io::Error>;
+    fn create_minidump_file(&self) -> Result<(File, PathBuf), std::io::Error>;
     /// Called when a crash has been fully written as a minidump to the provided
     /// file. Also returns the full heap buffer as well.
-    fn on_minidump_created(&self, result: Result<(std::fs::File, Vec<u8>), Error>);
+    fn on_minidump_created(&self, result: Result<MinidumpBinary, Error>);
+    /// Called when the client sends a message _other_ than a crash event
+    fn on_message(&self, kind: u32, buffer: Vec<u8>);
+}
+
+#[derive(Copy, Clone)]
+#[cfg_attr(test, derive(PartialEq, Debug))]
+#[repr(C)]
+pub(crate) struct Header {
+    kind: u32,
+    size: u32,
+}
+
+impl Header {
+    fn as_bytes(&self) -> &[u8] {
+        #[allow(unsafe_code)]
+        unsafe {
+            let size = std::mem::size_of::<Self>();
+            let ptr = (self as *const Self).cast();
+            std::slice::from_raw_parts(ptr, size)
+        }
+    }
+
+    fn from_bytes(buf: &[u8]) -> Option<Self> {
+        if buf.len() != std::mem::size_of::<Self>() {
+            return None;
+        }
+
+        #[allow(unsafe_code)]
+        unsafe {
+            Some(*buf.as_ptr().cast::<Self>())
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::Header;
+
+    #[test]
+    fn header_bytes() {
+        let expected = Header {
+            kind: 20,
+            size: 8 * 1024,
+        };
+        let exp_bytes = expected.as_bytes();
+
+        let actual = Header::from_bytes(exp_bytes).unwrap();
+
+        assert_eq!(expected, actual);
+    }
 }

@@ -7,11 +7,11 @@ edition = "2021"
 cfg-if = "1.0"
 log = "0.4"
 thiserror = "1.0"
+# Minidump writing (currently linux/android only)
+#minidump_writer_linux = { git = "https://github.com/EmbarkStudios/minidump_writer_linux", branch = "changes" }
+minidump-writer = { path = "../../minidump_writer_linux" }
 
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
-# Minidump writing for linux
-#minidump_writer_linux = { git = "https://github.com/EmbarkStudios/minidump_writer_linux", branch = "changes" }
-minidump_writer_linux = { path = "../../minidump_writer_linux" }
 # Event loop for uds
 mio = "0.7"
 # Improved Unix domain socket support, includes features that are not available in std
