@@ -121,6 +121,7 @@ pub unsafe fn restore_sigaltstack() {
 
 /// Restores the signal handler for the specified signal back to its original,
 /// default, handler
+#[inline]
 unsafe fn install_default_handler(sig: Signal) {
     set_handler(sig, libc::SIG_DFL);
 }

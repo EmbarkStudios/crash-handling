@@ -39,16 +39,8 @@ pub fn raise_trap() {
 
 /// Raises `SIGSEGV` on unix and a `EXCEPTION_STACK_OVERFLOW` exception on windows
 pub fn raise_stack_overflow() {
-    std::thread::Builder::new()
-        .name("stackoverflow".to_owned())
-        .stack_size(1024)
-        .spawn(move || {
-            let mut big_boi = [0u8; 2 * 1024];
-            big_boi[big_boi.len() - 1] = 1;
+    let mut big_boi = [0u8; 4 * 1024 * 1024];
+    big_boi[big_boi.len() - 1] = 1;
 
-            println!("{:?}", &big_boi[big_boi.len() - 20..]);
-        })
-        .unwrap()
-        .join()
-        .unwrap();
+    println!("{:?}", &big_boi[big_boi.len() - 20..]);
 }
