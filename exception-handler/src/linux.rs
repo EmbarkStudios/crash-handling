@@ -23,9 +23,8 @@ unsafe impl Send for CrashContext {}
 impl CrashContext {
     pub fn as_bytes(&self) -> &[u8] {
         unsafe {
-            eprintln!("msghdr {}", std::mem::size_of::<libc::msghdr>());
-            let size = dbg!(std::mem::size_of_val(self));
-            let ptr = self as *const Self as *const u8;
+            let size = std::mem::size_of_val(self);
+            let ptr = (self as *const Self).cast();
             std::slice::from_raw_parts(ptr, size)
         }
     }
@@ -162,7 +161,6 @@ impl ExceptionHandler {
 
 impl Drop for ExceptionHandler {
     fn drop(&mut self) {
-        println!("WAIT WTF IS DROP BEING CALLED");
         self.do_detach();
     }
 }
