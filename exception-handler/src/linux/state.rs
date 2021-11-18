@@ -1,4 +1,4 @@
-use crate::Error;
+use crate::{Error, Signal};
 use std::{mem, ptr};
 
 const MIN_STACK_SIZE: usize = 16 * 1024;
@@ -36,8 +36,7 @@ pub unsafe fn install_sigaltstack() -> Result<(), Error> {
 
     // ... but failing that we need to allocate our own, so do all that
     // here.
-    let page_size = libc::sysconf(libc::_SC_PAGESIZE) as usize;
-    let guard_size = page_size;
+    let guard_size = libc::sysconf(libc::_SC_PAGESIZE) as usize;
     let alloc_size = guard_size + MIN_STACK_SIZE;
 
     let ptr = libc::mmap(
@@ -120,42 +119,50 @@ pub unsafe fn restore_sigaltstack() {
     }
 }
 
-/// Restores the signal handler for the specified signal back to its original
-/// handler
-unsafe fn install_default_handler(sig: libc::c_int) {
+/// Restores the signal handler for the specified signal back to its original,
+/// default, handler
+unsafe fn install_default_handler(sig: Signal) {
+    set_handler(sig, libc::SIG_DFL);
+}
+
+#[inline]
+pub(crate) unsafe fn ignore_signal(sig: Signal) {
+    set_handler(sig, libc::SIG_IGN);
+}
+
+unsafe fn set_handler(sig: Signal, action: usize) {
     // Android L+ expose signal and sigaction symbols that override the system
     // ones. There is a bug in these functions where a request to set the handler
     // to SIG_DFL is ignored. In that case, an infinite loop is entered as the
     // signal is repeatedly sent to breakpad's signal handler.
     // To work around this, directly call the system's sigaction.
-
     cfg_if::cfg_if! {
         if #[cfg(target_os = "android")] {
             let mut sa: libc::sigaction = mem::zeroed();
             libc::sigemptyset(&mut sa.sa_mask);
-            sa.sa_sigaction = libc::SIG_DFL;
+            sa.sa_sigaction = action;
             sa.sa_flags = libc::SA_RESTART;
             libc::syscall(
                 libc::SYS_rt_sigaction,
-                sig,
+                sig as i32,
                 &sa,
                 ptr::null::<libc::sigaction>(),
                 mem::size_of::<libc::sigset_t>(),
             );
         } else {
-            libc::signal(sig, libc::SIG_DFL);
+            libc::signal(sig as i32, action);
         }
     }
 }
 
 /// The various signals we attempt to handle
-const EXCEPTION_SIGNALS: [libc::c_int; 6] = [
-    libc::SIGSEGV,
-    libc::SIGABRT,
-    libc::SIGFPE,
-    libc::SIGILL,
-    libc::SIGBUS,
-    libc::SIGTRAP,
+const EXCEPTION_SIGNALS: [Signal; 6] = [
+    Signal::Segv,
+    Signal::Abort,
+    Signal::Fpe,
+    Signal::Ill,
+    Signal::Bus,
+    Signal::Trap,
 ];
 
 static OLD_HANDLERS: parking_lot::Mutex<Option<[libc::sigaction; 6]>> =
@@ -168,7 +175,7 @@ pub unsafe fn restore_handlers() {
 
     if let Some(old) = &*ohl {
         for (sig, action) in EXCEPTION_SIGNALS.into_iter().zip(old.iter()) {
-            if libc::sigaction(sig, action, ptr::null_mut()) == -1 {
+            if libc::sigaction(sig as i32, action, ptr::null_mut()) == -1 {
                 install_default_handler(sig);
             }
         }
@@ -194,7 +201,7 @@ pub unsafe fn install_handlers() {
         .zip(old_handlers.iter_mut())
     {
         let mut old = mem::zeroed();
-        if libc::sigaction(sig, ptr::null(), &mut old) == -1 {
+        if libc::sigaction(sig as i32, ptr::null(), &mut old) == -1 {
             return;
         }
         *handler = mem::MaybeUninit::new(old);
@@ -205,7 +212,7 @@ pub unsafe fn install_handlers() {
 
     // Mask all exception signals when we're handling one of them.
     for sig in EXCEPTION_SIGNALS {
-        libc::sigaddset(&mut sa.sa_mask, sig);
+        libc::sigaddset(&mut sa.sa_mask, sig as i32);
     }
 
     sa.sa_sigaction = signal_handler as usize;
@@ -215,7 +222,7 @@ pub unsafe fn install_handlers() {
     for sig in EXCEPTION_SIGNALS {
         // At this point it is impractical to back out changes, and so failure to
         // install a signal is intentionally ignored.
-        libc::sigaction(sig, &sa, ptr::null_mut());
+        let _ = libc::sigaction(sig as i32, &sa, ptr::null_mut());
     }
 
     // Everything is initialized. Transmute the array to the
@@ -227,7 +234,7 @@ pub(crate) static HANDLER_STACK: parking_lot::Mutex<Vec<std::sync::Weak<HandlerI
     parking_lot::const_mutex(Vec::new());
 
 unsafe extern "C" fn signal_handler(
-    sig: libc::c_int,
+    sig: Signal,
     info: *mut libc::siginfo_t,
     uc: *mut libc::c_void,
 ) {
@@ -249,18 +256,18 @@ unsafe extern "C" fn signal_handler(
         // will call the function with the right arguments.
         {
             let mut cur_handler = mem::zeroed();
-            if libc::sigaction(sig, ptr::null_mut(), &mut cur_handler) == 0
+            if libc::sigaction(sig as i32, ptr::null_mut(), &mut cur_handler) == 0
                 && cur_handler.sa_sigaction == signal_handler as usize
                 && cur_handler.sa_flags & libc::SA_SIGINFO == 0
             {
                 // Reset signal handler with the correct flags.
                 libc::sigemptyset(&mut cur_handler.sa_mask);
-                libc::sigaddset(&mut cur_handler.sa_mask, sig);
+                libc::sigaddset(&mut cur_handler.sa_mask, sig as i32);
 
                 cur_handler.sa_sigaction = signal_handler as usize;
                 cur_handler.sa_flags = libc::SA_ONSTACK | libc::SA_SIGINFO;
 
-                if libc::sigaction(sig, &cur_handler, ptr::null_mut()) == -1 {
+                if libc::sigaction(sig as i32, &cur_handler, ptr::null_mut()) == -1 {
                     // When resetting the handler fails, try to reset the
                     // default one to avoid an infinite loop here.
                     install_default_handler(sig);
@@ -274,7 +281,7 @@ unsafe extern "C" fn signal_handler(
         let handled = (|| {
             for handler in handlers.iter() {
                 if let Some(handler) = handler.upgrade() {
-                    if handler.handle_signal(sig, info, uc) {
+                    if handler.handle_signal(sig as i32, info, uc) {
                         return true;
                     }
                 }
@@ -283,11 +290,11 @@ unsafe extern "C" fn signal_handler(
             false
         })();
 
-        // Upon returning from this signal handler, sig will become unmasked and then
-        // it will be retriggered. If one of the ExceptionHandlers handled it
-        // successfully, restore the default handler. Otherwise, restore the
-        // previously installed handler. Then, when the signal is retriggered, it will
-        // be delivered to the appropriate handler.
+        // Upon returning from this signal handler, sig will become unmasked and
+        // then it will be retriggered. If one of the ExceptionHandlers handled
+        // it successfully, restore the default handler. Otherwise, restore the
+        // previously installed handler. Then, when the signal is retriggered,
+        // it will be delivered to the appropriate handler.
         if handled {
             install_default_handler(sig);
         } else {
@@ -295,7 +302,7 @@ unsafe extern "C" fn signal_handler(
         }
     }
 
-    if info.si_code <= 0 || sig == libc::SIGABRT {
+    if info.si_code <= 0 || sig == Signal::Abort {
         // This signal was triggered by somebody sending us the signal with kill().
         // In order to retrigger it, we have to queue a new signal by calling
         // kill() ourselves.  The special case (si_pid == 0 && sig == SIGABRT) is
@@ -338,7 +345,7 @@ impl HandlerInner {
         // The siginfo_t in libc is lowest common denominator, but this code is
         // specifically targeting linux/android, which contains the si_pid field
         // that we require
-        let nix_info = &*((info as *const libc::siginfo_t).cast::<nix::sys::signalfd::siginfo>());
+        let nix_info = &*((info as *const libc::siginfo_t).cast::<libc::signalfd_siginfo>());
 
         // Allow ourselves to be dumped if the signal is trusted.
         if info.si_code > 0
@@ -352,7 +359,6 @@ impl HandlerInner {
 
         {
             *crash_ctx = mem::MaybeUninit::zeroed();
-
             let mut cc = &mut *crash_ctx.as_mut_ptr();
 
             ptr::copy_nonoverlapping(nix_info, &mut cc.siginfo, 1);
@@ -362,6 +368,7 @@ impl HandlerInner {
 
             cfg_if::cfg_if! {
                 if #[cfg(target_arch = "aarch64")] {
+                    unimplemented!("needs to compile");
                     let fp_ptr = uc_ptr.uc_mcontext.__reserved.cast::<libc::fpsimd_context>();
 
                     if fp_ptr.head.magic == libc::FPSIMD_MAGIC {

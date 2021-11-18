@@ -89,6 +89,6 @@ cfg_if::cfg_if! {
     if #[cfg(any(target_os = "linux", target_os = "android"))] {
         pub mod linux;
 
-        pub use linux::{ExceptionHandler, CrashContext};
+        pub use linux::{ExceptionHandler, CrashContext, Signal};
     }
 }

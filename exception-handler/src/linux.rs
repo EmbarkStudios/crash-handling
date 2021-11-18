@@ -3,20 +3,41 @@ mod state;
 use crate::Error;
 
 /// The full context for a crash
+#[repr(C)]
+#[derive(Clone)]
 pub struct CrashContext {
-    /// The signal info for the crash
-    pub siginfo: nix::sys::signalfd::siginfo,
-    /// The id of the crashing thread
-    pub tid: libc::pid_t,
     /// Crashing thread context
     pub context: uctx::ucontext_t,
     /// Float state. This isn't part of the user ABI for Linux aarch, and is
     /// already part of ucontext_t in mips
     #[cfg(not(any(target_arch = "mips", target_arch = "arm")))]
     pub float_state: uctx::fpregset_t,
+    /// The signal info for the crash
+    pub siginfo: libc::signalfd_siginfo,
+    /// The id of the crashing thread
+    pub tid: libc::pid_t,
 }
 
 unsafe impl Send for CrashContext {}
+
+impl CrashContext {
+    pub fn as_bytes(&self) -> &[u8] {
+        unsafe {
+            eprintln!("msghdr {}", std::mem::size_of::<libc::msghdr>());
+            let size = dbg!(std::mem::size_of_val(self));
+            let ptr = self as *const Self as *const u8;
+            std::slice::from_raw_parts(ptr, size)
+        }
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
+        if bytes.len() != std::mem::size_of::<Self>() {
+            return None;
+        }
+
+        unsafe { Some((*bytes.as_ptr().cast::<Self>()).clone()) }
+    }
+}
 
 pub trait CrashEvent: Send + Sync {
     /// Method invoked when a crash occurs. Returning true indicates your handler
@@ -30,6 +51,33 @@ where
 {
     fn on_crash(&self, context: &CrashContext) -> bool {
         (self)(context)
+    }
+}
+
+#[derive(Copy, Clone, PartialEq)]
+#[repr(i32)]
+pub enum Signal {
+    Hup = libc::SIGHUP,
+    Int = libc::SIGINT,
+    Quit = libc::SIGQUIT,
+    Ill = libc::SIGILL,
+    Trap = libc::SIGTRAP,
+    Abort = libc::SIGABRT,
+    Bus = libc::SIGBUS,
+    Fpe = libc::SIGFPE,
+    Kill = libc::SIGKILL,
+    Segv = libc::SIGSEGV,
+    Pipe = libc::SIGPIPE,
+    Alarm = libc::SIGALRM,
+    Term = libc::SIGTERM,
+}
+
+impl Signal {
+    #[inline]
+    pub fn ignore(self) {
+        unsafe {
+            state::ignore_signal(self);
+        }
     }
 }
 
@@ -90,13 +138,13 @@ impl ExceptionHandler {
     }
 
     /// Sends the specified user signal.
-    pub fn simulate_signal(&self, signal: i32) -> bool {
+    pub fn simulate_signal(&self, signal: Signal) -> bool {
         // Normally this would be an unsafe function, since this unsafe encompasses
         // the entirety of the body, however the user is really not required to
         // uphold any guarantees on their end, so no real need to declare the
         // function itself unsafe.
         unsafe {
-            let mut siginfo: nix::sys::signalfd::siginfo = std::mem::zeroed();
+            let mut siginfo: libc::signalfd_siginfo = std::mem::zeroed();
             siginfo.ssi_code = state::SI_USER;
             siginfo.ssi_pid = std::process::id();
 
@@ -104,8 +152,8 @@ impl ExceptionHandler {
             uctx::getcontext(&mut context);
 
             self.inner.handle_signal(
-                signal,
-                &mut *(&mut siginfo as *mut nix::sys::signalfd::siginfo).cast::<libc::siginfo_t>(),
+                signal as i32,
+                &mut *(&mut siginfo as *mut libc::signalfd_siginfo).cast::<libc::siginfo_t>(),
                 &mut *(&mut context as *mut uctx::ucontext_t).cast::<libc::c_void>(),
             )
         }
@@ -114,6 +162,7 @@ impl ExceptionHandler {
 
 impl Drop for ExceptionHandler {
     fn drop(&mut self) {
+        println!("WAIT WTF IS DROP BEING CALLED");
         self.do_detach();
     }
 }
