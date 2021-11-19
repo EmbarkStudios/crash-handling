@@ -71,7 +71,7 @@ impl Server {
                 return Ok(());
             }
 
-            poll.poll(&mut events, None)?;
+            poll.poll(&mut events, Some(std::time::Duration::from_millis(10)))?;
 
             for event in events.iter() {
                 if event.token().0 == 0 {
@@ -119,8 +119,6 @@ impl Server {
                     }
                 }
             }
-
-            std::thread::sleep(std::time::Duration::from_millis(1));
         }
     }
 

@@ -1,62 +1,95 @@
+use minidumper_test::Signal;
+
 use clap::Parser;
-use std::path::PathBuf;
 
 #[derive(Parser)]
 struct Command {
-    /// Identifier for the client or server, this is required since for tests
-    /// we spawn multiple simultaneous processes and want each one to get its
-    /// own socket
+    /// The unique identifier for the socket connection and the minidump file
+    /// that should be produced when this clietn
     #[clap(long)]
     id: String,
-    /// The directory where the minidump will be written
-    #[clap(short)]
-    dump_dir: PathBuf,
-    #[clap(subcommand)]
-    sub: Subcommand,
+    /// The signal/exception to raise
+    #[clap(long, arg_enum)]
+    signal: Signal,
+    /// Raises the signal on a separate thread rather than the main thread
+    #[clap(long)]
+    use_thread: bool,
 }
 
-#[derive(clap::ArgEnum, Clone, Copy)]
-enum Signal {
-    IllegalInstruction,
-    Trap,
-    Abort,
-    Bus,
-    Fpe,
-    Segv,
-}
+fn real_main() -> anyhow::Result<()> {
+    let cmd = Command::parse();
 
-#[derive(Parser)]
-enum Subcommand {
-    /// Runs the client, which will spawn the server automatically and connect
-    /// to it before raising the specified signal
-    Client {
-        /// The signal/exception to raise
-        #[clap(possible_values = &Signal::variants())]
-        signal: Signal,
-    },
-    /// Runs the server which is responsible for actually creating a minidump
-    /// of the "faulty" client process
-    Server,
+    let start = std::time::Instant::now();
+    let connect_timeout = std::time::Duration::from_secs(2);
+
+    let md_client = loop {
+        match minidumper::Client::with_name(&cmd.id) {
+            Ok(md_client) => break md_client,
+            Err(e) => {
+                if std::time::Instant::now() - start > connect_timeout {
+                    anyhow::bail!("timed out trying to connect to server process: {:#}", e);
+                }
+            }
+        }
+    };
+
+    let handler = exception_handler::ExceptionHandler::attach(Box::new(
+        move |cc: &exception_handler::CrashContext| {
+            println!("requesting dump");
+            let res = dbg!(md_client.request_dump(cc));
+            res.is_ok()
+        },
+    ));
+
+    let signal = cmd.signal;
+
+    let raise_signal = move || match signal {
+        Signal::Illegal => {
+            sadness_generator::raise_illegal_instruction();
+        }
+        Signal::Trap => {
+            sadness_generator::raise_trap();
+        }
+        Signal::Abort => {
+            sadness_generator::raise_abort();
+        }
+        Signal::Bus => {
+            sadness_generator::raise_bus();
+        }
+        Signal::Fpe => {
+            sadness_generator::raise_floating_point_exception();
+        }
+        Signal::Segv => {
+            sadness_generator::raise_segfault();
+        }
+        Signal::StackOverflow => {
+            sadness_generator::raise_stack_overflow();
+        }
+    };
+
+    if cmd.use_thread {
+        std::thread::spawn(raise_signal)
+            .join()
+            .expect("failed to join thread");
+    } else {
+        raise_signal();
+    }
+
+    // We won't get here, but still
+    drop(handler);
+
+    Ok(())
 }
 
 fn main() {
-    let cmd = Command::parse();
+    // We want this program to crash and have a minidump written, it _shouldn't_
+    // have errors that prevent that from happening, so emit an error code if we
+    // do encounter an error so that we can fail the test
+    if let Err(e) = real_main() {
+        eprintln!("error: {:#}", e);
 
-    match cmd.sub {
-        Subcommand::Client { signal } => {
-            let mut server_cmd = std::process::Command::new(
-                std::env::current_exe().expect("unable to retrieve current executable"),
-            );
-            server_cmd.args(&[
-                "--id",
-                &cmd.id,
-                "-d",
-                &cmd.dump_dir.to_str().expect("non utf-8 dump directory"),
-                "server",
-            ]);
-
-            server_cmd.spawn();
-        }
-        Subcommand::Server => {}
+        // When exiting due to a crash, the exit code will be 128 + the integer
+        // signal number, at least on unixes
+        std::process::exit(222);
     }
 }

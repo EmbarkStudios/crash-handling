@@ -5,11 +5,15 @@ edition = "2021"
 publish = false
 
 [[bin]]
-name = "minidumper-test"
+name = "client"
 path = "src/bin.rs"
 
 [dependencies]
+anyhow = "1.0"
+assert_cmd = "2.0"
 clap = "3.0.0-beta.5"
 exception-handler = { path = "../exception-handler" }
 minidumper = { path = "../minidumper" }
+predicates = "2.0"
 sadness-generator = { path = "../sadness-generator" }
+tracing-subscriber = { version = "0.3" }
