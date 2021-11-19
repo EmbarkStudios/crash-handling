@@ -76,6 +76,11 @@ pub fn spinup_server(id: &str) -> Server {
     impl minidumper::ServerHandler for Inner {
         fn create_minidump_file(&self) -> Result<(std::fs::File, PathBuf), std::io::Error> {
             let path = make_dump_path(&self.id);
+
+            if !path.parent().unwrap().exists() {
+                let _ = std::fs::create_dir_all(path.parent().unwrap());
+            }
+
             let file = std::fs::File::create(&path)?;
 
             Ok((file, path))
@@ -152,4 +157,78 @@ pub fn capture_output() {
     SUB.call_once(|| {
         tracing_subscriber::fmt().with_test_writer().init();
     })
+}
+
+pub fn generate_minidump(id: &str, signal: Signal, use_thread: bool) -> Vec<u8> {
+    capture_output();
+
+    let server = spinup_server(id);
+    run_client(id, signal, use_thread);
+
+    let dump_path = server
+        .dump_rx
+        .recv_timeout(std::time::Duration::from_secs(1))
+        .expect("failed to receive dump path");
+
+    match std::fs::read(&dump_path) {
+        Ok(buf) => buf,
+        Err(e) => {
+            panic!(
+                "failed to read minidump from {}: {}",
+                dump_path.display(),
+                e
+            );
+        }
+    }
+}
+
+pub use minidump::system_info::{Cpu, Os};
+
+#[inline]
+pub fn get_native_os() -> Os {
+    cfg_if::cfg_if! {
+        if #[cfg(target_os = "linux")] {
+            Os::Linux
+        } else {
+            compile_error!("implement me");
+        }
+    }
+}
+
+#[inline]
+pub fn get_native_cpu() -> Cpu {
+    cfg_if::cfg_if! {
+        if #[cfg(target_arch = "x86_64")] {
+            Cpu::X86_64
+        } else {
+            compile_error!("implement me");
+        }
+    }
+}
+
+pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
+    use minidump::{format::ExceptionCodeLinux, CrashReason};
+
+    let md = minidump::Minidump::read(md_buf).expect("failed to parse minidump");
+
+    let exc: minidump::MinidumpException<'_> =
+        md.get_stream().expect("unable to find exception stream");
+
+    let native_os = get_native_os();
+    let native_cpu = get_native_cpu();
+
+    let crash_reason = exc.get_crash_reason(native_os, native_cpu);
+
+    match native_os {
+        Os::Linux => match signal {
+            Signal::Abort => {
+                assert!(matches!(
+                    crash_reason,
+                    CrashReason::LinuxGeneral(ExceptionCodeLinux::SIGABRT, _)
+                ));
+            }
+            _ => unimplemented!(),
+        },
+        _ => unimplemented!(),
+    }
 }

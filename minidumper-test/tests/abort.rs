@@ -1,24 +1,15 @@
 use minidumper_test::*;
 
 #[test]
-fn abort() {
-    capture_output();
+fn abort_simple() {
+    let md = generate_minidump("abort-simple", Signal::Abort, false);
 
-    let server = spinup_server("abort-simple");
-    run_client("abort-simple", Signal::Abort, false);
-
-    let dump_path = server
-        .dump_rx
-        .recv_timeout(std::time::Duration::from_secs(1))
-        .expect("failed to receive dump path");
-
-    assert!(
-        std::fs::metadata(&dump_path)
-            .expect("failed to read minidump")
-            .len()
-            > 1024
-    );
+    assert_minidump(&md, Signal::Abort);
 }
 
 #[test]
-fn abort_threaded() {}
+fn abort_threaded() {
+    let md = generate_minidump("abort-threaded", Signal::Abort, true);
+
+    assert_minidump(&md, Signal::Abort);
+}

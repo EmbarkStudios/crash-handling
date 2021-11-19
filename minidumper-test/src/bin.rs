@@ -33,7 +33,7 @@ fn real_main() -> anyhow::Result<()> {
         }
     };
 
-    let handler = exception_handler::ExceptionHandler::attach(Box::new(
+    let _handler = exception_handler::ExceptionHandler::attach(Box::new(
         move |cc: &exception_handler::CrashContext| {
             println!("requesting dump");
             let res = dbg!(md_client.request_dump(cc));
@@ -75,10 +75,7 @@ fn real_main() -> anyhow::Result<()> {
         raise_signal();
     }
 
-    // We won't get here, but still
-    drop(handler);
-
-    Ok(())
+    anyhow::bail!("we should have raised a signal and exited");
 }
 
 fn main() {

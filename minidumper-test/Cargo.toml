@@ -12,7 +12,9 @@ path = "src/bin.rs"
 anyhow = "1.0"
 assert_cmd = "2.0"
 clap = "3.0.0-beta.5"
+cfg-if = "1.0"
 exception-handler = { path = "../exception-handler" }
+minidump = "0.9"
 minidumper = { path = "../minidumper" }
 predicates = "2.0"
 sadness-generator = { path = "../sadness-generator" }
