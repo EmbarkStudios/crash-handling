@@ -14,6 +14,9 @@ struct Command {
     /// Raises the signal on a separate thread rather than the main thread
     #[clap(long)]
     use_thread: bool,
+    /// Waits on a debugger to attach
+    #[clap(long)]
+    wait_on_debugger: bool,
 }
 
 fn real_main() -> anyhow::Result<()> {
@@ -21,6 +24,19 @@ fn real_main() -> anyhow::Result<()> {
 
     let start = std::time::Instant::now();
     let connect_timeout = std::time::Duration::from_secs(2);
+
+    if cmd.wait_on_debugger {
+        println!("waiting on debugger");
+        notify_rust::Notification::new()
+            .summary("Waiting on debugger")
+            .body(&format!("{} - {}", cmd.id, std::process::id()))
+            .timeout(0)
+            .show()
+            .expect("failed to post notification")
+            .wait_for_action(|_| {
+                println!("continuing");
+            });
+    }
 
     let md_client = loop {
         match minidumper::Client::with_name(&cmd.id) {
@@ -35,9 +51,9 @@ fn real_main() -> anyhow::Result<()> {
 
     let _handler = exception_handler::ExceptionHandler::attach(Box::new(
         move |cc: &exception_handler::CrashContext| {
-            println!("requesting dump");
-            let res = dbg!(md_client.request_dump(cc));
-            res.is_ok()
+            // println!, that one cool trick to segfault your signal handler!
+            //println!("requesting dump"); DON'T DO THIS
+            md_client.request_dump(cc).is_ok()
         },
     ));
 

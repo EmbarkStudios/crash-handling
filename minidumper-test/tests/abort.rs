@@ -2,14 +2,12 @@ use minidumper_test::*;
 
 #[test]
 fn abort_simple() {
-    let md = generate_minidump("abort-simple", Signal::Abort, false);
-
-    assert_minidump(&md, Signal::Abort);
+    run_test(Signal::Abort, 0, false);
 }
 
 #[test]
 fn abort_threaded() {
-    let md = generate_minidump("abort-threaded", Signal::Abort, true);
-
-    assert_minidump(&md, Signal::Abort);
+    for i in 0..32 {
+        run_test(Signal::Abort, i, true);
+    }
 }

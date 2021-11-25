@@ -1,3 +1,16 @@
+#[inline]
+pub fn run_test(signal: Signal, counter: u32, use_thread: bool) -> Vec<u8> {
+    let id = format!(
+        "{}-{}-{}",
+        signal,
+        counter,
+        if use_thread { "threaded" } else { "simple" }
+    );
+    let md = generate_minidump(&id, signal, use_thread);
+    assert_minidump(&md, signal);
+    md
+}
+
 #[derive(clap::ArgEnum, Clone, Copy)]
 pub enum Signal {
     Illegal,
@@ -133,24 +146,48 @@ pub fn spinup_server(id: &str) -> Server {
 }
 
 pub fn run_client(id: &str, signal: Signal, use_thread: bool) {
-    use assert_cmd::Command;
+    use std::env;
 
-    let mut cmd = Command::cargo_bin("client").unwrap();
+    // Adapted from
+    // https://github.com/rust-lang/cargo/blob/485670b3983b52289a2f353d589c57fae2f60f82/tests/testsuite/support/mod.rs#L507
+    let mut cmd_path = env::current_exe().expect("failed to get exe path");
+    cmd_path.pop();
+    if cmd_path.ends_with("deps") {
+        cmd_path.pop();
+    }
+
+    cmd_path.push("crash-client");
+    if !env::consts::EXE_SUFFIX.is_empty() {
+        cmd_path.set_extension(env::consts::EXE_SUFFIX);
+    }
+
+    let mut cmd = std::process::Command::new(&cmd_path);
+    cmd.stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
     cmd.args(&["--id", id, "--signal", &signal.to_string()]);
     if use_thread {
         cmd.arg("--use-thread");
     }
 
-    let assert = cmd.assert().interrupted();
-    let output = assert.get_output();
+    let wait_for_debugger = env::var("DEBUG").is_ok();
+    if wait_for_debugger {
+        cmd.arg("--wait-on-debugger");
+    }
+
+    let child = cmd.spawn().expect("failed to run crash-client");
+    let output = child.wait_with_output().expect("failed to wait for output");
 
     let stdout = std::str::from_utf8(&output.stdout).expect("invalid stdout");
     let stderr = std::str::from_utf8(&output.stderr).expect("invalid stderr");
 
     println!("{}", stdout);
     eprintln!("{}", stderr);
+
+    // Ensure it was interrupted and did not exit properly
+    assert!(output.status.code().is_none());
 }
 
+#[inline]
 pub fn capture_output() {
     static SUB: std::sync::Once = std::sync::Once::new();
 
