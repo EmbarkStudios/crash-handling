@@ -242,6 +242,8 @@ unsafe extern "C" fn signal_handler(
     let info = &mut *info;
     let uc = &mut *uc;
 
+    debug_print!("handling signal");
+
     {
         let handlers = HANDLER_STACK.lock();
 
@@ -282,7 +284,9 @@ unsafe extern "C" fn signal_handler(
         let handled = (|| {
             for handler in handlers.iter() {
                 if let Some(handler) = handler.upgrade() {
+                    debug_print!("calling handler");
                     if handler.handle_signal(sig as i32, info, uc) {
+                        debug_print!("handled");
                         return true;
                     }
                 }
@@ -297,11 +301,15 @@ unsafe extern "C" fn signal_handler(
         // previously installed handler. Then, when the signal is retriggered,
         // it will be delivered to the appropriate handler.
         if handled {
+            debug_print!("installing default handler");
             install_default_handler(sig);
         } else {
+            debug_print!("restoring handlers");
             restore_handlers();
         }
     }
+
+    debug_print!("finishing signal handler");
 
     if info.si_code <= 0 || sig == Signal::Abort {
         // This signal was triggered by somebody sending us the signal with kill().
@@ -353,7 +361,10 @@ impl HandlerInner {
             || ((info.si_code == SI_USER || info.si_code == SI_TKILL)
                 && nix_info.ssi_pid == std::process::id())
         {
-            libc::syscall(libc::SYS_prctl, libc::PR_SET_DUMPABLE, 1, 0, 0, 0);
+            debug_print!("setting dumpable");
+            assert!(libc::syscall(libc::SYS_prctl, libc::PR_SET_DUMPABLE, 1, 0, 0, 0) != -1);
+        } else {
+            debug_print!("oh no");
         }
 
         let mut crash_ctx = CRASH_CONTEXT.lock();

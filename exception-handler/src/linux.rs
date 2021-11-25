@@ -64,8 +64,7 @@ where
         F: Send + Sync + Fn(&CrashContext) -> bool,
     {
         fn on_crash(&self, context: &CrashContext) -> bool {
-        (self)(context)
-    }
+            debug_print!("inner...");
             (self.inner)(context)
         }
     }
