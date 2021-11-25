@@ -244,7 +244,10 @@ pub fn get_native_cpu() -> Cpu {
 }
 
 pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
-    use minidump::{format::ExceptionCodeLinux, CrashReason};
+    use minidump::{
+        format::{ExceptionCodeLinux, ExceptionCodeLinuxSigbusKind},
+        CrashReason,
+    };
 
     let md = minidump::Minidump::read(md_buf).expect("failed to parse minidump");
 
@@ -262,6 +265,12 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                 assert!(matches!(
                     crash_reason,
                     CrashReason::LinuxGeneral(ExceptionCodeLinux::SIGABRT, _)
+                ));
+            }
+            Signal::Bus => {
+                assert!(matches!(
+                    crash_reason,
+                    CrashReason::LinuxSigbus(ExceptionCodeLinuxSigbusKind::BUS_ADRALN)
                 ));
             }
             _ => unimplemented!(),
