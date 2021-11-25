@@ -23,7 +23,11 @@ impl ClientConn {
         use std::io::IoSliceMut;
 
         let mut hdr_buf = [0u8; std::mem::size_of::<crate::Header>()];
-        let (_len, _trunc) = self.socket.peek(&mut hdr_buf).ok()?;
+        let (len, _trunc) = self.socket.peek(&mut hdr_buf).ok()?;
+
+        if len == 0 {
+            return None;
+        }
 
         let header = crate::Header::from_bytes(&hdr_buf)?;
         let mut buffer = Vec::new();
@@ -115,7 +119,14 @@ impl Server {
                         Some((kind, buffer)) => {
                             handler.on_message(kind, buffer);
                         }
-                        None => continue,
+                        None => {
+                            log::info!("client closed socket");
+                            let mut cc = clients.swap_remove(pos);
+
+                            if let Err(e) = poll.registry().deregister(&mut cc.socket) {
+                                log::error!("failed to deregister socket: {}", e);
+                            }
+                        }
                     }
                 }
             }
