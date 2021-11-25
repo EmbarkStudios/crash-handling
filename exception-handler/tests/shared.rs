@@ -23,7 +23,7 @@ pub fn handles_signal(signal: Signal, raiser: impl Fn()) {
             let tid = libc::gettid();
 
             handler = Some(
-                exception_handler::ExceptionHandler::attach(Box::new(
+                exception_handler::ExceptionHandler::attach(exception_handler::make_crash_event(
                     move |cc: &exception_handler::CrashContext| {
                         assert_eq!(cc.siginfo.ssi_signo, signal as u32);
                         assert_eq!(cc.tid, tid);

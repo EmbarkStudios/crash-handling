@@ -38,19 +38,39 @@ impl CrashContext {
     }
 }
 
-pub trait CrashEvent: Send + Sync {
+pub unsafe trait CrashEvent: Send + Sync {
     /// Method invoked when a crash occurs. Returning true indicates your handler
     /// has processed the crash and that no further handlers should run.
     fn on_crash(&self, context: &CrashContext) -> bool;
 }
 
-impl<F> CrashEvent for F
+/// The [`CrashEvent`] trait is marked unsafe since it is up to the implementor
+/// to only do signal/exception safe operations within it, but it's convenient
+/// to use a closure since it's just a single method. But...a little too
+/// convenient, especially since closures cannot be marked unsafe. This function
+/// just wraps the provided closure to satisfy the trait, but is itself unsafe
+/// to at least force the conscious thought needed for implementing the handler.
+#[inline]
+pub unsafe fn make_crash_event<F>(closure: F) -> Box<dyn CrashEvent>
 where
-    F: Send + Sync + Fn(&CrashContext) -> bool,
+    F: Send + Sync + Fn(&CrashContext) -> bool + 'static,
 {
-    fn on_crash(&self, context: &CrashContext) -> bool {
+    struct Wrapper<F> {
+        inner: F,
+    }
+
+    unsafe impl<F> CrashEvent for Wrapper<F>
+    where
+        F: Send + Sync + Fn(&CrashContext) -> bool,
+    {
+        fn on_crash(&self, context: &CrashContext) -> bool {
         (self)(context)
     }
+            (self.inner)(context)
+        }
+    }
+
+    Box::new(Wrapper { inner: closure })
 }
 
 #[derive(Copy, Clone, PartialEq)]

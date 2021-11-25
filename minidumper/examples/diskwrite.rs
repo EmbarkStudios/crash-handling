@@ -56,7 +56,7 @@ fn main() {
         return;
     }
 
-    //let mut _server_proc = None;
+    let mut _server_proc = None;
 
     // Attempt to connect to the server
     let client = loop {
@@ -82,14 +82,14 @@ fn main() {
         if #[cfg(any(target_os = "linux", target_os = "android"))] {
             client.send_message(std::num::NonZeroU32::new(1).unwrap(), "mistakes will be made").unwrap();
 
-            let _handler = exception_handler::linux::ExceptionHandler::attach(Box::new(move |crash_context: &exception_handler::CrashContext| {
-                log::error!("OH NO");
+            let handler = exception_handler::ExceptionHandler::attach(unsafe {exception_handler::make_crash_event(move |crash_context: &exception_handler::CrashContext| {
+                //log::error!("OH NO");
 
                 // Before we request the crash, send a message to the server
                 client.send_message(std::num::NonZeroU32::new(2).unwrap(), "mistakes were made").unwrap();
 
-                dbg!(client.request_dump(crash_context).is_ok())
-            })).expect("failed to attach signal handler");
+                client.request_dump(crash_context).is_ok()
+            })}).expect("failed to attach signal handler");
 
             handler.simulate_signal(exception_handler::Signal::Segv);
         } else {
