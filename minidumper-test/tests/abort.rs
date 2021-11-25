@@ -2,7 +2,7 @@ use minidumper_test::*;
 
 #[test]
 fn abort_simple() {
-    run_test(Signal::Abort, 0, true);
+    run_test(Signal::Abort, 0, false);
 }
 
 #[test]
