@@ -37,8 +37,10 @@ impl Client {
         let io_bufs = [IoSlice::new(header_buf), IoSlice::new(crash_ctx_buffer)];
         self.socket.send_vectored(&io_bufs)?;
 
+        exception_handler::debug_print!("waiting for dump to finish");
         let mut ack = [0u8; 1];
         self.socket.recv(&mut ack)?;
+        exception_handler::debug_print!("finished!");
 
         Ok(())
     }

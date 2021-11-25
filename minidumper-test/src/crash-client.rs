@@ -22,6 +22,8 @@ struct Command {
 fn real_main() -> anyhow::Result<()> {
     let cmd = Command::parse();
 
+    println!("pid: {}", std::process::id());
+
     let start = std::time::Instant::now();
     let connect_timeout = std::time::Duration::from_secs(2);
 
@@ -49,13 +51,16 @@ fn real_main() -> anyhow::Result<()> {
         }
     };
 
-    let _handler = exception_handler::ExceptionHandler::attach(Box::new(
-        move |cc: &exception_handler::CrashContext| {
+    let _handler = exception_handler::ExceptionHandler::attach(unsafe {
+        exception_handler::make_crash_event(move |cc: &exception_handler::CrashContext| {
+            std::thread::sleep(std::time::Duration::from_secs(120));
+            //exception_handler::debug_print!("DID WE GET HERE");
             // println!, that one cool trick to segfault your signal handler!
             //println!("requesting dump"); DON'T DO THIS
             md_client.request_dump(cc).is_ok()
-        },
-    ));
+            //true
+        })
+    });
 
     let signal = cmd.signal;
 
@@ -82,6 +87,14 @@ fn real_main() -> anyhow::Result<()> {
             sadness_generator::raise_stack_overflow();
         }
     };
+
+    let mut threads = Vec::new();
+
+    for _ in 0..10 {
+        threads.push(std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::MAX)
+        }));
+    }
 
     if cmd.use_thread {
         std::thread::spawn(raise_signal)
