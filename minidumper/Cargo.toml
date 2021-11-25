@@ -7,6 +7,9 @@ edition = "2021"
 cfg-if = "1.0"
 log = "0.4"
 thiserror = "1.0"
+exception-handler = { path = "../exception-handler", features = [
+    "debug-print",
+] }
 # Minidump writing (currently linux/android only)
 #minidump_writer_linux = { git = "https://github.com/EmbarkStudios/minidump_writer_linux", branch = "changes" }
 minidump-writer = { path = "../../minidump_writer_linux" }

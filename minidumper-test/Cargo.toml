@@ -6,13 +6,19 @@ publish = false
 
 [[bin]]
 name = "crash-client"
-path = "src/bin.rs"
+path = "src/crash-client.rs"
+
+[[bin]]
+name = "crash-server"
+path = "src/crash-server.rs"
 
 [dependencies]
 anyhow = "1.0"
 clap = "3.0.0-beta.5"
 cfg-if = "1.0"
-exception-handler = { path = "../exception-handler" }
+exception-handler = { path = "../exception-handler", features = [
+    "debug-print",
+] }
 minidump = "0.9"
 minidumper = { path = "../minidumper" }
 notify-rust = "4.5"
