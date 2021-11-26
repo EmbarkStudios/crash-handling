@@ -89,6 +89,8 @@ cfg_if::cfg_if! {
     if #[cfg(unix)] {
         #[macro_use]
         pub mod unix;
+
+        pub use unix::write_stderr;
     }
 }
 

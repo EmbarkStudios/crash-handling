@@ -119,8 +119,9 @@ pub unsafe fn restore_sigaltstack() {
     }
 }
 
-/// Restores the signal handler for the specified signal back to its original,
-/// default, handler
+/// Restores the signal handler for the specified signal back to its default
+/// handler, which _should_ perform the default signal action as seen in
+/// https://man7.org/linux/man-pages/man7/signal.7.html
 #[inline]
 unsafe fn install_default_handler(sig: Signal) {
     set_handler(sig, libc::SIG_DFL);
@@ -242,8 +243,6 @@ unsafe extern "C" fn signal_handler(
     let info = &mut *info;
     let uc = &mut *uc;
 
-    debug_print!("handling signal");
-
     {
         let handlers = HANDLER_STACK.lock();
 
@@ -284,9 +283,7 @@ unsafe extern "C" fn signal_handler(
         let handled = (|| {
             for handler in handlers.iter() {
                 if let Some(handler) = handler.upgrade() {
-                    debug_print!("calling handler");
                     if handler.handle_signal(sig as i32, info, uc) {
-                        debug_print!("handled");
                         return true;
                     }
                 }
