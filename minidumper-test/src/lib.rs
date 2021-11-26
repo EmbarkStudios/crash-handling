@@ -278,3 +278,11 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
         _ => unimplemented!(),
     }
 }
+
+pub fn run_threaded_test(signal: Signal, count: u32) {
+    use rayon::prelude::*;
+
+    (0..count).into_par_iter().for_each(|i| {
+        run_test(signal, i, true);
+    });
+}

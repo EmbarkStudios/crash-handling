@@ -22,5 +22,6 @@ exception-handler = { path = "../exception-handler", features = [
 minidump = "0.9"
 minidumper = { path = "../minidumper" }
 notify-rust = "4.5"
+rayon = "1.5"
 sadness-generator = { path = "../sadness-generator" }
 tracing-subscriber = { version = "0.3" }
