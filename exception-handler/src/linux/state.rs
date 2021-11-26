@@ -313,7 +313,7 @@ unsafe extern "C" fn signal_handler(
         // In order to retrigger it, we have to queue a new signal by calling
         // kill() ourselves.  The special case (si_pid == 0 && sig == SIGABRT) is
         // due to the kernel sending a SIGABRT from a user request via SysRQ.
-        let tid = libc::gettid();
+        let tid = libc::syscall(libc::SYS_gettid) as i32;
         if libc::syscall(libc::SYS_tgkill, std::process::id(), tid, sig) < 0 {
             // If we failed to kill ourselves (e.g. because a sandbox disallows us
             // to do so), we instead resort to terminating our process. This will

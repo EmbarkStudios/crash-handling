@@ -20,7 +20,7 @@ pub fn handles_signal(signal: Signal, raiser: impl Fn()) {
 
         if val == 0 {
             let got_it_in_handler = got_it.clone();
-            let tid = libc::gettid();
+            let tid = libc::syscall(libc::SYS_gettid) as i32;
 
             handler = Some(
                 exception_handler::ExceptionHandler::attach(exception_handler::make_crash_event(
