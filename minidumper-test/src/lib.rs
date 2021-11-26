@@ -13,13 +13,13 @@ pub fn run_test(signal: Signal, counter: u32, use_thread: bool) -> Vec<u8> {
 
 #[derive(clap::ArgEnum, Clone, Copy)]
 pub enum Signal {
-    Illegal,
-    Trap,
     Abort,
     Bus,
     Fpe,
+    Illegal,
     Segv,
     StackOverflow,
+    Trap,
 }
 
 use std::fmt;
@@ -244,10 +244,7 @@ pub fn get_native_cpu() -> Cpu {
 }
 
 pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
-    use minidump::{
-        format::{ExceptionCodeLinux, ExceptionCodeLinuxSigbusKind},
-        CrashReason,
-    };
+    use minidump::{format, CrashReason};
 
     let md = minidump::Minidump::read(md_buf).expect("failed to parse minidump");
 
@@ -264,16 +261,51 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
             Signal::Abort => {
                 assert!(matches!(
                     crash_reason,
-                    CrashReason::LinuxGeneral(ExceptionCodeLinux::SIGABRT, _)
+                    CrashReason::LinuxGeneral(format::ExceptionCodeLinux::SIGABRT, _)
                 ));
             }
             Signal::Bus => {
                 assert!(matches!(
                     crash_reason,
-                    CrashReason::LinuxSigbus(ExceptionCodeLinuxSigbusKind::BUS_ADRALN)
+                    CrashReason::LinuxSigbus(format::ExceptionCodeLinuxSigbusKind::BUS_ADRERR)
                 ));
             }
-            _ => unimplemented!(),
+            Signal::Fpe => {
+                assert!(matches!(
+                    crash_reason,
+                    CrashReason::LinuxSigfpe(format::ExceptionCodeLinuxSigfpeKind::FPE_INTDIV)
+                ));
+            }
+            Signal::Illegal => {
+                assert!(matches!(
+                    crash_reason,
+                    CrashReason::LinuxSigill(format::ExceptionCodeLinuxSigillKind::ILL_ILLOPN)
+                ));
+            }
+            Signal::Segv => {
+                assert!(matches!(
+                    crash_reason,
+                    CrashReason::LinuxSigsegv(format::ExceptionCodeLinuxSigsegvKind::SEGV_MAPERR)
+                ));
+            }
+            Signal::StackOverflow => {
+                // Not sure if there is a way to work around this, but on Linux it seems that a stack overflow
+                // on the main thread is always reported as a SEGV_MAPERR rather than a SEGV_ACCERR like for
+                // non-main threads, so we just accept either ¯\_(ツ)_/¯
+                assert!(matches!(
+                    crash_reason,
+                    CrashReason::LinuxSigsegv(
+                        format::ExceptionCodeLinuxSigsegvKind::SEGV_ACCERR
+                            | format::ExceptionCodeLinuxSigsegvKind::SEGV_MAPERR
+                    )
+                ));
+            }
+            Signal::Trap => {
+                assert!(matches!(
+                    crash_reason,
+                    CrashReason::LinuxGeneral(format::ExceptionCodeLinux::SIGTRAP, _)
+                ));
+            }
         },
         _ => unimplemented!(),
     }

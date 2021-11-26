@@ -7,7 +7,5 @@ fn abort_simple() {
 
 #[test]
 fn abort_threaded() {
-    //for i in 0..32 {
-    //run_test(Signal::Abort, 0, true);
-    //}
+    run_threaded_test(Signal::Abort, 32);
 }

@@ -3,7 +3,7 @@ extern "C" {
     fn sig_fpe();
     fn sig_segv();
     fn sig_ill();
-    fn sig_bus();
+    fn sig_bus(path_ptr: *const u8, path_len: usize);
     fn sig_trap();
 }
 
@@ -28,8 +28,8 @@ pub fn raise_illegal_instruction() {
 }
 
 /// Raises `SIGBUS` on unix and who knows what on windows
-pub fn raise_bus() {
-    unsafe { sig_bus() }
+pub fn raise_bus(path: &str) {
+    unsafe { sig_bus(path.as_ptr(), path.len()) }
 }
 
 /// Raises `SIGTRAP` on unix and a `EXCEPTION_BREAKPOINT` exception on windows
@@ -39,7 +39,7 @@ pub fn raise_trap() {
 
 /// Raises `SIGSEGV` on unix and a `EXCEPTION_STACK_OVERFLOW` exception on windows
 pub fn raise_stack_overflow() {
-    let mut big_boi = [0u8; 4 * 1024 * 1024];
+    let mut big_boi = [0u8; 9 * 1024 * 1024];
     big_boi[big_boi.len() - 1] = 1;
 
     println!("{:?}", &big_boi[big_boi.len() - 20..]);

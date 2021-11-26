@@ -53,8 +53,6 @@ fn real_main() -> anyhow::Result<()> {
 
     let _handler = exception_handler::ExceptionHandler::attach(unsafe {
         exception_handler::make_crash_event(move |cc: &exception_handler::CrashContext| {
-            std::thread::sleep(std::time::Duration::from_secs(120));
-            //exception_handler::debug_print!("DID WE GET HERE");
             // println!, that one cool trick to segfault your signal handler!
             //println!("requesting dump"); DON'T DO THIS
             md_client.request_dump(cc).is_ok()
@@ -64,18 +62,31 @@ fn real_main() -> anyhow::Result<()> {
 
     let signal = cmd.signal;
 
+    let mut bf = std::env::current_dir().unwrap();
+    if bf.file_name() != Some(std::ffi::OsStr::new("minidumper-test")) {
+        bf.push("minidumper-test");
+    }
+
+    bf.push(".dumps");
+    bf.push(format!("bus-{}.txt", cmd.id));
+
     let raise_signal = move || match signal {
         Signal::Illegal => {
             sadness_generator::raise_illegal_instruction();
         }
         Signal::Trap => {
             sadness_generator::raise_trap();
+
+            // For some reason on linux the default SIGTRAP action is not core
+            // dumping as it is supposed to, and thus we exit normally, so..
+            // cheat?
+            sadness_generator::raise_abort();
         }
         Signal::Abort => {
             sadness_generator::raise_abort();
         }
         Signal::Bus => {
-            sadness_generator::raise_bus();
+            sadness_generator::raise_bus(bf.to_str().unwrap());
         }
         Signal::Fpe => {
             sadness_generator::raise_floating_point_exception();

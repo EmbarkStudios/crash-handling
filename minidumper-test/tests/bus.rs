@@ -7,7 +7,5 @@ fn bus_simple() {
 
 #[test]
 fn bus_threaded() {
-    for i in 0..32 {
-        run_test(Signal::Bus, i, true);
-    }
+    run_threaded_test(Signal::Bus, 32);
 }
