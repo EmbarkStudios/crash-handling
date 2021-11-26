@@ -358,10 +358,7 @@ impl HandlerInner {
             || ((info.si_code == SI_USER || info.si_code == SI_TKILL)
                 && nix_info.ssi_pid == std::process::id())
         {
-            debug_print!("setting dumpable");
-            assert!(libc::syscall(libc::SYS_prctl, libc::PR_SET_DUMPABLE, 1, 0, 0, 0) != -1);
-        } else {
-            debug_print!("oh no");
+            libc::syscall(libc::SYS_prctl, libc::PR_SET_DUMPABLE, 1, 0, 0, 0);
         }
 
         let mut crash_ctx = CRASH_CONTEXT.lock();
