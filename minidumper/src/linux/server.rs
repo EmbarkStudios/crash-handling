@@ -31,6 +31,7 @@ impl ClientConn {
 
         let header = crate::Header::from_bytes(&hdr_buf)?;
         let mut buffer = Vec::new();
+
         buffer.resize(header.size as usize, 0);
 
         let (_len, _trunc) = self
@@ -87,6 +88,7 @@ impl Server {
                             poll.registry()
                                 .register(&mut accepted, token, Interest::READABLE)?;
 
+                            log::debug!("accepted connection {}", token.0);
                             clients.push(ClientConn::new(accepted, token));
                         }
                         Err(err) => {
@@ -127,9 +129,13 @@ impl Server {
                         }
                         Some((kind, buffer)) => {
                             handler.on_message(kind, buffer);
+
+                            if let Err(e) = clients[pos].socket.send(&[1]) {
+                                log::error!("failed to send ack: {}", e);
+                            }
                         }
                         None => {
-                            log::info!("client closed socket");
+                            log::debug!("client closed socket {}", pos);
                             let mut cc = clients.swap_remove(pos);
 
                             if let Err(e) = poll.registry().deregister(&mut cc.socket) {
