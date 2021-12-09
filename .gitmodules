@@ -1,0 +1,4 @@
+[submodule "minidump-writer"]
+	path = minidump-writer
+	url = https://github.com/EmbarkStudios/minidump_writer_linux.git
+	branch = changes

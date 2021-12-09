@@ -4,15 +4,16 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+# Nicer cfg handling
 cfg-if = "1.0"
+libc = "0.2"
+# Basic log emitting
 log = "0.4"
+# Nicer error creation
 thiserror = "1.0"
-exception-handler = { path = "../exception-handler", features = [
-    "debug-print",
-] }
 # Minidump writing (currently linux/android only)
-#minidump_writer_linux = { git = "https://github.com/EmbarkStudios/minidump_writer_linux", branch = "changes" }
-minidump-writer = { path = "../../minidump_writer_linux" }
+#minidump-writer = { git = "https://github.com/EmbarkStudios/minidump_writer_linux", rev = "7e6f130" }
+minidump-writer = { path = "../minidump-writer" }
 
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
 # Event loop for uds
