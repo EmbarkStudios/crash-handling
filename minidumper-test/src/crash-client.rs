@@ -53,10 +53,7 @@ fn real_main() -> anyhow::Result<()> {
 
     let _handler = exception_handler::ExceptionHandler::attach(unsafe {
         exception_handler::make_crash_event(move |cc: &exception_handler::CrashContext| {
-            // println!, that one cool trick to segfault your signal handler!
-            //println!("requesting dump"); DON'T DO THIS
-            md_client.request_dump(cc).is_ok()
-            //true
+            md_client.request_dump(cc, true).is_ok()
         })
     });
 

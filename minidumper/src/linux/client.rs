@@ -24,7 +24,11 @@ impl Client {
     /// handler, the use of a reference allows the context to be stored outside
     /// of the stack and heap to avoid that complication, but you may of course
     /// generate one however you like.
-    pub fn request_dump(&self, crash_context: &super::CrashContext) -> Result<(), Error> {
+    pub fn request_dump(
+        &self,
+        crash_context: &super::CrashContext,
+        debug_print: bool,
+    ) -> Result<(), Error> {
         let crash_ctx_buffer = crash_context.as_bytes();
 
         let header = crate::Header {
@@ -34,13 +38,29 @@ impl Client {
 
         let header_buf = header.as_bytes();
 
+        #[inline]
+        #[allow(unsafe_code)]
+        pub fn write_stderr(s: &'static str) {
+            unsafe {
+                libc::write(2, s.as_ptr().cast(), s.len());
+            }
+        }
+
+        if debug_print {
+            write_stderr("requesting minidump...");
+        }
         let io_bufs = [IoSlice::new(header_buf), IoSlice::new(crash_ctx_buffer)];
         self.socket.send_vectored(&io_bufs)?;
 
-        exception_handler::debug_print!("waiting for dump to finish...");
+        if debug_print {
+            write_stderr("waiting on ack...");
+        }
         let mut ack = [0u8; 1];
         self.socket.recv(&mut ack)?;
-        exception_handler::debug_print!("minidump creation acked");
+
+        if debug_print {
+            write_stderr("minidump ack received");
+        }
 
         Ok(())
     }

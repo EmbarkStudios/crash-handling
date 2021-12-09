@@ -14,6 +14,7 @@ macro_rules! debug_print {
 
 /// Writes the specified string directly to stderr. This is safe to be called
 /// from within a compromised context.
+#[inline]
 pub fn write_stderr(s: &'static str) {
     unsafe {
         libc::write(2, s.as_ptr().cast(), s.len());

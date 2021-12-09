@@ -85,12 +85,10 @@ fn main() {
             client.send_message(std::num::NonZeroU32::new(1).unwrap(), "mistakes will be made").unwrap();
 
             let handler = exception_handler::ExceptionHandler::attach(unsafe {exception_handler::make_crash_event(move |crash_context: &exception_handler::CrashContext| {
-                //log::error!("OH NO");
-
                 // Before we request the crash, send a message to the server
                 client.send_message(std::num::NonZeroU32::new(2).unwrap(), "mistakes were made").unwrap();
 
-                client.request_dump(crash_context).is_ok()
+                client.request_dump(crash_context, true).is_ok()
             })}).expect("failed to attach signal handler");
 
             handler.simulate_signal(exception_handler::Signal::Segv);
