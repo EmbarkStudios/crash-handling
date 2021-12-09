@@ -27,7 +27,7 @@ fn main() {
             fn on_minidump_created(
                 &self,
                 result: Result<minidumper::MinidumpBinary, minidumper::Error>,
-            ) {
+            ) -> bool {
                 match result {
                     Ok(mut md_bin) => {
                         use std::io::Write;
@@ -38,6 +38,8 @@ fn main() {
                         log::error!("failed to write minidump: {:#}", e);
                     }
                 }
+
+                true
             }
 
             fn on_message(&self, kind: u32, buffer: Vec<u8>) {

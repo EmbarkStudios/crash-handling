@@ -109,7 +109,10 @@ pub trait ServerHandler: Send + Sync {
     fn create_minidump_file(&self) -> Result<(File, PathBuf), std::io::Error>;
     /// Called when a crash has been fully written as a minidump to the provided
     /// file. Also returns the full heap buffer as well.
-    fn on_minidump_created(&self, result: Result<MinidumpBinary, Error>);
+    ///
+    /// A return value of true indicates that the message loop should exit and
+    /// stop processing messages.
+    fn on_minidump_created(&self, result: Result<MinidumpBinary, Error>) -> bool;
     /// Called when the client sends a message _other_ than a crash event
     fn on_message(&self, kind: u32, buffer: Vec<u8>);
 }

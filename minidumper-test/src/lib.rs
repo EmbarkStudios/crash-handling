@@ -102,7 +102,7 @@ pub fn spinup_server(id: &str) -> Server {
         fn on_minidump_created(
             &self,
             result: Result<minidumper::MinidumpBinary, minidumper::Error>,
-        ) {
+        ) -> bool {
             let md_bin = result.expect("failed to write minidump");
             md_bin
                 .file
@@ -114,6 +114,8 @@ pub fn spinup_server(id: &str) -> Server {
                 .expect("unable to acquire lock")
                 .send(md_bin.path)
                 .expect("couldn't send minidump path");
+
+            false
         }
 
         fn on_message(&self, _kind: u32, _buffer: Vec<u8>) {

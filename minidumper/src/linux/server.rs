@@ -98,15 +98,20 @@ impl Server {
                         Some((0, crash_context)) => {
                             let mut cc = clients.swap_remove(pos);
 
-                            if let Err(err) = Self::handle_crash_request(
+                            let exit = match Self::handle_crash_request(
                                 &cc.socket,
                                 crash_context,
                                 handler.as_ref(),
                             ) {
-                                log::error!("failed to capture minidump: {}", err);
-                            } else {
-                                log::info!("captured minidump");
-                            }
+                                Err(err) => {
+                                    log::error!("failed to capture minidump: {}", err);
+                                    false
+                                }
+                                Ok(exit) => {
+                                    log::info!("captured minidump");
+                                    exit
+                                }
+                            };
 
                             if let Err(e) = poll.registry().deregister(&mut cc.socket) {
                                 log::error!("failed to deregister socket: {}", e);
@@ -114,6 +119,10 @@ impl Server {
 
                             if let Err(e) = cc.socket.send(&[1]) {
                                 log::error!("failed to send ack: {}", e);
+                            }
+
+                            if exit {
+                                return Ok(());
                             }
                         }
                         Some((kind, buffer)) => {
@@ -137,7 +146,7 @@ impl Server {
         socket: &UnixSeqpacketConn,
         buffer: Vec<u8>,
         handler: &dyn crate::ServerHandler,
-    ) -> Result<(), Error> {
+    ) -> Result<bool, Error> {
         let peer_creds = socket.initial_peer_credentials()?;
 
         let pid = peer_creds.pid().ok_or(Error::UnknownClientPid)?;
@@ -158,7 +167,7 @@ impl Server {
         let result = writer.dump(&mut minidump_file);
 
         // Notify the user handler about the minidump, even if we failed to write it
-        handler.on_minidump_created(
+        Ok(handler.on_minidump_created(
             result
                 .map(|contents| crate::MinidumpBinary {
                     file: minidump_file,
@@ -166,8 +175,6 @@ impl Server {
                     contents,
                 })
                 .map_err(crate::Error::from),
-        );
-
-        Ok(())
+        ))
     }
 }
