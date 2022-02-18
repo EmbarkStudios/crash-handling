@@ -47,19 +47,19 @@ impl Client {
         }
 
         if debug_print {
-            write_stderr("requesting minidump...");
+            write_stderr("requesting minidump...\n");
         }
         let io_bufs = [IoSlice::new(header_buf), IoSlice::new(crash_ctx_buffer)];
         self.socket.send_vectored(&io_bufs)?;
 
         if debug_print {
-            write_stderr("waiting on ack...");
+            write_stderr("waiting on ack...\n");
         }
         let mut ack = [0u8; 1];
         self.socket.recv(&mut ack)?;
 
         if debug_print {
-            write_stderr("minidump ack received");
+            write_stderr("minidump ack received\n");
         }
 
         Ok(())
