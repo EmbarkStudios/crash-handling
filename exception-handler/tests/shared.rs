@@ -1,22 +1,38 @@
 pub use exception_handler::Signal;
 
 use std::{
-    mem::MaybeUninit,
+    mem,
     sync::{self as ss, atomic},
 };
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub fn handles_signal(signal: Signal, raiser: impl Fn()) {
+    // the setjmp crate is outdated and uses a convoluted build script backed
+    // by bindgen/clang-sys which are extremely outdated, so we just do them
+    // here
+    #[repr(C)]
+    struct JmpBuf {
+        __jmp_buf: [i32; 1],
+        __fl: u32,
+        __ss: [u32; 32],
+    }
+
+    extern "C" {
+        #[cfg_attr(target_env = "gnu", link_name = "__sigsetjmp")]
+        fn sigsetjmp(jb: *mut JmpBuf, save_mask: i32) -> i32;
+        fn siglongjmp(jb: *mut JmpBuf, val: i32) -> !;
+    }
+
     let got_it = ss::Arc::new(atomic::AtomicBool::new(false));
     let mut handler = None;
 
     unsafe {
-        let jmpbuf = ss::Arc::new(parking_lot::Mutex::new(MaybeUninit::uninit()));
+        let jmpbuf = ss::Arc::new(parking_lot::Mutex::new(mem::MaybeUninit::uninit()));
 
         // Set a jump point. The first time we are here we set up the signal
         // handler and raise the signal, the signal handler jumps back to here
         // and then we step over the initial block.
-        let val = setjmp::sigsetjmp(jmpbuf.lock().as_mut_ptr(), 1);
+        let val = sigsetjmp(jmpbuf.lock().as_mut_ptr(), 1);
 
         if val == 0 {
             let got_it_in_handler = got_it.clone();
@@ -35,7 +51,7 @@ pub fn handles_signal(signal: Signal, raiser: impl Fn()) {
                         got_it_in_handler.store(true, atomic::Ordering::Relaxed);
 
                         // long jump back to before we crashed
-                        setjmp::siglongjmp(jmpbuf.lock().as_mut_ptr(), 1);
+                        siglongjmp(jmpbuf.lock().as_mut_ptr(), 1);
 
                         //true
                     },
@@ -53,5 +69,5 @@ pub fn handles_signal(signal: Signal, raiser: impl Fn()) {
     // handler, which leaves mutexes still locked since the stack is not unwound
     // so if we don't just forget the hander we'll block infinitely waiting
     // on mutex locks that will never be acquired
-    std::mem::forget(handler);
+    mem::forget(handler);
 }
