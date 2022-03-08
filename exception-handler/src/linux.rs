@@ -38,18 +38,30 @@ impl CrashContext {
     }
 }
 
+/// User implemented trait for handling a signal that has ocurred.
+///
+/// # Safety
+///
+/// This trait is marked unsafe as  care needs to be taken when implementing it
+/// due to running in a compromised context. Notably, only a small subset of
+/// libc functions are [async signal safe](https://man7.org/linux/man-pages/man7/signal-safety.7.html)
+/// and calling non-safe ones can have undefined behavior, including such common
+/// ones as `malloc` (if using a multi-threaded allocator). In general, it is
+/// advised to do as _little_ as possible when handling a signal, with more
+/// complicated or dangerous (in a compromised context) code being intialized
+/// before the signal handler is installed, or hoisted out to an entirely
+/// different sub-process.
 pub unsafe trait CrashEvent: Send + Sync {
     /// Method invoked when a crash occurs. Returning true indicates your handler
     /// has processed the crash and that no further handlers should run.
     fn on_crash(&self, context: &CrashContext) -> bool;
 }
 
-/// The [`CrashEvent`] trait is marked unsafe since it is up to the implementor
-/// to only do signal/exception safe operations within it, but it's convenient
-/// to use a closure since it's just a single method. But...a little too
-/// convenient, especially since closures cannot be marked unsafe. This function
-/// just wraps the provided closure to satisfy the trait, but is itself unsafe
-/// to at least force the conscious thought needed for implementing the handler.
+/// Creates a [`CrashEvent`] using the supplied closure as the implementation.
+///
+/// # Safety
+///
+/// See the [`CrashEvent`] Safety section for information on why this is `unsafe`.
 #[inline]
 pub unsafe fn make_crash_event<F>(closure: F) -> Box<dyn CrashEvent>
 where
@@ -64,7 +76,6 @@ where
         F: Send + Sync + Fn(&CrashContext) -> bool,
     {
         fn on_crash(&self, context: &CrashContext) -> bool {
-            debug_print!("inner...");
             (self.inner)(context)
         }
     }

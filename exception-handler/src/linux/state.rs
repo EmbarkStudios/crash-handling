@@ -121,7 +121,7 @@ pub unsafe fn restore_sigaltstack() {
 
 /// Restores the signal handler for the specified signal back to its default
 /// handler, which _should_ perform the default signal action as seen in
-/// https://man7.org/linux/man-pages/man7/signal.7.html
+/// <https://man7.org/linux/man-pages/man7/signal.7.html>
 #[inline]
 unsafe fn install_default_handler(sig: Signal) {
     set_handler(sig, libc::SIG_DFL);

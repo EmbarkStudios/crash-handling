@@ -53,7 +53,7 @@ pub fn raise_bus(path: &str) {
 
     #[cfg(target_os = "linux")]
     unsafe {
-        let bus_fd = libc::open(path.as_ptr(), libc::O_RDWR | libc::O_CREAT, 0666);
+        let bus_fd = libc::open(path.as_ptr(), libc::O_RDWR | libc::O_CREAT, 0o666);
         let mapping = std::slice::from_raw_parts_mut(
             libc::mmap(
                 std::ptr::null_mut(),
