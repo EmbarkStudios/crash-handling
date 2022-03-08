@@ -1,11 +1,4 @@
-#[link(name = "sadness")]
-extern "C" {
-    fn sig_fpe();
-    fn sig_segv();
-    fn sig_ill();
-    fn sig_bus(path_ptr: *const u8, path_len: usize);
-    fn sig_trap();
-}
+use std::arch::asm;
 
 /// Raises `SIGSABRT` on unix and who knows what on windows
 pub fn raise_abort() {
@@ -14,27 +7,76 @@ pub fn raise_abort() {
 
 /// Raises `SIGSEGV` on unix and a `EXCEPTION_ACCESS_VIOLATION` exception on windows
 pub fn raise_segfault() {
-    unsafe { sig_segv() }
+    let s: &u32 = unsafe {
+        // avoid deref_nullptr lint
+        fn definitely_not_null() -> *const u32 {
+            std::ptr::null()
+        }
+        &*definitely_not_null()
+    };
+
+    println!("ok...");
+    println!("we are crashing by accessing a null reference: {s}");
 }
 
 /// Raises `SIGFPE` on unix and a `EXCEPTION_INT_DIVIDE_BY_ZERO` exception on windows
 pub fn raise_floating_point_exception() {
-    unsafe { sig_fpe() }
+    let ohno = unsafe {
+        #[cfg(target_arch = "x86_64")]
+        {
+            let mut divisor: u32;
+            asm!(
+                "mov eax, 1",
+                "cdq",
+                "mov {div:e}, 0",
+                "idiv {div:e}",
+                div = out(reg) divisor
+            );
+            divisor
+        }
+    };
+
+    println!("we are crashing by accessing a null reference: {ohno}");
 }
 
 /// Raises `SIGILL` on unix and a `EXCEPTION_ILLEGAL_INSTRUCTION` exception on windows
 pub fn raise_illegal_instruction() {
-    unsafe { sig_ill() }
+    unsafe {
+        #[cfg(target_arch = "x86_64")]
+        asm!("ud2");
+    }
 }
 
 /// Raises `SIGBUS` on unix and who knows what on windows
 pub fn raise_bus(path: &str) {
-    unsafe { sig_bus(path.as_ptr(), path.len()) }
+    let path = std::ffi::CString::new(path).unwrap();
+
+    #[cfg(target_os = "linux")]
+    unsafe {
+        let bus_fd = libc::open(path.as_ptr(), libc::O_RDWR | libc::O_CREAT, 0666);
+        let mapping = std::slice::from_raw_parts_mut(
+            libc::mmap(
+                std::ptr::null_mut(),
+                128,
+                libc::PROT_READ | libc::PROT_WRITE,
+                libc::MAP_SHARED,
+                bus_fd,
+                0,
+            )
+            .cast::<u8>(),
+            128,
+        );
+
+        println!("{}", mapping[1]);
+    }
 }
 
 /// Raises `SIGTRAP` on unix and a `EXCEPTION_BREAKPOINT` exception on windows
 pub fn raise_trap() {
-    unsafe { sig_trap() }
+    unsafe {
+        #[cfg(target_arch = "x86_64")]
+        asm!("int3");
+    }
 }
 
 /// Raises `SIGSEGV` on unix and a `EXCEPTION_STACK_OVERFLOW` exception on windows
