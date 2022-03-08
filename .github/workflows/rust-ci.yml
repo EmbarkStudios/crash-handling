@@ -17,7 +17,7 @@ jobs:
           submodules: true
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: "1.59.0"
           override: true
 
       # make sure all code has been formatted with rustfmt
@@ -45,7 +45,7 @@ jobs:
           submodules: true
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: "1.59.0"
           override: true
       - run: cargo fetch
       - name: cargo test build
@@ -71,7 +71,7 @@ jobs:
           submodules: true
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: "1.59.0"
           override: true
       - run: cargo fetch
       - name: cargo publish check
