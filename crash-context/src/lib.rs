@@ -79,100 +79,39 @@
 // crate-specific exceptions:
 #![allow(unsafe_code, nonstandard_style)]
 
-use std::ffi::c_void;
-
 cfg_if::cfg_if! {
-    if #[cfg(any(
-        target_os = "linux",
-        target_os = "l4re",
-        target_os = "android",
-        target_os = "emscripten"))
-    ] {
-        #[repr(C)]
-        #[derive(Copy, Clone)]
-        pub struct sigset_t {
-            #[cfg(target_pointer_width = "32")]
-            __val: [u32; 32],
-            #[cfg(target_pointer_width = "64")]
-            __val: [u64; 16],
-        }
+    if #[cfg(any(target_os = "linux", target_os = "android"))] {
+        mod linux;
+        pub use linux::*;
     }
 }
 
+#[cfg(feature = "fill-minidump")]
 cfg_if::cfg_if! {
     if #[cfg(target_arch = "x86_64")] {
-        #[repr(C)]
-        #[derive(Clone)]
-        pub struct ucontext_t {
-            pub uc_flags: u64,
-            pub uc_link: *mut ucontext_t,
-            pub uc_stack: stack_t,
-            pub uc_mcontext: mcontext_t,
-            pub uc_sigmask: sigset_t,
-            __private: [u8; 512],
-        }
-
-        #[repr(C)]
-        #[derive(Clone)]
-        pub struct stack_t {
-            pub ss_sp: *mut c_void,
-            pub ss_flags: i32,
-            pub ss_size: usize,
-        }
-
-        #[repr(C)]
-        #[derive(Clone)]
-        pub struct mcontext_t {
-            pub gregs: [i64; 23],
-            pub fpregs: *mut fpregset_t,
-            __reserved: [u64; 8],
-        }
-
-        #[repr(C)]
-        #[derive(Clone)]
-        pub struct fpregset_t {
-            pub cwd: u16,
-            pub swd: u16,
-            pub ftw: u16,
-            pub fop: u16,
-            pub rip: u64,
-            pub rdp: u64,
-            pub mxcsr: u32,
-            pub mxcr_mask: u32,
-            pub st_space: [u32; 32],
-            pub xmm_space: [u32; 64],
-            __padding: [u64; 12],
-        }
-
-        mod x86_64;
-        pub use x86_64::getcontext;
+        pub use minidump_common::format::CONTEXT_AMD64 as RawCpuContext;
+    } else if #[cfg(target_arch = "x86")] {
+        pub use minidump_common::format::CONTEXT_X86 as RawCpuContext;
     }
 }
 
-extern "C" {
-    pub fn getcontext(uc: *mut ucontext_t) -> i32;
-}
-
-#[cfg(test)]
-mod test {
-    #[test]
-    fn gets_context() {
-        unsafe {
-            let mut uctx = std::mem::zeroed();
-
-            assert_eq!(super::getcontext(&mut uctx), 0);
-
-            assert!(!uctx.uc_mcontext.fpregs.is_null());
-        }
-    }
-
-    // Musl doesn't contain fpregs in libc because reasons https://github.com/rust-lang/libc/pull/1646
-    #[cfg(not(target_env = "musl"))]
-    #[test]
-    fn matches_libc() {
-        assert_eq!(
-            std::mem::size_of::<libc::ucontext_t>(),
-            std::mem::size_of::<super::ucontext_t>()
-        );
+#[cfg(feature = "fill-minidump")]
+pub trait CpuContext {
+    /// The instruction pointer at the time of the crash.
+    ///
+    /// See <https://en.wikipedia.org/wiki/Program_counter>
+    fn instruction_pointer(&self) -> usize;
+    /// The stack pointer at the time of the crash.
+    ///
+    /// See <https://en.wikipedia.org/wiki/Stack_register>
+    fn stack_pointer(&self) -> usize;
+    /// Fills out the specified [`RawCpuContext`] with information from
+    /// a [`CrashContext`].
+    fn fill_cpu_context(&self, cpu_ctx: &mut RawCpuContext);
+    /// Retrieves a [`RawCpuContext`] from a [`CrashContext`].
+    fn get_cpu_context(&self) -> RawCpuContext {
+        let mut ctx = Default::default();
+        self.fill_cpu_context(&mut ctx);
+        ctx
     }
 }
