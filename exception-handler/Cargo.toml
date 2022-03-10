@@ -21,12 +21,13 @@ debug-print = []
 cfg-if = "1.0"
 # Nicer sync primitives
 parking_lot = "0.12"
+# Definition of a portable crash-context that can be shared between various
+# crates
+crash-context = { path = "../crash-context" }
 
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
 # Wrapper around libc
 libc = "0.2"
-# Portable ucontext replacement, particularly for musl
-uctx = { path = "../uctx" }
 
 [dev-dependencies]
 sadness-generator = { path = "../sadness-generator" }

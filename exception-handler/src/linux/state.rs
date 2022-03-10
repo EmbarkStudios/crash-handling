@@ -329,7 +329,7 @@ unsafe extern "C" fn signal_handler(
 
 /// The size of `CrashContext` can be too big w.r.t the size of alternatate stack
 /// for `signal_handler`. Keep the crash context as a .bss field.
-static CRASH_CONTEXT: parking_lot::Mutex<mem::MaybeUninit<super::CrashContext>> =
+static CRASH_CONTEXT: parking_lot::Mutex<mem::MaybeUninit<crash_context::CrashContext>> =
     parking_lot::const_mutex(mem::MaybeUninit::uninit());
 
 pub(crate) struct HandlerInner {

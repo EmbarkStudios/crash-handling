@@ -29,15 +29,16 @@ fn real_main() -> anyhow::Result<()> {
 
     if cmd.wait_on_debugger {
         println!("waiting on debugger");
-        notify_rust::Notification::new()
-            .summary("Waiting on debugger")
-            .body(&format!("{} - {}", cmd.id, std::process::id()))
-            .timeout(0)
-            .show()
-            .expect("failed to post notification")
-            .wait_for_action(|_| {
-                println!("continuing");
-            });
+        // notify_rust has some crazy deps, can be turned on manually if needed...
+        // notify_rust::Notification::new()
+        //     .summary("Waiting on debugger")
+        //     .body(&format!("{} - {}", cmd.id, std::process::id()))
+        //     .timeout(0)
+        //     .show()
+        //     .expect("failed to post notification")
+        //     .wait_for_action(|_| {
+        //         println!("continuing");
+        //     });
     }
 
     let md_client = loop {

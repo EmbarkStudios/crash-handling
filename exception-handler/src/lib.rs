@@ -97,6 +97,6 @@ cfg_if::cfg_if! {
         #[macro_use]
         pub mod linux;
 
-        pub use linux::{ExceptionHandler, CrashContext, Signal, make_crash_event};
+        pub use linux::{ExceptionHandler, Signal, make_crash_event};
     }
 }
