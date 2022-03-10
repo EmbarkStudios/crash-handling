@@ -1,0 +1,17 @@
+[package]
+name = "crash-context"
+description = "Provides types containing target specific contextual information during an exception"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+
+[features]
+# If enabled, adds support for filling out the target specific CPU context
+# from a crash context
+fill-minidump = ["minidump-common"]
+
+[dependencies]
+cfg-if = "1.0"
+
+[target.'cfg(unix)'.dev-dependencies]
+libc = "0.2"

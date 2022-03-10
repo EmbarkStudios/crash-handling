@@ -102,7 +102,7 @@ cfg_if::cfg_if! {
 cfg_if::cfg_if! {
     if #[cfg(target_arch = "x86_64")] {
         #[repr(C)]
-        #[derive(Copy, Clone)]
+        #[derive(Clone)]
         pub struct ucontext_t {
             pub uc_flags: u64,
             pub uc_link: *mut ucontext_t,
@@ -113,7 +113,7 @@ cfg_if::cfg_if! {
         }
 
         #[repr(C)]
-        #[derive(Copy, Clone)]
+        #[derive(Clone)]
         pub struct stack_t {
             pub ss_sp: *mut c_void,
             pub ss_flags: i32,
@@ -121,7 +121,7 @@ cfg_if::cfg_if! {
         }
 
         #[repr(C)]
-        #[derive(Copy, Clone)]
+        #[derive(Clone)]
         pub struct mcontext_t {
             pub gregs: [i64; 23],
             pub fpregs: *mut fpregset_t,
@@ -129,7 +129,7 @@ cfg_if::cfg_if! {
         }
 
         #[repr(C)]
-        #[derive(Copy, Clone)]
+        #[derive(Clone)]
         pub struct fpregset_t {
             pub cwd: u16,
             pub swd: u16,
@@ -143,12 +143,14 @@ cfg_if::cfg_if! {
             pub xmm_space: [u32; 64],
             __padding: [u64; 12],
         }
+
+        mod x86_64;
+        pub use x86_64::getcontext;
     }
 }
 
-#[link(name = "ucontext")]
 extern "C" {
-    pub fn getcontext(ctx: *mut ucontext_t) -> i32;
+    pub fn getcontext(uc: *mut ucontext_t) -> i32;
 }
 
 #[cfg(test)]

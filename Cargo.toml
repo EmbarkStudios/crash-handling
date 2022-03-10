@@ -1,11 +1,15 @@
 [workspace]
 members = [
+    "crash-context",
     "exception-handler",
     "minidumper",
     "minidumper-test",
     "sadness-generator",
-    "uctx",
 ]
 
 [profile.dev]
 debug = 2
+
+[patch.crates-io]
+minidump = { git = "https://github.com/luser/rust-minidump", rev = "b8e6b18c3164c124c12d9ce9819e4cb9809b5e09" }
+minidump-common = { git = "https://github.com/luser/rust-minidump", rev = "b8e6b18c3164c124c12d9ce9819e4cb9809b5e09" }
