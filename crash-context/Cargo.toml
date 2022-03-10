@@ -12,6 +12,7 @@ fill-minidump = ["minidump-common"]
 
 [dependencies]
 cfg-if = "1.0"
+minidump-common = { version = "0.9", optional = true }
 
 [target.'cfg(unix)'.dev-dependencies]
 libc = "0.2"
