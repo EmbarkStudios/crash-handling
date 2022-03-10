@@ -15,7 +15,6 @@ pub fn raise_segfault() {
         &*definitely_not_null()
     };
 
-    println!("ok...");
     println!("we are crashing by accessing a null reference: {s}");
 }
 
