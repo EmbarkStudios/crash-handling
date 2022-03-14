@@ -240,7 +240,7 @@ pub fn get_native_cpu() -> Cpu {
         if #[cfg(target_arch = "x86_64")] {
             Cpu::X86_64
         } else {
-            compile_error!("implement me");
+            Cpu::Arm64
         }
     }
 }

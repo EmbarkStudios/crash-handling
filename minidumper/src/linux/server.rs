@@ -157,7 +157,7 @@ impl Server {
 
         let pid = peer_creds.pid().ok_or(Error::UnknownClientPid)?;
 
-        let cc = super::CrashContext::from_bytes(&buffer).ok_or_else(|| {
+        let cc = crash_context::CrashContext::from_bytes(&buffer).ok_or_else(|| {
             Error::from(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 "client sent an incorrectly sized buffer",

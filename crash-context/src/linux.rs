@@ -98,6 +98,56 @@ cfg_if::cfg_if! {
             pub _st: [fpreg_t; 8],
             pub status: u32,
         }
+    } else if #[cfg(target_arch = "aarch64")] {
+        #[repr(C)]
+        #[derive(Clone)]
+        pub struct ucontext_t {
+            pub uc_flags: u32,
+            pub uc_link: *mut ucontext_t,
+            pub uc_stack: stack_t,
+            pub uc_sigmask: sigset_t,
+            pub uc_mcontext: mcontext_t,
+        }
+
+        // Note you might see this defined in C with `unsigned long` or
+        // `unsigned long long` and think, WTF, those aren't the same! Except
+        // `long` means either 32-bit _or_ 64-bit depending on the data model,
+        // and the default data model for C/C++ is LP64 which means long is
+        // 64-bit. I had forgotten what a trash type long was.
+        #[repr(C)]
+        #[derive(Clone)]
+        pub struct mcontext_t {
+            // Note in the kernel this is just part of regs which is length 32
+            pub fault_address: u64,
+            pub regs: [u64; 31],
+            pub sp: u64,
+            pub pc: u64,
+            pub pstate: u64,
+            // Note that u128 is ABI safe on aarch64, this is actually a
+            // `long double` in C which Rust doesn't have native support
+            pub __reserved: [u128; 256],
+        }
+
+        /// Magic value written by the kernel and our custom getcontext
+        pub const FPSIMD_MAGIC: u32 = 0x46508001;
+
+        #[repr(C)]
+        #[derive(Clone)]
+        pub struct _aarch64_ctx {
+            pub magic: u32,
+            pub size: u32,
+        }
+
+        #[repr(C)]
+        #[derive(Clone)]
+        pub struct fpsimd_context {
+            pub head: _aarch64_ctx,
+            pub fpsr: u32,
+            pub fpcr: u32,
+            pub vregs: [u128; 32],
+        }
+
+        pub type fpregset_t = fpsimd_context;
     }
 }
 

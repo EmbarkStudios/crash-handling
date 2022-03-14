@@ -369,23 +369,22 @@ impl HandlerInner {
 
             ptr::copy_nonoverlapping(nix_info, &mut cc.siginfo, 1);
 
-            let uc_ptr = &*(uc as *const libc::c_void).cast::<uctx::ucontext_t>();
+            let uc_ptr = &*(uc as *const libc::c_void).cast::<crash_context::ucontext_t>();
             ptr::copy_nonoverlapping(uc_ptr, &mut cc.context, 1);
 
             cfg_if::cfg_if! {
                 if #[cfg(target_arch = "aarch64")] {
-                    unimplemented!("needs to compile");
-                    let fp_ptr = uc_ptr.uc_mcontext.__reserved.cast::<libc::fpsimd_context>();
+                    let fp_ptr = uc_ptr.uc_mcontext.__reserved.as_ptr().cast::<crash_context::fpsimd_context>();
 
-                    if fp_ptr.head.magic == libc::FPSIMD_MAGIC {
-                        ptr::copy_nonoverlapping(fp_ptr, &mut cc.float_state, mem::size_of::<libc::_libc_fpstate>());
+                    if (*fp_ptr).head.magic == crash_context::FPSIMD_MAGIC {
+                        ptr::copy_nonoverlapping(fp_ptr, &mut cc.float_state, mem::size_of::<crash_context::fpregset_t>());
                     }
                 } else if #[cfg(not(all(
                     target_arch = "arm",
                     target_arch = "mips",
                     target_arch = "mips64")))] {
                     if !uc_ptr.uc_mcontext.fpregs.is_null() {
-                        ptr::copy_nonoverlapping(uc_ptr.uc_mcontext.fpregs, ((&mut cc.float_state) as *mut uctx::fpregset_t).cast(), 1);
+                        ptr::copy_nonoverlapping(uc_ptr.uc_mcontext.fpregs, ((&mut cc.float_state) as *mut crash_context::fpregset_t).cast(), 1);
 
                     }
                 } else {

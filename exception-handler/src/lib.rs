@@ -100,3 +100,5 @@ cfg_if::cfg_if! {
         pub use linux::{ExceptionHandler, Signal, make_crash_event};
     }
 }
+
+pub use crash_context::CrashContext;

@@ -1,6 +1,6 @@
 mod state;
 
-use crate::Error;
+use crate::{CrashContext, Error};
 
 /// User implemented trait for handling a signal that has ocurred.
 ///
@@ -142,12 +142,12 @@ impl ExceptionHandler {
             siginfo.ssi_pid = std::process::id();
 
             let mut context = std::mem::zeroed();
-            uctx::getcontext(&mut context);
+            crash_context::crash_context_getcontext(&mut context);
 
             self.inner.handle_signal(
                 signal as i32,
                 &mut *(&mut siginfo as *mut libc::signalfd_siginfo).cast::<libc::siginfo_t>(),
-                &mut *(&mut context as *mut uctx::ucontext_t).cast::<libc::c_void>(),
+                &mut *(&mut context as *mut crash_context::ucontext_t).cast::<libc::c_void>(),
             )
         }
     }

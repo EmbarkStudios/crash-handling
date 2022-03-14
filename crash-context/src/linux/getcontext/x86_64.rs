@@ -33,107 +33,73 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 // and they're not really inputs, just literals, so...yah
 
 #[cfg(target_os = "linux")]
-std::arch::global_asm! {
-    ".text",
-    ".global crash_context_getcontext",
-    ".hidden crash_context_getcontext",
-    ".align 4",
-    ".type crash_context_getcontext, @function",
-"crash_context_getcontext:",
-    ".cfi_startproc",
-    // Callee saved: RBX, RBP, R12-R15
-    "movq %r12, 0x48(%rdi)",
-    "movq %r13, 0x50(%rdi)",
-    "movq %r14, 0x58(%rdi)",
-    "movq %r15, 0x60(%rdi)",
-    "movq %rbp, 0x78(%rdi)",
-    "movq %rbx, 0x80(%rdi)",
 
-    // Save argument registers
-    "movq %r8,  0x28(%rdi)",
-    "movq %r9,  0x30(%rdi)",
-    "movq %rdi, 0x68(%rdi)",
-    "movq %rsi, 0x70(%rdi)",
-    "movq %rdx, 0x88(%rdi)",
-    "movq %rax, 0x90(%rdi)",
-    "movq %rcx, 0x98(%rdi)",
+// Unfortunately, the asm! macro has a few really annoying limitations at the
+// moment
+//
+// 1. const operands are unstable
+// 2. cfg attributes can't be used inside the asm macro at all
+//
+// and the worst part is we need it for literally only 1 thing, using a different
+// offset to the fpstate in ucontext depending on whether we are targeting android
+// or not :(
+macro_rules! asm_func {
+    ($offset:expr) => {
+        std::arch::global_asm! {
+            ".text",
+            ".global crash_context_getcontext",
+            ".hidden crash_context_getcontext",
+            ".align 4",
+            ".type crash_context_getcontext, @function",
+        "crash_context_getcontext:",
+            ".cfi_startproc",
+            // Callee saved: RBX, RBP, R12-R15
+            "movq %r12, 0x48(%rdi)",
+            "movq %r13, 0x50(%rdi)",
+            "movq %r14, 0x58(%rdi)",
+            "movq %r15, 0x60(%rdi)",
+            "movq %rbp, 0x78(%rdi)",
+            "movq %rbx, 0x80(%rdi)",
 
-    // Save fp state
-    "leaq 0x1a8(%rdi),%r8",
-    "movq %r8, 0xe0(%rdi)",
-    "fnstenv (%r8)",
-    "stmxcsr 0x18(%r8)",
+            // Save argument registers
+            "movq %r8,  0x28(%rdi)",
+            "movq %r9,  0x30(%rdi)",
+            "movq %rdi, 0x68(%rdi)",
+            "movq %rsi, 0x70(%rdi)",
+            "movq %rdx, 0x88(%rdi)",
+            "movq %rax, 0x90(%rdi)",
+            "movq %rcx, 0x98(%rdi)",
 
-    // Exclude this call
-    "leaq 8(%rsp), %rax",
-    "movq %rax, 0xa0(%rdi)",
+            // Save fp state
+            stringify!(leaq $offset(%rdi),%r8),
+            "movq %r8, 0xe0(%rdi)",
+            "fnstenv (%r8)",
+            "stmxcsr 0x18(%r8)",
 
-    "movq 0(%rsp), %rax",
-    "movq %rax, 0xa8(%rdi)",
+            // Exclude this call
+            "leaq 8(%rsp), %rax",
+            "movq %rax, 0xa0(%rdi)",
 
-    // Save signal mask: sigprocmask(SIGBLOCK, NULL, &uc->uc_sigmask)
-    "leaq 0x128(%rdi), %rdx",  // arg3
-    "xorq %rsi, %rsi",  // arg2 NULL
-    "xorq %rdi, %rdi",  // arg1 SIGBLOCK == 0
-    "call sigprocmask@PLT",
+            "movq 0(%rsp), %rax",
+            "movq %rax, 0xa8(%rdi)",
 
-    // Always return 0 for success, even if sigprocmask failed.
-    "xorl %eax, %eax",
-    "ret",
-    ".cfi_endproc",
-    ".size crash_context_getcontext, . - crash_context_getcontext",
-    options(att_syntax)
+            // Save signal mask: sigprocmask(SIGBLOCK, NULL, &uc->uc_sigmask)
+            "leaq 0x128(%rdi), %rdx",  // arg3
+            "xorq %rsi, %rsi",  // arg2 NULL
+            "xorq %rdi, %rdi",  // arg1 SIGBLOCK == 0
+            "call sigprocmask@PLT",
+
+            // Always return 0 for success, even if sigprocmask failed.
+            "xorl %eax, %eax",
+            "ret",
+            ".cfi_endproc",
+            ".size crash_context_getcontext, . - crash_context_getcontext",
+            options(att_syntax)
+        }
+    };
 }
 
+#[cfg(target_os = "linux")]
+asm_func!(0x1a8);
 #[cfg(target_os = "android")]
-std::arch::global_asm! {
-    ".text",
-    ".global crash_context_getcontext",
-    ".hidden crash_context_getcontext",
-    ".align 4",
-    ".type crash_context_getcontext, @function",
-"crash_context_getcontext:",
-    ".cfi_startproc",
-    // Callee saved: RBX, RBP, R12-R15
-    "movq %r12, 0x48(%rdi)",
-    "movq %r13, 0x50(%rdi)",
-    "movq %r14, 0x58(%rdi)",
-    "movq %r15, 0x60(%rdi)",
-    "movq %rbp, 0x78(%rdi)",
-    "movq %rbx, 0x80(%rdi)",
-
-    // Save argument registers
-    "movq %r8,  0x28(%rdi)",
-    "movq %r9,  0x30(%rdi)",
-    "movq %rdi, 0x68(%rdi)",
-    "movq %rsi, 0x70(%rdi)",
-    "movq %rdx, 0x88(%rdi)",
-    "movq %rax, 0x90(%rdi)",
-    "movq %rcx, 0x98(%rdi)",
-
-    // Save fp state
-    "leaq 0x130(%rdi),%r8", // This is the only difference from vanilla linux :(
-    "movq %r8, 0xe0(%rdi)",
-    "fnstenv (%r8)",
-    "stmxcsr 0x18(%r8)",
-
-    // Exclude this call
-    "leaq 8(%rsp), %rax",
-    "movq %rax, 0xa0(%rdi)",
-
-    "movq 0(%rsp), %rax",
-    "movq %rax, 0xa8(%rdi)",
-
-    // Save signal mask: sigprocmask(SIGBLOCK, NULL, &uc->uc_sigmask)
-    "leaq 0x128(%rdi), %rdx",  // arg3
-    "xorq %rsi, %rsi",  // arg2 NULL
-    "xorq %rdi, %rdi",  // arg1 SIGBLOCK == 0
-    "call sigprocmask@PLT",
-
-    // Always return 0 for success, even if sigprocmask failed.
-    "xorl %eax, %eax",
-    "ret",
-    ".cfi_endproc",
-    ".size crash_context_getcontext, . - crash_context_getcontext",
-    options(att_syntax)
-}
+asm_func!(0x130);

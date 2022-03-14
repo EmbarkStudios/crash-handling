@@ -13,3 +13,4 @@ debug = 2
 [patch.crates-io]
 minidump = { git = "https://github.com/EmbarkStudios/rust-minidump", branch = "master" }
 minidump-common = { git = "https://github.com/EmbarkStudios/rust-minidump", branch = "master" }
+minidump-writer = { path = "../minidump_writer_linux" }

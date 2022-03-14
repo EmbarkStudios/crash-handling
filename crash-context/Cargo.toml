@@ -12,7 +12,7 @@ fill-minidump = ["minidump-common", "scroll"]
 
 [dependencies]
 cfg-if = "1.0"
-minidump-common = { version = "0.9", optional = true }
+minidump-common = { version = "0.10", optional = true }
 scroll = { version = "0.11", optional = true }
 
 [target.'cfg(unix)'.dependencies]

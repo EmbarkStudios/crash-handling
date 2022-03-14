@@ -13,7 +13,8 @@ log = "0.4"
 # Nicer error creation
 thiserror = "1.0"
 # Minidump writing (currently linux/android only)
-minidump-writer = { git = "https://github.com/EmbarkStudios/minidump_writer_linux", branch = "changes" }
+#minidump-writer = { git = "https://github.com/EmbarkStudios/minidump_writer_linux", branch = "changes" }
+minidump-writer = { path = "../../minidump_writer_linux" }
 
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
 # Event loop for uds

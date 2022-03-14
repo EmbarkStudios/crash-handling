@@ -92,6 +92,8 @@ cfg_if::cfg_if! {
         pub use minidump_common::format::CONTEXT_AMD64 as RawCpuContext;
     } else if #[cfg(target_arch = "x86")] {
         pub use minidump_common::format::CONTEXT_X86 as RawCpuContext;
+    } else if #[cfg(target_arch = "aarch64")] {
+        pub use minidump_common::format::CONTEXT_ARM64_OLD as RawCpuContext;
     }
 }
 

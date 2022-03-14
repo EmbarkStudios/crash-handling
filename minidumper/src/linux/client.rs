@@ -26,7 +26,7 @@ impl Client {
     /// generate one however you like.
     pub fn request_dump(
         &self,
-        crash_context: &super::CrashContext,
+        crash_context: &crash_context::CrashContext,
         debug_print: bool,
     ) -> Result<(), Error> {
         let crash_ctx_buffer = crash_context.as_bytes();

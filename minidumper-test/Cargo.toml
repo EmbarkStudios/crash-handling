@@ -19,7 +19,7 @@ cfg-if = "1.0"
 exception-handler = { path = "../exception-handler", features = [
     "debug-print",
 ] }
-minidump = "0.9"
+minidump = "0.10"
 minidumper = { path = "../minidumper" }
 # This has some crazy dependencies, can enable manually if needed
 #notify-rust = "4.5"
