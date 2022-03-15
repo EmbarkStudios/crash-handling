@@ -1,5 +1,3 @@
-#[cfg(feature = "fill-minidump")]
-pub(crate) mod fill;
 mod getcontext;
 
 pub use getcontext::crash_context_getcontext;
@@ -102,7 +100,7 @@ cfg_if::cfg_if! {
         #[repr(C)]
         #[derive(Clone)]
         pub struct ucontext_t {
-            pub uc_flags: u32,
+            pub uc_flags: u64,
             pub uc_link: *mut ucontext_t,
             pub uc_stack: stack_t,
             pub uc_sigmask: sigset_t,
@@ -148,10 +146,49 @@ cfg_if::cfg_if! {
         }
 
         pub type fpregset_t = fpsimd_context;
+    } else if #[cfg(target_arch = "arm")] {
+        #[repr(C)]
+        #[derive(Clone)]
+        pub struct ucontext_t {
+            pub uc_flags: u32,
+            pub uc_link: *mut ucontext_t,
+            pub uc_stack: stack_t,
+            // Note that the mcontext_t and sigset_t are swapped compared to
+            // all of the other arches currently supported :p
+            pub uc_mcontext: mcontext_t,
+            pub uc_sigmask: sigset_t,
+            pub uc_regspace: [u64; 64],
+        }
+
+        #[repr(C)]
+        #[derive(Clone)]
+        pub struct mcontext_t {
+            pub trap_no: u32,
+            pub error_code: u32,
+            pub oldmask: u32,
+            pub arm_r0: u32,
+            pub arm_r1: u32,
+            pub arm_r2: u32,
+            pub arm_r3: u32,
+            pub arm_r4: u32,
+            pub arm_r5: u32,
+            pub arm_r6: u32,
+            pub arm_r7: u32,
+            pub arm_r8: u32,
+            pub arm_r9: u32,
+            pub arm_r10: u32,
+            pub arm_fp: u32,
+            pub arm_ip: u32,
+            pub arm_sp: u32,
+            pub arm_lr: u32,
+            pub arm_pc: u32,
+            pub arm_cpsr: u32,
+            pub fault_address: u32,
+        }
     }
 }
 
-/// The full context for a crash linux/android crash
+/// The full context for a linux/android crash
 #[repr(C)]
 #[derive(Clone)]
 pub struct CrashContext {
@@ -161,13 +198,12 @@ pub struct CrashContext {
     /// as libc's differs between glibc and musl <https://github.com/rust-lang/libc/pull/1646>
     /// even though the ucontext_t received from a signal will be the same
     /// regardless of the libc implementation used as it is only arch specific
-    /// not libc specific
+    /// and not libc specific
     pub context: ucontext_t,
     /// State of floating point registers.
     ///
-    /// This isn't part of the user ABI for Linux arm, and is already part
-    /// of [`crate::ucontext_t`] in mips
-    #[cfg(not(any(target_arch = "mips", target_arch = "arm")))]
+    /// This isn't part of the user ABI for Linux arm
+    #[cfg(not(target_arch = "arm"))]
     pub float_state: fpregset_t,
     /// The signal info for the crash
     pub siginfo: libc::signalfd_siginfo,

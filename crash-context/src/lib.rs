@@ -85,35 +85,3 @@ cfg_if::cfg_if! {
         pub use linux::*;
     }
 }
-
-#[cfg(feature = "fill-minidump")]
-cfg_if::cfg_if! {
-    if #[cfg(target_arch = "x86_64")] {
-        pub use minidump_common::format::CONTEXT_AMD64 as RawCpuContext;
-    } else if #[cfg(target_arch = "x86")] {
-        pub use minidump_common::format::CONTEXT_X86 as RawCpuContext;
-    } else if #[cfg(target_arch = "aarch64")] {
-        pub use minidump_common::format::CONTEXT_ARM64_OLD as RawCpuContext;
-    }
-}
-
-#[cfg(feature = "fill-minidump")]
-pub trait CpuContext {
-    /// The instruction pointer at the time of the crash.
-    ///
-    /// See <https://en.wikipedia.org/wiki/Program_counter>
-    fn instruction_pointer(&self) -> usize;
-    /// The stack pointer at the time of the crash.
-    ///
-    /// See <https://en.wikipedia.org/wiki/Stack_register>
-    fn stack_pointer(&self) -> usize;
-    /// Fills out the specified [`RawCpuContext`] with information from
-    /// a [`CrashContext`].
-    fn fill_cpu_context(&self, cpu_ctx: &mut RawCpuContext);
-    /// Retrieves a [`RawCpuContext`] from a [`CrashContext`].
-    fn get_cpu_context(&self) -> RawCpuContext {
-        let mut ctx = Default::default();
-        self.fill_cpu_context(&mut ctx);
-        ctx
-    }
-}
