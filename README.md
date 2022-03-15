@@ -21,8 +21,9 @@
 
 ## WIP
 
-- [ ] - Exception Handler
-- [ ] - Minidump creation for crash context
+- [`crash-context`](crash-context) - Provides portable types containing target specific contextual information at the time of an exception
+- [`exception-handler`](exception-handler) - Provides signal/exception handlers that invoke a user supplied callback with the contextual information on the crash
+- [`minidumper`](minidumper) - Provides an IPC client and server, the client provides a crash context and the server creates a minidump based on that crash context and invokes a user supplied callback with the minidump
 
 ## Contribution
 
