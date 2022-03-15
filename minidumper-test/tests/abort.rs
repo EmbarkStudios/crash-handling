@@ -6,6 +6,7 @@ fn abort_simple() {
 }
 
 #[test]
+#[ignore = "slow on CI"]
 fn abort_threaded() {
     run_threaded_test(Signal::Abort, 32);
 }
