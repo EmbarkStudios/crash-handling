@@ -243,6 +243,8 @@ pub fn get_native_cpu() -> Cpu {
             Cpu::X86
         } else if #[cfg(target_arch = "aarch64")] {
             Cpu::Arm64
+        } else if #[cfg(target_arch = "arm")] {
+            Cpu::Arm
         }
     }
 }
