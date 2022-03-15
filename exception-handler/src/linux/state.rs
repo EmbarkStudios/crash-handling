@@ -379,15 +379,11 @@ impl HandlerInner {
                     if (*fp_ptr).head.magic == crash_context::FPSIMD_MAGIC {
                         ptr::copy_nonoverlapping(fp_ptr, &mut cc.float_state, mem::size_of::<crash_context::fpregset_t>());
                     }
-                } else if #[cfg(not(all(
-                    target_arch = "arm",
-                    target_arch = "mips",
-                    target_arch = "mips64")))] {
+                } else if #[cfg(not(target_arch = "arm"))] {
                     if !uc_ptr.uc_mcontext.fpregs.is_null() {
                         ptr::copy_nonoverlapping(uc_ptr.uc_mcontext.fpregs, ((&mut cc.float_state) as *mut crash_context::fpregset_t).cast(), 1);
 
                     }
-                } else {
                 }
             }
 
