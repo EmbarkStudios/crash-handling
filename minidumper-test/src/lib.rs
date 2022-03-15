@@ -317,8 +317,6 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
     }
 }
 
-
-
 pub fn run_threaded_test(signal: Signal, count: u32) {
     use rayon::prelude::*;
 
