@@ -77,5 +77,5 @@ jobs:
       - name: cargo publish check
         run: |
           cargo publish --dry-run --manifest-path exception-handler/Cargo.toml
-          cargo publish --dry-run --manifest-path minidumper/Cargo.toml
-          cargo publish --dry-run --manifest-path uctx/Cargo.toml
+          #cargo publish --dry-run --manifest-path minidumper/Cargo.toml
+          cargo publish --dry-run --manifest-path crash-context/Cargo.toml
