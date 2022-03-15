@@ -168,9 +168,7 @@ impl Server {
 
         let mut writer =
             minidump_writer::minidump_writer::MinidumpWriter::new(pid.get() as i32, cc.tid);
-        writer.set_crash_context(minidump_writer::crash_context::CrashContext {
-            inner: cc
-        });
+        writer.set_crash_context(minidump_writer::crash_context::CrashContext { inner: cc });
 
         let result = writer.dump(&mut minidump_file);
 
