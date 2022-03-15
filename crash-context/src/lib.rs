@@ -77,28 +77,11 @@
 )]
 // END - Embark standard lints v6 for Rust 1.55+
 // crate-specific exceptions:
-#![allow(unsafe_code)]
-
-mod error;
-
-pub use error::Error;
-
-cfg_if::cfg_if! {
-    if #[cfg(unix)] {
-        #[macro_use]
-        pub mod unix;
-
-        pub use unix::write_stderr;
-    }
-}
+#![allow(unsafe_code, nonstandard_style)]
 
 cfg_if::cfg_if! {
     if #[cfg(any(target_os = "linux", target_os = "android"))] {
-        #[macro_use]
-        pub mod linux;
-
-        pub use linux::{ExceptionHandler, Signal, make_crash_event};
+        mod linux;
+        pub use linux::*;
     }
 }
-
-pub use crash_context::CrashContext;

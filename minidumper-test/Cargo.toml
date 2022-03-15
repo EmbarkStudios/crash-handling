@@ -1,0 +1,29 @@
+[package]
+name = "minidumper-test"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[[bin]]
+name = "crash-client"
+path = "src/crash-client.rs"
+
+[[bin]]
+name = "crash-server"
+path = "src/crash-server.rs"
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "3.1", features = ["derive"] }
+cfg-if = "1.0"
+exception-handler = { path = "../exception-handler", features = [
+    "debug-print",
+] }
+minidump = "0.10"
+minidumper = { path = "../minidumper" }
+# This has some crazy dependencies, can enable manually if needed
+#notify-rust = "4.5"
+rayon = "1.5"
+sadness-generator = { path = "../sadness-generator" }
+tracing-subscriber = { version = "0.3" }

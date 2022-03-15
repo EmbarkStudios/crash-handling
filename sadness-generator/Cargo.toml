@@ -1,0 +1,10 @@
+[package]
+name = "sadness-generator"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.59.0" # We use global_asm!
+license = "MIT OR Apache-2.0"
+publish = false
+
+[dependencies]
+libc = "0.2"

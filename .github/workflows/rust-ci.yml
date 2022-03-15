@@ -13,9 +13,11 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
+        with:
+          submodules: true
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: "1.59.0"
           override: true
 
       # make sure all code has been formatted with rustfmt
@@ -35,28 +37,29 @@ jobs:
     name: Test
     strategy:
       matrix:
-        os: [ubuntu-20.04, windows-latest, macOS-latest]
+        os: [ubuntu-20.04]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
+        with:
+          submodules: true
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: "1.59.0"
           override: true
       - run: cargo fetch
       - name: cargo test build
-        # Note the use of release here means longer compile time, but much
-        # faster test execution time. If you don't have any heavy tests it
-        # might be faster to take off release and just compile in debug
-        run: cargo build --tests --release
+        run: cargo build --tests
       - name: cargo test
-        run: cargo test --release
+        run: cargo test
 
   deny-check:
     name: cargo-deny
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
+        with:
+          submodules: true
       - uses: EmbarkStudios/cargo-deny-action@v1
 
   publish-check:
@@ -64,10 +67,15 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
+        with:
+          submodules: true
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: "1.59.0"
           override: true
       - run: cargo fetch
       - name: cargo publish check
-        run: cargo publish --dry-run
+        run: |
+          cargo publish --dry-run --manifest-path exception-handler/Cargo.toml
+          #cargo publish --dry-run --manifest-path minidumper/Cargo.toml
+          cargo publish --dry-run --manifest-path crash-context/Cargo.toml

@@ -1,0 +1,33 @@
+[package]
+name = "minidumper"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Nicer cfg handling
+cfg-if = "1.0"
+crash-context = "0.0.1"
+libc = "0.2"
+# Basic log emitting
+log = "0.4"
+# Minidump writing (currently linux/android only)
+minidump-writer = "0.1"
+# Nicer error creation
+thiserror = "1.0"
+
+[target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
+# Event loop for uds
+mio = "0.7"
+# Improved Unix domain socket support, includes features that are not available in std
+uds = { version = "0.2.6", features = ["mio_07"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+# Named pipe support, though Windows 10+ does support Unix domain sockets
+named_pipe = "0.4"
+
+[dev-dependencies]
+# catching crashes to request minidumps
+exception-handler = { path = "../exception-handler" }
+# uuid generation
+uuid = { version = "0.8", features = ["v4"] }
+backtrace = "0.3"
