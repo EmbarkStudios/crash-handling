@@ -1,9 +1,19 @@
 [package]
 name = "crash-context"
-description = "Provides types containing target specific contextual information during an exception"
-version = "0.1.0"
+version = "0.0.1"
+description = "Provides portable types containing target specific contextual information at the time of an exception"
+repository = "https://github.com/EmbarkStudios/crash-handling"
+authors = [
+    "Embark <opensource@embark-studios.com>",
+    "Jake Shadle <jake.shadle@embark-studios.com>",
+]
 edition = "2021"
-license = "Apache-2.0 OR MIT"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+documentation = "https://docs.rs/crash-context"
+homepage = "https://github.com/EmbarkStudios/crash-context"
+categories = ["external-ffi-bindings"]
+keywords = ["crash", "libc", "getcontext"]
 
 [dependencies]
 cfg-if = "1.0"
