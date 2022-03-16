@@ -58,6 +58,10 @@ skip = [
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
+allow-git = [
+    "https://github.com/luser/rust-minidump",
+    "https://github.com/msirringhaus/minidump_writer_linux",
+]
 
 [sources.allow-org]
 github = ["EmbarkStudios"]
