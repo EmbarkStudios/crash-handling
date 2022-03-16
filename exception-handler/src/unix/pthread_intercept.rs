@@ -23,6 +23,16 @@ struct PthreadCreateParams {
 
 static mut THREAD_DESTRUCTOR_KEY: libc::pthread_key_t = 0;
 
+#[cfg(target_env = "musl")]
+extern "C" {
+    pub fn __pthread_create(
+        thread: *mut libc::pthread_t,
+        attr: *const libc::pthread_attr_t,
+        main: pthread_main_t,
+        arg: *mut c_void,
+    ) -> i32;
+}
+
 /// This interposer replaces `pthread_create` so that we can inject an
 /// alternate signal stack in every new thread, regardless of whether the
 /// thread is created directly in Rust's std library or not
@@ -38,7 +48,16 @@ pub extern "C" fn pthread_create(
     static INIT: parking_lot::Once = parking_lot::Once::new();
 
     INIT.call_once(|| unsafe {
-        let ptr = libc::dlsym(libc::RTLD_NEXT, b"pthread_create\0".as_ptr().cast());
+        let ptr;
+
+        #[cfg(target_env = "musl")]
+        {
+            ptr = __pthread_create as *const c_void;
+        }
+        #[cfg(not(target_env = "musl"))]
+        {
+            ptr = libc::dlsym(libc::RTLD_NEXT, b"pthread_create\0".as_ptr().cast());
+        }
 
         if !ptr.is_null() {
             REAL_PTHREAD_CREATE = Some(std::mem::transmute(ptr));
@@ -51,7 +70,6 @@ pub extern "C" fn pthread_create(
     assert!(*real_pthread_create != pthread_create as pthread_create_t, "We could not obtain the real pthread_create(). Calling the symbol we got would make us enter an infinte loop so stop here instead.");
 
     let create_params = Box::new(PthreadCreateParams { main, arg });
-
     let create_params = Box::into_raw(create_params);
 
     let result = unsafe {
