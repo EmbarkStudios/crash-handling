@@ -80,7 +80,7 @@ pub struct ExceptionHandler {
 
 impl ExceptionHandler {
     /// Attaches a signal handler.
-    /// 
+    ///
     /// The provided callback will be invoked if a signal is caught, providing a
     /// [`CrashContext`] with the details of the thread where the signal was thrown.
     ///
