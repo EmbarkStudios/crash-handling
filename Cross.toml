@@ -1,0 +1,2 @@
+[target.arm-unknown-linux-gnueabihf]
+image = "ghcr.io/cross-rs/arm-unknown-linux-gnueabihf@sha256:2c7f685d79baa15a6437c9ccb76381ad2f597eec62e1a27f9c11fea5ce2adbf6"
