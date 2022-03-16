@@ -26,9 +26,9 @@ std::arch::global_asm! {
     "mov   r4, r0",
 
     // Call sigprocmask(SIG_BLOCK, NULL, &(ucontext->uc_sigmask))
-    "mov   r0, #0",  /* SIG_BLOCK */
-    "mov   r1, #0",  /* NULL */
-    "add   r2, r4, #UCONTEXT_SIGMASK_OFFSET",
+    "mov   r0, #0",  // SIG_BLOCK
+    "mov   r1, #0",  // NULL
+    "add   r2, r4, #104", // UCONTEXT_SIGMASK_OFFSET
     "bl    sigprocmask(PLT)",
 
     /* Intentionally do not save the FPU state here. This is because on
