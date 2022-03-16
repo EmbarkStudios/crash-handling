@@ -121,9 +121,7 @@ unsafe extern "C" fn set_alt_signal_stack_and_start(params: *mut c_void) -> *mut
     // functionally the same and can call a cleanup function/destructor on both
     // thread exit and cancel
     libc::pthread_setspecific(THREAD_DESTRUCTOR_KEY, alt_stack_mem);
-    let thread_rv = user_main(user_arg);
-
-    thread_rv
+    user_main(user_arg)
 }
 
 /// Install the alternate signal stack

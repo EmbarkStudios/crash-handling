@@ -32,7 +32,7 @@ pub fn handles_signal(signal: Signal, raiser: impl Fn()) {
         let val = sigsetjmp(jmpbuf.lock().as_mut_ptr(), 1);
 
         if val == 0 {
-            let got_it_in_handler = got_it.clone();
+            let got_it_in_handler = got_it;
             let tid = libc::syscall(libc::SYS_gettid) as i32;
 
             handler = Some(
