@@ -19,6 +19,7 @@ pub enum Signal {
     Illegal,
     Segv,
     StackOverflow,
+    StackOverflowCThread,
     Trap,
 }
 
@@ -26,13 +27,14 @@ use std::fmt;
 impl fmt::Display for Signal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
-            Self::Illegal => "illegal",
-            Self::Trap => "trap",
             Self::Abort => "abort",
             Self::Bus => "bus",
             Self::Fpe => "fpe",
+            Self::Illegal => "illegal",
             Self::Segv => "segv",
             Self::StackOverflow => "stack-overflow",
+            Self::StackOverflowCThread => "stack-overflow-c-thread",
+            Self::Trap => "trap",
         })
     }
 }
@@ -294,7 +296,7 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                     CrashReason::LinuxSigsegv(format::ExceptionCodeLinuxSigsegvKind::SEGV_MAPERR)
                 ));
             }
-            Signal::StackOverflow => {
+            Signal::StackOverflow | Signal::StackOverflowCThread => {
                 // Not sure if there is a way to work around this, but on Linux it seems that a stack overflow
                 // on the main thread is always reported as a SEGV_MAPERR rather than a SEGV_ACCERR like for
                 // non-main threads, so we just accept either ¯\_(ツ)_/¯

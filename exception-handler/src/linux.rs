@@ -79,9 +79,10 @@ pub struct ExceptionHandler {
 }
 
 impl ExceptionHandler {
-    /// Attaches a signal handler. The provided callback will be invoked if a
-    /// signal is caught, providing a [`CrashContext`] with the details of
-    /// the thread where the signal was thrown.
+    /// Attaches a signal handler.
+    ///
+    /// The provided callback will be invoked if a signal is caught, providing a
+    /// [`CrashContext`] with the details of the thread where the signal was thrown.
     ///
     /// The callback runs in a compromised context, so it is highly recommended
     /// to not perform actions that may fail due to corrupted state that caused

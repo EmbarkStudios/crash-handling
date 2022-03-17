@@ -1,15 +1,12 @@
-pub use exception_handler::Signal;
-
-use std::{
-    mem,
-    sync::{self as ss, atomic},
-};
+pub use exception_handler::{debug_print, Signal};
+use parking_lot::{Condvar, Mutex};
+use std::{mem, sync::Arc};
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub fn handles_signal(signal: Signal, raiser: impl Fn()) {
-    // the setjmp crate is outdated and uses a convoluted build script backed
-    // by bindgen/clang-sys which are extremely outdated, so we just do them
-    // here
+    // the setjmp crate uses a convoluted build script backed by bindgen/clang-sys
+    // which are extremely outdated, so we just do them here, and libc just doesn't
+    // support them all since they're kind of terrible...but useful
     #[repr(C)]
     struct JmpBuf {
         __jmp_buf: [i32; 1],
@@ -23,11 +20,11 @@ pub fn handles_signal(signal: Signal, raiser: impl Fn()) {
         fn siglongjmp(jb: *mut JmpBuf, val: i32) -> !;
     }
 
-    let got_it = ss::Arc::new(atomic::AtomicBool::new(false));
+    let got_it = Arc::new((Mutex::new(false), Condvar::new()));
     let mut handler = None;
 
     unsafe {
-        let jmpbuf = ss::Arc::new(parking_lot::Mutex::new(mem::MaybeUninit::uninit()));
+        let jmpbuf = Arc::new(Mutex::new(mem::MaybeUninit::uninit()));
 
         // Set a jump point. The first time we are here we set up the signal
         // handler and raise the signal, the signal handler jumps back to here
@@ -35,20 +32,26 @@ pub fn handles_signal(signal: Signal, raiser: impl Fn()) {
         let val = sigsetjmp(jmpbuf.lock().as_mut_ptr(), 1);
 
         if val == 0 {
-            let got_it_in_handler = got_it.clone();
-            let tid = libc::syscall(libc::SYS_gettid) as i32;
+            let got_it_in_handler = got_it;
+            //let tid = libc::syscall(libc::SYS_gettid) as i32;
 
             handler = Some(
                 exception_handler::ExceptionHandler::attach(exception_handler::make_crash_event(
                     move |cc: &exception_handler::CrashContext| {
                         assert_eq!(cc.siginfo.ssi_signo, signal as u32);
-                        assert_eq!(cc.tid, tid);
+                        //assert_eq!(cc.tid, tid);
 
                         // At least on linux these...aren't set. Which is weird
                         //assert_eq!(cc.siginfo.ssi_pid, std::process::id());
                         //assert_eq!(cc.siginfo.ssi_tid, tid as u32);
 
-                        got_it_in_handler.store(true, atomic::Ordering::Relaxed);
+                        debug_print!("handling signal");
+                        {
+                            let (lock, cvar) = &*got_it_in_handler;
+                            let mut handled = lock.lock();
+                            *handled = true;
+                            cvar.notify_one();
+                        }
 
                         // long jump back to before we crashed
                         siglongjmp(jmpbuf.lock().as_mut_ptr(), 1);
@@ -60,9 +63,18 @@ pub fn handles_signal(signal: Signal, raiser: impl Fn()) {
             );
 
             raiser();
-        }
+        } else {
+            loop {
+                std::thread::yield_now();
 
-        assert!(got_it.load(atomic::Ordering::Relaxed));
+                let (lock, _cvar) = &*got_it;
+                let signaled = lock.lock();
+                if *signaled {
+                    debug_print!("signal handled");
+                    break;
+                }
+            }
+        }
     }
 
     // We can't actually clean up the handler since we long jump out of the signal

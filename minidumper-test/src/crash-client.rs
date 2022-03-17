@@ -95,6 +95,9 @@ fn real_main() -> anyhow::Result<()> {
         Signal::StackOverflow => {
             sadness_generator::raise_stack_overflow();
         }
+        Signal::StackOverflowCThread => {
+            sadness_generator::raise_stack_overflow_in_non_rust_thread_normal();
+        }
     };
 
     let mut threads = Vec::new();

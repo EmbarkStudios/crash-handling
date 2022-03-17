@@ -98,3 +98,54 @@ pub fn raise_stack_overflow() {
 
     println!("{:?}", &big_boi[big_boi.len() - 20..]);
 }
+
+/// Raises `SIGSEGV` on unix and a `EXCEPTION_STACK_OVERFLOW` exception on windows
+///
+/// This is raised inside of a non-Rust `std::thread::Thread` to ensure that
+/// alternate stacks apply to all threads, even ones not created from Rust
+pub fn raise_stack_overflow_in_non_rust_thread(uses_longjmp: bool) {
+    #[cfg(unix)]
+    unsafe {
+        let mut native: libc::pthread_t = std::mem::zeroed();
+        let mut attr: libc::pthread_attr_t = std::mem::zeroed();
+
+        assert_eq!(
+            libc::pthread_attr_setstacksize(&mut attr, 2 * 1024 * 1024),
+            0,
+            "failed to set thread stack size",
+        );
+
+        extern "C" fn thread_start(_arg: *mut libc::c_void) -> *mut libc::c_void {
+            raise_stack_overflow();
+            std::ptr::null_mut()
+        }
+
+        let ret = libc::pthread_create(&mut native, &attr, thread_start, std::ptr::null_mut());
+
+        // We might not get here, but that's ok
+        assert_eq!(
+            libc::pthread_attr_destroy(&mut attr),
+            0,
+            "failed to destroy thread attributes"
+        );
+        assert_eq!(ret, 0, "pthread_create failed");
+
+        // Note if we're doing longjmp shenanigans, we can't do thread join, that
+        // has to be handled by the calling code
+        if !uses_longjmp {
+            assert_eq!(
+                libc::pthread_join(native, std::ptr::null_mut()),
+                0,
+                "failed to join"
+            );
+        }
+    }
+}
+
+pub fn raise_stack_overflow_in_non_rust_thread_normal() {
+    raise_stack_overflow_in_non_rust_thread(false);
+}
+
+pub fn raise_stack_overflow_in_non_rust_thread_longjmp() {
+    raise_stack_overflow_in_non_rust_thread(true);
+}
