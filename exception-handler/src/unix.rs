@@ -1,6 +1,6 @@
-mod pthread_intercept;
+mod pthread_interpose;
 
 // Force this function to be linked, but it shouldn't actually be called by
-// users directly
+// users directly as it interposes the libc `pthread_create`
 #[doc(hidden)]
-pub use pthread_intercept::pthread_create;
+pub use pthread_interpose::pthread_create;

@@ -1,4 +1,4 @@
-//! Intercepts calls to `pthread_create` so that we always install an alternate
+//! Interposes calls to `pthread_create` so that we always install an alternate
 //! signal stack.
 //!
 //! Original code from <https://hg.mozilla.org/mozilla-central/file/3cf2b111807aec49c54bc958771177d33925aace/toolkit/crashreporter/pthread_create_interposer/pthread_create_interposer.cpp>
@@ -21,10 +21,16 @@ struct PthreadCreateParams {
     arg: *mut c_void,
 }
 
+/// Key created at first thread creation so that we can set the thread specific
+/// alternate stack memory as per-thread data that is uninstalled and unmapped
+/// in the `pthread_key` destructor
 static mut THREAD_DESTRUCTOR_KEY: libc::pthread_key_t = 0;
 
 #[cfg(target_env = "musl")]
 extern "C" {
+    /// This is the weak alias for `pthread_create`. We declare this so we can
+    /// use its address when targeting musl, as we can't lookup the actual
+    /// `pthread_create` symbol at runtime since we've interposed it.
     pub fn __pthread_create(
         thread: *mut libc::pthread_t,
         attr: *const libc::pthread_attr_t,
@@ -36,6 +42,12 @@ extern "C" {
 /// This interposer replaces `pthread_create` so that we can inject an
 /// alternate signal stack in every new thread, regardless of whether the
 /// thread is created directly in Rust's std library or not
+///
+/// # Errors
+///
+/// This will fail if we're unable to retrieve the address of the actual
+/// libc `pthread_create`, or if we do find the address but it's actually the
+/// address of this interpose function which would result in infinte recursion
 #[no_mangle]
 pub extern "C" fn pthread_create(
     thread: *mut libc::pthread_t,
@@ -47,6 +59,8 @@ pub extern "C" fn pthread_create(
     static mut REAL_PTHREAD_CREATE: Option<pthread_create_t> = None;
     static INIT: parking_lot::Once = parking_lot::Once::new();
 
+    // Finds the real pthread_create and specifies the pthread_key that is
+    // used to uninstall and unmap the alternate stack
     INIT.call_once(|| unsafe {
         let ptr;
 
@@ -101,6 +115,11 @@ const fn get_stack_size() -> usize {
     }
 }
 
+/// The size of the alternate stack that is mapped for every thread.
+///
+/// This has a minimum size of 16k, which might seem a bit large, but this
+/// memory will only ever be committed in case we actually get a stack overflow,
+/// which is (hopefully) exceedingly rare
 const SIG_STACK_SIZE: usize = get_stack_size();
 
 /// This is the replacment function for the user's thread entry, it installs
@@ -128,6 +147,11 @@ unsafe extern "C" fn set_alt_signal_stack_and_start(params: *mut c_void) -> *mut
 ///
 /// Returns a pointer to the memory area we mapped to store the stack only if it
 /// was installed successfully, otherwise returns `null`.
+///
+/// # Errors
+///
+/// If we're able to map memory, but unable to install the alternate stack, we
+/// expect that we can unmap the memory
 unsafe fn install_sig_alt_stack() -> *mut libc::c_void {
     let alt_stack_mem = libc::mmap(
         ptr::null_mut(),
@@ -162,6 +186,11 @@ unsafe fn install_sig_alt_stack() -> *mut libc::c_void {
 }
 
 /// Uninstall the alternate signal stack and unmaps the memory.
+///
+/// # Errors
+///
+/// If the alternate stack is not `null`, it is expected that uninstalling and
+/// unmapping will not error
 #[no_mangle]
 unsafe extern "C" fn uninstall_sig_alt_stack(alt_stack_mem: *mut libc::c_void) {
     if alt_stack_mem.is_null() {
