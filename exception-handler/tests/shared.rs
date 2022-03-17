@@ -4,9 +4,9 @@ use std::{mem, sync::Arc};
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub fn handles_signal(signal: Signal, raiser: impl Fn()) {
-    // the setjmp crate is outdated and uses a convoluted build script backed
-    // by bindgen/clang-sys which are extremely outdated, so we just do them
-    // here
+    // the setjmp crate uses a convoluted build script backed by bindgen/clang-sys
+    // which are extremely outdated, so we just do them here, and libc just doesn't
+    // support them all since they're kind of terrible...but useful
     #[repr(C)]
     struct JmpBuf {
         __jmp_buf: [i32; 1],
