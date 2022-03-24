@@ -5,7 +5,7 @@ use clap::Parser;
 #[derive(Parser)]
 struct Command {
     /// The unique identifier for the socket connection and the minidump file
-    /// that should be produced when this clietn
+    /// that should be produced when this client crashes
     #[clap(long)]
     id: String,
     /// The signal/exception to raise
