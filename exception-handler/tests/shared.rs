@@ -107,6 +107,7 @@ pub enum ExceptionCode {
 pub fn handles_exception(ec: ExceptionCode, raiser: impl Fn()) {
     /// Not available in libc for obvious reasons, definitions in setjmp.h
     #[repr(C)]
+    #[cfg_attr(target_arch = "x86_64", repr(align(16)))]
     struct JmpBuf {
         #[cfg(target_arch = "x86")]
         __jmp_buf: [i32; 16],
