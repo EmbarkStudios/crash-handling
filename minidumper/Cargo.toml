@@ -6,24 +6,38 @@ edition = "2021"
 [dependencies]
 # Nicer cfg handling
 cfg-if = "1.0"
-crash-context = "0.0.2"
+crash-context = { version = "0.0.2", path = "../crash-context" }
 libc = "0.2"
 # Basic log emitting
 log = "0.4"
 # Minidump writing (currently linux/android only)
 minidump-writer = "0.1"
+# Event loop
+mio = "0.8"
+# Nicer locking primitives
+parking_lot = "0.12"
 # Nicer error creation
 thiserror = "1.0"
 
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
-# Event loop for uds
-mio = "0.7"
 # Improved Unix domain socket support, includes features that are not available in std
-uds = { version = "0.2.6", features = ["mio_07"] }
+uds = { git = "https://github.com/EmbarkStudios/uds", branch = "master", features = [
+    "mio_08",
+] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-# Named pipe support, though Windows 10+ does support Unix domain sockets
-named_pipe = "0.4"
+# Event loop + name pipes
+mio = { version = "0.8", features = ["os-ext"] }
+# Nicer binary interop
+scroll = "0.11"
+
+[target.'cfg(target_os = "windows")'.dependencies.windows-sys]
+version = "0.34" # Matches the version used in mio/miow
+features = [
+    "Win32_Foundation",               # Core types eg HANDLE
+    "Win32_System_Diagnostics_Debug", # ReadProcessMemory, WriteMinidump
+    "Win32_System_Threading",         # *Event functions, OpenProcess
+]
 
 [dev-dependencies]
 # catching crashes to request minidumps
