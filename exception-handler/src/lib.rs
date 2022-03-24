@@ -104,6 +104,10 @@ macro_rules! debug_print {
 #[inline]
 pub fn write_stderr(s: &'static str) {
     unsafe {
+        #[cfg(target_os = "windows")]
+        libc::write(2, s.as_ptr().cast(), s.len() as u32);
+
+        #[cfg(not(target_os = "windows"))]
         libc::write(2, s.as_ptr().cast(), s.len());
     }
 }
@@ -114,13 +118,63 @@ cfg_if::cfg_if! {
     }
 }
 
+pub use crash_context::CrashContext;
+
+/// User implemented trait for handling a signal that has ocurred.
+///
+/// # Safety
+///
+/// This trait is marked unsafe as  care needs to be taken when implementing it
+/// due to running in a compromised context. Notably, only a small subset of
+/// libc functions are [async signal safe](https://man7.org/linux/man-pages/man7/signal-safety.7.html)
+/// and calling non-safe ones can have undefined behavior, including such common
+/// ones as `malloc` (if using a multi-threaded allocator). In general, it is
+/// advised to do as _little_ as possible when handling a signal, with more
+/// complicated or dangerous (in a compromised context) code being intialized
+/// before the signal handler is installed, or hoisted out to an entirely
+/// different sub-process.
+pub unsafe trait CrashEvent: Send + Sync {
+    /// Method invoked when a crash occurs. Returning true indicates your handler
+    /// has processed the crash and that no further handlers should run.
+    fn on_crash(&self, context: &CrashContext) -> bool;
+}
+
+/// Creates a [`CrashEvent`] using the supplied closure as the implementation.
+///
+/// # Safety
+///
+/// See the [`CrashEvent`] Safety section for information on why this is `unsafe`.
+#[inline]
+pub unsafe fn make_crash_event<F>(closure: F) -> Box<dyn CrashEvent>
+where
+    F: Send + Sync + Fn(&CrashContext) -> bool + 'static,
+{
+    struct Wrapper<F> {
+        inner: F,
+    }
+
+    unsafe impl<F> CrashEvent for Wrapper<F>
+    where
+        F: Send + Sync + Fn(&CrashContext) -> bool,
+    {
+        fn on_crash(&self, context: &CrashContext) -> bool {
+            (self.inner)(context)
+        }
+    }
+
+    Box::new(Wrapper { inner: closure })
+}
+
 cfg_if::cfg_if! {
     if #[cfg(any(target_os = "linux", target_os = "android"))] {
         #[macro_use]
         pub mod linux;
 
-        pub use linux::{ExceptionHandler, Signal, make_crash_event};
+        pub use linux::{ExceptionHandler, Signal};
+    } else if #[cfg(target_os = "windows")] {
+        #[macro_use]
+        pub mod windows;
+
+        pub use windows::{ExceptionHandler};
     }
 }
-
-pub use crash_context::CrashContext;

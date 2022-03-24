@@ -333,12 +333,12 @@ static CRASH_CONTEXT: parking_lot::Mutex<mem::MaybeUninit<crash_context::CrashCo
     parking_lot::const_mutex(mem::MaybeUninit::uninit());
 
 pub(crate) struct HandlerInner {
-    handler: Box<dyn super::CrashEvent>,
+    handler: Box<dyn crate::CrashEvent>,
 }
 
 impl HandlerInner {
     #[inline]
-    pub(crate) fn new(handler: Box<dyn super::CrashEvent>) -> Self {
+    pub(crate) fn new(handler: Box<dyn crate::CrashEvent>) -> Self {
         Self { handler }
     }
 
