@@ -9,4 +9,13 @@ pub enum Error {
     #[cfg(any(target_os = "linux", target_os = "android"))]
     #[error(transparent)]
     Writer(#[from] minidump_writer::errors::WriterError),
+    #[cfg(target_os = "windows")]
+    #[error(transparent)]
+    Writer(#[from] minidump_writer::errors::Error),
+    #[cfg(target_os = "windows")]
+    #[error("protocol error, expected tag '{expected}' but received '{received}'")]
+    Protocol { expected: u32, received: u32 },
+    #[cfg(target_os = "windows")]
+    #[error(transparent)]
+    Scroll(#[from] scroll::Error),
 }

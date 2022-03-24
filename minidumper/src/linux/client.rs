@@ -1,4 +1,4 @@
-use crate::Error;
+use crate::{write_stderr, Error};
 use std::io::IoSlice;
 
 pub struct Client {
@@ -38,14 +38,6 @@ impl Client {
 
         let header_buf = header.as_bytes();
 
-        #[inline]
-        #[allow(unsafe_code)]
-        pub fn write_stderr(s: &'static str) {
-            unsafe {
-                libc::write(2, s.as_ptr().cast(), s.len());
-            }
-        }
-
         if debug_print {
             write_stderr("requesting minidump...\n");
         }
@@ -66,15 +58,11 @@ impl Client {
     }
 
     /// Sends a message to the server.
-    pub fn send_message(
-        &self,
-        kind: std::num::NonZeroU32,
-        buf: impl AsRef<[u8]>,
-    ) -> Result<(), Error> {
+    pub fn send_message(&self, kind: u32, buf: impl AsRef<[u8]>) -> Result<(), Error> {
         let buffer = buf.as_ref();
 
         let header = crate::Header {
-            kind: kind.get(),
+            kind: kind + 1, // 0 is reserved for requesting a dump
             size: buffer.len() as u32,
         };
 

@@ -23,7 +23,7 @@ impl ClientConn {
         use std::io::IoSliceMut;
 
         let mut hdr_buf = [0u8; std::mem::size_of::<crate::Header>()];
-        let (len, _trunc) = self.socket.peek(&mut hdr_buf).ok()?;
+        let len = self.socket.peek(&mut hdr_buf).ok()?;
 
         if len == 0 {
             return None;
@@ -128,7 +128,10 @@ impl Server {
                             }
                         }
                         Some((kind, buffer)) => {
-                            handler.on_message(kind, buffer);
+                            handler.on_message(
+                                kind - 1, /* give the user back the original code they specified */
+                                buffer,
+                            );
 
                             if let Err(e) = clients[pos].socket.send(&[1]) {
                                 log::error!("failed to send ack: {}", e);
