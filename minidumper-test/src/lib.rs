@@ -171,8 +171,8 @@ pub fn run_client(id: &str, signal: Signal, use_thread: bool) {
     }
 
     cmd_path.push("crash-client");
-    if !env::consts::EXE_SUFFIX.is_empty() {
-        cmd_path.set_extension(env::consts::EXE_SUFFIX);
+    if cfg!(target_os = "windows") {
+        cmd_path.set_extension("exe");
     }
 
     println!("running client: {}", cmd_path.display());
