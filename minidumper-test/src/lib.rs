@@ -175,6 +175,7 @@ pub fn run_client(id: &str, signal: Signal, use_thread: bool) {
         cmd_path.set_extension(env::consts::EXE_SUFFIX);
     }
 
+    println!("running client: {}", cmd_path.display());
     let mut cmd = std::process::Command::new(&cmd_path);
     cmd.stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
