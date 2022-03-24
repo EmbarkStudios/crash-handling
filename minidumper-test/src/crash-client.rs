@@ -83,6 +83,7 @@ fn real_main() -> anyhow::Result<()> {
         Signal::Abort => {
             sadness_generator::raise_abort();
         }
+        #[cfg(unix)]
         Signal::Bus => {
             sadness_generator::raise_bus(bf.to_str().unwrap());
         }
@@ -97,6 +98,14 @@ fn real_main() -> anyhow::Result<()> {
         }
         Signal::StackOverflowCThread => {
             sadness_generator::raise_stack_overflow_in_non_rust_thread_normal();
+        }
+        #[cfg(windows)]
+        Signal::Purecall => {
+            sadness_generator::raise_purecall();
+        }
+        #[cfg(windows)]
+        Signal::InvalidParameter => {
+            sadness_generator::raise_invalid_parameter();
         }
     };
 

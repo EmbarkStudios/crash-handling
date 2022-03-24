@@ -14,6 +14,7 @@ pub fn run_test(signal: Signal, counter: u32, use_thread: bool) -> Vec<u8> {
 #[derive(clap::ArgEnum, Clone, Copy)]
 pub enum Signal {
     Abort,
+    #[cfg(unix)]
     Bus,
     Fpe,
     Illegal,
@@ -21,6 +22,10 @@ pub enum Signal {
     StackOverflow,
     StackOverflowCThread,
     Trap,
+    #[cfg(windows)]
+    Purecall,
+    #[cfg(windows)]
+    InvalidParameter,
 }
 
 use std::fmt;
@@ -28,6 +33,7 @@ impl fmt::Display for Signal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Self::Abort => "abort",
+            #[cfg(unix)]
             Self::Bus => "bus",
             Self::Fpe => "fpe",
             Self::Illegal => "illegal",
@@ -35,6 +41,10 @@ impl fmt::Display for Signal {
             Self::StackOverflow => "stack-overflow",
             Self::StackOverflowCThread => "stack-overflow-c-thread",
             Self::Trap => "trap",
+            #[cfg(windows)]
+            Self::Purecall => "purecall",
+            #[cfg(windows)]
+            Self::InvalidParameter => "invalid-params",
         })
     }
 }
@@ -230,6 +240,8 @@ pub fn get_native_os() -> Os {
     cfg_if::cfg_if! {
         if #[cfg(target_os = "linux")] {
             Os::Linux
+        } else if #[cfg(target_os = "windows")] {
+            Os::Windows
         } else {
             compile_error!("implement me");
         }
@@ -264,55 +276,107 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
 
     let crash_reason = exc.get_crash_reason(native_os, native_cpu);
 
+    macro_rules! verify {
+        ($expected:pat) => {
+            assert!(matches!(crash_reason, $expected));
+        };
+    }
+
     match native_os {
         Os::Linux => match signal {
             Signal::Abort => {
-                assert!(matches!(
-                    crash_reason,
-                    CrashReason::LinuxGeneral(format::ExceptionCodeLinux::SIGABRT, _)
+                verify!(CrashReason::LinuxGeneral(
+                    format::ExceptionCodeLinux::SIGABRT,
+                    _
                 ));
             }
+            #[cfg(unix)]
             Signal::Bus => {
-                assert!(matches!(
-                    crash_reason,
-                    CrashReason::LinuxSigbus(format::ExceptionCodeLinuxSigbusKind::BUS_ADRERR)
+                verify!(CrashReason::LinuxSigbus(
+                    format::ExceptionCodeLinuxSigbusKind::BUS_ADRERR
                 ));
             }
             Signal::Fpe => {
-                assert!(matches!(
-                    crash_reason,
-                    CrashReason::LinuxSigfpe(format::ExceptionCodeLinuxSigfpeKind::FPE_INTDIV)
+                verify!(CrashReason::LinuxSigfpe(
+                    format::ExceptionCodeLinuxSigfpeKind::FPE_INTDIV
                 ));
             }
             Signal::Illegal => {
-                assert!(matches!(
-                    crash_reason,
-                    CrashReason::LinuxSigill(format::ExceptionCodeLinuxSigillKind::ILL_ILLOPN)
+                verify!(CrashReason::LinuxSigill(
+                    format::ExceptionCodeLinuxSigillKind::ILL_ILLOPN
                 ));
             }
             Signal::Segv => {
-                assert!(matches!(
-                    crash_reason,
-                    CrashReason::LinuxSigsegv(format::ExceptionCodeLinuxSigsegvKind::SEGV_MAPERR)
+                verify!(CrashReason::LinuxSigsegv(
+                    format::ExceptionCodeLinuxSigsegvKind::SEGV_MAPERR
                 ));
             }
             Signal::StackOverflow | Signal::StackOverflowCThread => {
                 // Not sure if there is a way to work around this, but on Linux it seems that a stack overflow
                 // on the main thread is always reported as a SEGV_MAPERR rather than a SEGV_ACCERR like for
                 // non-main threads, so we just accept either ¯\_(ツ)_/¯
-                assert!(matches!(
-                    crash_reason,
-                    CrashReason::LinuxSigsegv(
-                        format::ExceptionCodeLinuxSigsegvKind::SEGV_ACCERR
-                            | format::ExceptionCodeLinuxSigsegvKind::SEGV_MAPERR
-                    )
+                verify!(CrashReason::LinuxSigsegv(
+                    format::ExceptionCodeLinuxSigsegvKind::SEGV_ACCERR
+                        | format::ExceptionCodeLinuxSigsegvKind::SEGV_MAPERR
                 ));
             }
             Signal::Trap => {
-                assert!(matches!(
-                    crash_reason,
-                    CrashReason::LinuxGeneral(format::ExceptionCodeLinux::SIGTRAP, _)
+                verify!(CrashReason::LinuxGeneral(
+                    format::ExceptionCodeLinux::SIGTRAP,
+                    _
                 ));
+            }
+            #[cfg(windows)]
+            Signal::Purecall | Signal::InvalidParameter => {
+                unreachable!("windows only");
+            }
+        },
+        Os::Windows => match signal {
+            Signal::Abort => {
+                verify!(CrashReason::WindowsGeneral(
+                    format::ExceptionCodeWindows::EXCEPTION_GUARD_PAGE
+                ));
+            }
+            Signal::Fpe => {
+                verify!(CrashReason::WindowsGeneral(
+                    format::ExceptionCodeWindows::EXCEPTION_FLT_DIVIDE_BY_ZERO
+                ));
+            }
+            Signal::Illegal => {
+                verify!(CrashReason::WindowsGeneral(
+                    format::ExceptionCodeWindows::EXCEPTION_ILLEGAL_INSTRUCTION
+                ));
+            }
+            Signal::Segv => {
+                verify!(CrashReason::WindowsGeneral(
+                    format::ExceptionCodeWindows::EXCEPTION_ACCESS_VIOLATION
+                ));
+            }
+            Signal::StackOverflow | Signal::StackOverflowCThread => {
+                verify!(CrashReason::WindowsGeneral(
+                    format::ExceptionCodeWindows::EXCEPTION_STACK_OVERFLOW
+                ));
+            }
+            Signal::Trap => {
+                verify!(CrashReason::WindowsGeneral(
+                    format::ExceptionCodeWindows::EXCEPTION_BREAKPOINT
+                ));
+            }
+            #[cfg(windows)]
+            Signal::Purecall => {
+                verify!(CrashReason::WindowsGeneral(
+                    format::ExceptionCodeWindows::EXCEPTION_NONCONTINUABLE_EXCEPTION
+                ));
+            }
+            #[cfg(windows)]
+            Signal::InvalidParameter => {
+                verify!(CrashReason::WindowsWinError(
+                    format::WinErrorWindows::ERROR_INVALID_PARAMETER
+                ));
+            }
+            #[cfg(unix)]
+            Signal::Bus => {
+                unreachable!();
             }
         },
         _ => unimplemented!(),
