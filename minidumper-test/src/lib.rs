@@ -13,6 +13,7 @@ pub fn run_test(signal: Signal, counter: u32, use_thread: bool) -> Vec<u8> {
 
 #[derive(clap::ArgEnum, Clone, Copy)]
 pub enum Signal {
+    #[cfg(unix)]
     Abort,
     #[cfg(unix)]
     Bus,
@@ -32,6 +33,7 @@ use std::fmt;
 impl fmt::Display for Signal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
+            #[cfg(unix)]
             Self::Abort => "abort",
             #[cfg(unix)]
             Self::Bus => "bus",
@@ -285,6 +287,7 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
 
     match native_os {
         Os::Linux => match signal {
+            #[cfg(unix)]
             Signal::Abort => {
                 verify!(CrashReason::LinuxGeneral(
                     format::ExceptionCodeLinux::SIGABRT,
@@ -333,14 +336,9 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
             }
         },
         Os::Windows => match signal {
-            Signal::Abort => {
-                verify!(CrashReason::WindowsGeneral(
-                    format::ExceptionCodeWindows::EXCEPTION_GUARD_PAGE
-                ));
-            }
             Signal::Fpe => {
                 verify!(CrashReason::WindowsGeneral(
-                    format::ExceptionCodeWindows::EXCEPTION_FLT_DIVIDE_BY_ZERO
+                    format::ExceptionCodeWindows::EXCEPTION_INT_DIVIDE_BY_ZERO
                 ));
             }
             Signal::Illegal => {
@@ -376,7 +374,7 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                 ));
             }
             #[cfg(unix)]
-            Signal::Bus => {
+            Signal::Bus | Signal::Abort => {
                 unreachable!();
             }
         },

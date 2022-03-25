@@ -80,6 +80,7 @@ fn real_main() -> anyhow::Result<()> {
             // cheat?
             sadness_generator::raise_abort();
         }
+        #[cfg(unix)]
         Signal::Abort => {
             sadness_generator::raise_abort();
         }
