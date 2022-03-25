@@ -166,6 +166,7 @@ pub fn handles_exception(ec: ExceptionCode, raiser: impl Fn()) {
                         }
 
                         // long jump back to before we crashed
+                        debug_print!("long jumping");
                         longjmp(&mut JMP_BUF, 1);
 
                         //true
@@ -176,6 +177,7 @@ pub fn handles_exception(ec: ExceptionCode, raiser: impl Fn()) {
 
             raiser();
         } else {
+            debug_print!("got here?");
             loop {
                 std::thread::yield_now();
 
