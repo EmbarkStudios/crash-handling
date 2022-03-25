@@ -102,6 +102,60 @@ pub enum ExceptionCode {
     Purecall = STATUS_NONCONTINUABLE_EXCEPTION,
 }
 
+std::arch::global_asm! {
+    ".text",
+    ".global ehsetjmp",
+    //".hidden ehsetjmp",
+    //".type ehsetjmp, #function",
+    ".align 4",
+    ".cfi_startproc",
+"ehsetjmp:",
+    "mov %rbx, 8(%rcx)",
+    "mov %rsp, 16(%rcx)",
+    "mov %rbp, 24(%rcx)",
+    "mov %rsi, 32(%rcx)",
+    "mov %rdi, 40(%rcx)",
+    "mov %r12, 48(%rcx)",
+    "mov %r13, 56(%rcx)",
+    "mov %r14, 64(%rcx)",
+    "mov %r15, 72(%rcx)",
+    "pop 80(%rcx)", // rip
+    "push 80(%rcx)",
+
+    "xor %rax, %rax",
+    "ret",
+    ".cfi_endproc",
+    //".size ehsetjmp, . - ehsetjmp",
+    options(att_syntax)
+}
+
+std::arch::global_asm! {
+    ".text",
+    ".global ehlongjmp",
+    //".hidden ehlongjmp",
+    //".type ehlongjmp, #function",
+    ".align 4",
+    ".cfi_startproc",
+"ehlongjmp:",
+    "mov 8(%rcx), %rbx",
+    "mov 16(%rcx), %rsp",
+    "mov 24(%rcx), %rbp",
+    "mov 32(%rcx), %rsi",
+    "mov 40(%rcx), %rdi",
+    "mov 48(%rcx), %r12",
+    "mov 56(%rcx), %r13",
+    "mov 64(%rcx), %r14",
+    "mov 72(%rcx), %r15",
+    "pop %rax",
+    "push 80(%rcx)",
+
+    "mov %rdx, %rax", // return value
+    "ret",
+    ".cfi_endproc",
+    //".size ehlongjmp, . - ehlongjmp",
+    options(att_syntax)
+}
+
 #[cfg(all(target_os = "windows", feature = "jmp"))]
 pub fn handles_exception(ec: ExceptionCode, raiser: impl Fn()) {
     #[cfg(target_arch = "x86_64")]
@@ -130,8 +184,8 @@ pub fn handles_exception(ec: ExceptionCode, raiser: impl Fn()) {
     };
 
     extern "C" {
-        fn setjmp(jb: *mut JmpBuf) -> i32;
-        fn longjmp(jb: *mut JmpBuf, val: i32) -> !;
+        fn ehsetjmp(jb: *mut JmpBuf) -> i32;
+        fn ehlongjmp(jb: *mut JmpBuf, val: i32) -> !;
     }
 
     let got_it = Arc::new((Mutex::new(false), Condvar::new()));
@@ -143,7 +197,7 @@ pub fn handles_exception(ec: ExceptionCode, raiser: impl Fn()) {
         // Set a jump point. The first time we are here we set up the signal
         // handler and raise the signal, the signal handler jumps back to here
         // and then we step over the initial block.
-        let val = setjmp(&mut JMP_BUF);
+        let val = ehsetjmp(&mut JMP_BUF);
 
         if val == 0 {
             let got_it_in_handler = got_it;
@@ -167,7 +221,7 @@ pub fn handles_exception(ec: ExceptionCode, raiser: impl Fn()) {
 
                         // long jump back to before we crashed
                         debug_print!("long jumping");
-                        longjmp(&mut JMP_BUF, 1);
+                        ehlongjmp(&mut JMP_BUF, 1);
 
                         //true
                     },
