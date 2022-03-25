@@ -2,6 +2,26 @@ mod state;
 
 use crate::Error;
 
+use windows_sys::Win32::Foundation as found;
+
+/// Possible exception codes values for the the `exception_code` field
+/// in the crash context.
+///
+/// This is mainly for testing purposes, and is not exhaustive nor really accurate,
+/// as eg. a distinction is made between a floating point divide by zero between
+/// integers and floats.
+#[derive(Copy, Clone)]
+#[repr(i32)]
+pub enum ExceptionCode {
+    Fpe = found::EXCEPTION_INT_DIVIDE_BY_ZERO,
+    Illegal = found::EXCEPTION_ILLEGAL_INSTRUCTION,
+    Segv = found::EXCEPTION_ACCESS_VIOLATION,
+    StackOverflow = found::EXCEPTION_STACK_OVERFLOW,
+    Trap = found::EXCEPTION_BREAKPOINT,
+    InvalidParam = found::STATUS_INVALID_PARAMETER,
+    Purecall = found::STATUS_NONCONTINUABLE_EXCEPTION,
+}
+
 pub struct ExceptionHandler {
     inner: std::sync::Arc<state::HandlerInner>,
 }

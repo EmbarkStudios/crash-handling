@@ -86,191 +86,138 @@ pub fn handles_signal(signal: Signal, raiser: impl Fn()) {
     mem::forget(handler);
 }
 
-#[cfg(target_os = "windows")]
-use windows_sys::Win32::Foundation::*;
+#[cfg(all(target_os = "windows", target_arch = "x86_64"))]
+mod windows {
+    use super::*;
+    pub use exception_handler::ExceptionCode;
 
-#[cfg(target_os = "windows")]
-#[derive(Copy, Clone)]
-#[repr(i32)]
-pub enum ExceptionCode {
-    Fpe = EXCEPTION_INT_DIVIDE_BY_ZERO,
-    Illegal = EXCEPTION_ILLEGAL_INSTRUCTION,
-    Segv = EXCEPTION_ACCESS_VIOLATION,
-    StackOverflow = EXCEPTION_STACK_OVERFLOW,
-    Trap = EXCEPTION_BREAKPOINT,
-    InvalidParam = STATUS_INVALID_PARAMETER,
-    Purecall = STATUS_NONCONTINUABLE_EXCEPTION,
-}
+    std::arch::global_asm! {
+        ".text",
+        ".global ehsetjmp",
+        ".align 4",
+        ".cfi_startproc",
+    "ehsetjmp:",
+        "mov %rbx, 8(%rcx)",
+        "mov %rsp, 16(%rcx)",
+        "mov %rbp, 24(%rcx)",
+        "mov %rsi, 32(%rcx)",
+        "mov %rdi, 40(%rcx)",
+        "mov %r12, 48(%rcx)",
+        "mov %r13, 56(%rcx)",
+        "mov %r14, 64(%rcx)",
+        "mov %r15, 72(%rcx)",
+        "pop 80(%rcx)", // rip
+        "push 80(%rcx)",
 
-std::arch::global_asm! {
-    ".text",
-    ".global ehsetjmp",
-    //".hidden ehsetjmp",
-    //".type ehsetjmp, #function",
-    ".align 4",
-    ".cfi_startproc",
-"ehsetjmp:",
-    "mov %rbx, 8(%rcx)",
-    "mov %rsp, 16(%rcx)",
-    "mov %rbp, 24(%rcx)",
-    "mov %rsi, 32(%rcx)",
-    "mov %rdi, 40(%rcx)",
-    "mov %r12, 48(%rcx)",
-    "mov %r13, 56(%rcx)",
-    "mov %r14, 64(%rcx)",
-    "mov %r15, 72(%rcx)",
-    "pop 80(%rcx)", // rip
-    "push 80(%rcx)",
-
-    "xor %rax, %rax",
-    "ret",
-    ".cfi_endproc",
-    //".size ehsetjmp, . - ehsetjmp",
-    options(att_syntax)
-}
-
-std::arch::global_asm! {
-    ".text",
-    ".global ehlongjmp",
-    //".hidden ehlongjmp",
-    //".type ehlongjmp, #function",
-    ".align 4",
-    ".cfi_startproc",
-"ehlongjmp:",
-    "mov 8(%rcx), %rbx",
-    "mov 16(%rcx), %rsp",
-    "mov 24(%rcx), %rbp",
-    "mov 32(%rcx), %rsi",
-    "mov 40(%rcx), %rdi",
-    "mov 48(%rcx), %r12",
-    "mov 56(%rcx), %r13",
-    "mov 64(%rcx), %r14",
-    "mov 72(%rcx), %r15",
-    "pop %rax",
-    "push 80(%rcx)",
-
-    "mov %rdx, %rax", // return value
-    "ret",
-    ".cfi_endproc",
-    //".size ehlongjmp, . - ehlongjmp",
-    options(att_syntax)
-}
-
-#[cfg(all(target_os = "windows", feature = "jmp"))]
-pub fn handles_exception(ec: ExceptionCode, raiser: impl Fn()) {
-    #[cfg(target_arch = "x86_64")]
-    #[repr(C)]
-    #[derive(Copy, Clone)]
-    #[repr(align(16))]
-    struct LargeFloat {
-        _inner: [u64; 2],
+        "xor %rax, %rax",
+        "ret",
+        ".cfi_endproc",
+        options(att_syntax)
     }
 
-    /// Not available in libc for obvious reasons, definitions in setjmp.h
-    #[repr(C)]
-    struct JmpBuf {
-        #[cfg(target_arch = "x86")]
-        __jmp_buf: [i32; 16],
-        #[cfg(target_arch = "x86_64")]
-        __jmp_buf: [LargeFloat; 16],
-        #[cfg(target_arch = "arm")]
-        __jmp_buf: [i32; 28],
-        #[cfg(target_arch = "aarch64")]
-        __jmp_buf: [u64; 24],
+    std::arch::global_asm! {
+        ".text",
+        ".global ehlongjmp",
+        ".align 4",
+        ".cfi_startproc",
+    "ehlongjmp:",
+        "mov 8(%rcx), %rbx",
+        "mov 16(%rcx), %rsp",
+        "mov 24(%rcx), %rbp",
+        "mov 32(%rcx), %rsi",
+        "mov 40(%rcx), %rdi",
+        "mov 48(%rcx), %r12",
+        "mov 56(%rcx), %r13",
+        "mov 64(%rcx), %r14",
+        "mov 72(%rcx), %r15",
+        "pop %rax",
+        "push 80(%rcx)",
+
+        "mov %rdx, %rax", // return value
+        "ret",
+        ".cfi_endproc",
+        options(att_syntax)
     }
 
-    static mut JMP_BUF: JmpBuf = JmpBuf {
-        __jmp_buf: [LargeFloat { _inner: [0; 2] }; 16],
-    };
+    pub fn handles_exception(ec: ExceptionCode, raiser: impl Fn()) {
+        /// Not available in libc for obvious reasons, definitions in setjmp.h
+        #[repr(C)]
+        struct JmpBuf {
+            __jmp_buf: [u128; 16],
+        }
 
-    extern "C" {
-        fn ehsetjmp(jb: *mut JmpBuf) -> i32;
-        fn ehlongjmp(jb: *mut JmpBuf, val: i32) -> !;
-    }
+        #[allow(improper_ctypes)] // u128 is actually ok on x86_64 :)
+        extern "C" {
+            fn ehsetjmp(jb: *mut JmpBuf) -> i32;
+            fn ehlongjmp(jb: *mut JmpBuf, val: i32) -> !;
+        }
 
-    let got_it = Arc::new((Mutex::new(false), Condvar::new()));
-    let mut handler = None;
+        let got_it = Arc::new((Mutex::new(false), Condvar::new()));
+        let mut handler = None;
 
-    unsafe {
-        //let jmpbuf = Arc::new(Mutex::new(mem::MaybeUninit::uninit()));
+        unsafe {
+            let jmpbuf = Arc::new(Mutex::new(mem::MaybeUninit::uninit()));
 
-        // Set a jump point. The first time we are here we set up the signal
-        // handler and raise the signal, the signal handler jumps back to here
-        // and then we step over the initial block.
-        let val = ehsetjmp(&mut JMP_BUF);
+            // Set a jump point. The first time we are here we set up the signal
+            // handler and raise the signal, the signal handler jumps back to here
+            // and then we step over the initial block.
+            let val = ehsetjmp(jmpbuf.lock().as_mut_ptr());
 
-        if val == 0 {
-            let got_it_in_handler = got_it;
+            if val == 0 {
+                let got_it_in_handler = got_it;
 
-            handler = Some(
-                exception_handler::ExceptionHandler::attach(exception_handler::make_crash_event(
-                    move |cc: &exception_handler::CrashContext| {
-                        assert_eq!(
-                            cc.exception_code, ec as i32,
-                            "0x{:x} != 0x{:x}",
-                            cc.exception_code, ec as i32
-                        );
+                handler = Some(
+                    exception_handler::ExceptionHandler::attach(
+                        exception_handler::make_crash_event(
+                            move |cc: &exception_handler::CrashContext| {
+                                assert_eq!(
+                                    cc.exception_code, ec as i32,
+                                    "0x{:x} != 0x{:x}",
+                                    cc.exception_code, ec as i32
+                                );
 
-                        debug_print!("handling signal");
-                        {
-                            let (lock, cvar) = &*got_it_in_handler;
-                            let mut handled = lock.lock();
-                            *handled = true;
-                            cvar.notify_one();
-                        }
+                                debug_print!("handling signal");
+                                {
+                                    let (lock, cvar) = &*got_it_in_handler;
+                                    let mut handled = lock.lock();
+                                    *handled = true;
+                                    cvar.notify_one();
+                                }
 
-                        // long jump back to before we crashed
-                        debug_print!("long jumping");
-                        ehlongjmp(&mut JMP_BUF, 1);
+                                // long jump back to before we crashed
+                                debug_print!("long jumping");
+                                ehlongjmp(jmpbuf.lock().as_mut_ptr(), 1);
 
-                        //true
-                    },
-                ))
-                .unwrap(),
-            );
+                                //true
+                            },
+                        ),
+                    )
+                    .unwrap(),
+                );
 
-            raiser();
-        } else {
-            debug_print!("got here?");
-            loop {
-                std::thread::yield_now();
+                raiser();
+            } else {
+                debug_print!("got here?");
+                loop {
+                    std::thread::yield_now();
 
-                let (lock, _cvar) = &*got_it;
-                let signaled = lock.lock();
-                if *signaled {
-                    debug_print!("signal handled");
-                    break;
+                    let (lock, _cvar) = &*got_it;
+                    let signaled = lock.lock();
+                    if *signaled {
+                        debug_print!("signal handled");
+                        break;
+                    }
                 }
             }
         }
-    }
 
-    // We can't actually clean up the handler since we long jump out of the signal
-    // handler, which leaves mutexes still locked since the stack is not unwound
-    // so if we don't just forget the hander we'll block infinitely waiting
-    // on mutex locks that will never be acquired
-    mem::forget(handler);
-}
-
-#[cfg(all(target_os = "windows", not(feature = "jmp")))]
-pub fn handles_exception(ec: ExceptionCode, raiser: impl Fn()) {
-    unsafe {
-        let eh = exception_handler::ExceptionHandler::attach(exception_handler::make_crash_event(
-            move |cc: &exception_handler::CrashContext| {
-                assert_eq!(
-                    cc.exception_code, ec as i32,
-                    "0x{:x} != 0x{:x}",
-                    cc.exception_code, ec as i32
-                );
-
-                std::process::exit(0);
-            },
-        ))
-        .unwrap();
-
-        raiser();
-
-        std::thread::sleep(std::time::Duration::from_millis(1000));
-        panic!("failed to exit process from exception handler");
+        // We can't actually clean up the handler since we long jump out of the signal
+        // handler, which leaves mutexes still locked since the stack is not unwound
+        // so if we don't just forget the hander we'll block infinitely waiting
+        // on mutex locks that will never be acquired
+        mem::forget(handler);
     }
 }
+
+#[cfg(target_os = "windows")]
+pub use windows::*;

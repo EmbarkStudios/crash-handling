@@ -175,6 +175,6 @@ cfg_if::cfg_if! {
         #[macro_use]
         pub mod windows;
 
-        pub use windows::{ExceptionHandler};
+        pub use windows::{ExceptionHandler, ExceptionCode};
     }
 }
