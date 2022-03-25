@@ -228,5 +228,9 @@ pub fn raise_purecall() {
 /// [`SadnessFlavors::InvalidParameter`]
 #[cfg(target_os = "windows")]
 pub fn raise_invalid_parameter() {
-    unsafe { libc::fileno(std::ptr::null_mut()) };
+    extern "C" {
+        fn _mbscmp(s1: *const u8, s2: *const u8) -> i32;
+    }
+
+    unsafe { _mbscmp(std::ptr::null(), std::ptr::null()) };
 }

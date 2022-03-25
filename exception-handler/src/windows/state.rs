@@ -20,28 +20,29 @@ use windows_sys::Win32::{
 };
 
 /// MSVCRT has its own error handling function for invalid parameters to crt functions
-/// (eg printf) that instead of returning error codes from the function itself,
+/// (eg printf) which instead of returning error codes from the function itself,
 /// like one would want, call a handler if specified, or, worse, throw up a dialog
 /// if in a GUI!
 ///
-/// https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/set-invalid-parameter-handler-set-thread-local-invalid-parameter-handler?view=msvc-170
+/// [Invalid Parameter Handler](https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/set-invalid-parameter-handler-set-thread-local-invalid-parameter-handler?view=msvc-170)
 ///
 /// It also has a separate error handling function when calling pure virtuals
 /// because why not?
 ///
-/// https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/get-purecall-handler-set-purecall-handler?view=msvc-170
+/// [Purecall Handler](https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/get-purecall-handler-set-purecall-handler?view=msvc-170)
 extern "C" {
     fn _set_invalid_parameter_handler(
         new_handler: Option<_invalid_parameter_handler>,
     ) -> Option<_invalid_parameter_handler>;
     fn _set_purecall_handler(new_handler: Option<_purecall_handler>) -> Option<_purecall_handler>;
-    fn _invalid_parameter(
-        expression: *const u16,
-        function: *const u16,
-        file: *const u16,
-        line: u32,
-        reserved: usize,
-    );
+    // This is only available in the debug CRT
+    // fn _invalid_parameter(
+    //     expression: *const u16,
+    //     function: *const u16,
+    //     file: *const u16,
+    //     line: u32,
+    //     reserved: usize,
+    // );
     fn _invalid_parameter_noinfo();
 }
 
@@ -81,6 +82,8 @@ impl HandlerInner {
         // to install, but for now we just install all of them
         unsafe {
             let previous_filter = SetUnhandledExceptionFilter(Some(handle_exception));
+
+            debug_print!("setting...");
             let previous_iph = _set_invalid_parameter_handler(Some(handle_invalid_parameter));
             let previous_pch = _set_purecall_handler(Some(handle_pure_virtual_call));
 
@@ -172,6 +175,8 @@ unsafe extern "system" fn handle_exception(except_info: *const EXCEPTION_POINTER
     let lock = HANDLER_STACK.lock();
     let current_handler = AutoHandler::new(lock);
 
+    debug_print!("oh no");
+
     // Ignore EXCEPTION_BREAKPOINT and EXCEPTION_SINGLE_STEP exceptions.  This
     // logic will short-circuit before calling WriteMinidumpOnHandlerThread,
     // allowing something else to handle the breakpoint without incurring the
@@ -245,11 +250,17 @@ unsafe extern "C" fn handle_invalid_parameter(
     line: u32,
     reserved: usize,
 ) {
+    debug_print!("yes?");
+
     let lock = HANDLER_STACK.lock();
     let current_handler = AutoHandler::new(lock);
 
+    debug_print!("excellent");
+
     let mut assertion: crash_context::RawAssertionInfo = std::mem::zeroed();
     assertion.kind = MD_ASSERTION_INFO_TYPE_INVALID_PARAMETER;
+
+    debug_print!("doing stuff");
 
     // Make up an exception record for the current thread and CPU context
     // to make it possible for the crash processor to classify these
@@ -273,6 +284,8 @@ unsafe extern "C" fn handle_invalid_parameter(
     exception_record.ExceptionInformation[0] = assertion.expression.as_ptr() as usize;
     exception_record.ExceptionInformation[1] = assertion.file.as_ptr() as usize;
     exception_record.ExceptionInformation[2] = assertion.line as usize;
+
+    debug_print!("calling...");
 
     if current_handler.user_handler.on_crash(&crate::CrashContext {
         exception_pointers: &exception_ptrs,
