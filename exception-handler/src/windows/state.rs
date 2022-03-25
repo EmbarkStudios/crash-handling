@@ -249,7 +249,7 @@ unsafe extern "C" fn handle_invalid_parameter(
     let mut exception_context: CONTEXT = std::mem::zeroed();
 
     debug_print!("capturing context...");
-    //RtlCaptureContext(&mut exception_context);
+    RtlCaptureContext(&mut exception_context);
     debug_print!("captured...");
 
     let exception_ptrs = EXCEPTION_POINTERS {
