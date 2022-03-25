@@ -91,27 +91,31 @@ impl ExceptionHandler {
         }
     }
 
-    // Sends the specified user signal.
-    // pub fn simulate_signal(&self, signal: Signal) -> bool {
-    //     // Normally this would be an unsafe function, since this unsafe encompasses
-    //     // the entirety of the body, however the user is really not required to
-    //     // uphold any guarantees on their end, so no real need to declare the
-    //     // function itself unsafe.
-    //     unsafe {
-    //         let mut siginfo: libc::signalfd_siginfo = std::mem::zeroed();
-    //         siginfo.ssi_code = state::SI_USER;
-    //         siginfo.ssi_pid = std::process::id();
+    // Sends the specified user exception
+    pub fn simulate_exception(&self, exception_code: Option<i32>) -> bool {
+        // Normally this would be an unsafe function, since this unsafe encompasses
+        // the entirety of the body, however the user is really not required to
+        // uphold any guarantees on their end, so no real need to declare the
+        // function itself unsafe.
+        unsafe {
+            let mut exception_record: state::EXCEPTION_RECORD = std::mem::zeroed();
+            let mut exception_context = std::mem::MaybeUninit::uninit();
 
-    //         let mut context = std::mem::zeroed();
-    //         crash_context::crash_context_getcontext(&mut context);
+            state::RtlCaptureContext(exception_context.as_mut_ptr());
 
-    //         self.inner.handle_signal(
-    //             signal as i32,
-    //             &mut *(&mut siginfo as *mut libc::signalfd_siginfo).cast::<libc::siginfo_t>(),
-    //             &mut *(&mut context as *mut crash_context::ucontext_t).cast::<libc::c_void>(),
-    //         )
-    //     }
-    // }
+            let mut exception_context = exception_context.assume_init();
+
+            let exception_ptrs = state::EXCEPTION_POINTERS {
+                ExceptionRecord: &mut exception_record,
+                ContextRecord: &mut exception_context,
+            };
+
+            exception_record.ExceptionCode =
+                exception_code.unwrap_or(state::STATUS_NONCONTINUABLE_EXCEPTION);
+
+            state::handle_exception(&exception_ptrs) == state::EXCEPTION_EXECUTE_HANDLER
+        }
+    }
 }
 
 impl Drop for ExceptionHandler {

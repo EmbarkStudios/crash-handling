@@ -5,15 +5,15 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc, Weak,
 };
-use windows_sys::Win32::{
+pub(super) use windows_sys::Win32::{
     Foundation::{
         DBG_PRINTEXCEPTION_C, DBG_PRINTEXCEPTION_WIDE_C, EXCEPTION_BREAKPOINT,
         EXCEPTION_SINGLE_STEP, STATUS_INVALID_PARAMETER, STATUS_NONCONTINUABLE_EXCEPTION,
     },
     System::{
         Diagnostics::Debug::{
-            RtlCaptureContext, SetUnhandledExceptionFilter, CONTEXT, EXCEPTION_POINTERS,
-            EXCEPTION_RECORD, LPTOP_LEVEL_EXCEPTION_FILTER,
+            RtlCaptureContext, SetUnhandledExceptionFilter, EXCEPTION_POINTERS, EXCEPTION_RECORD,
+            LPTOP_LEVEL_EXCEPTION_FILTER,
         },
         Threading::GetCurrentThreadId,
     },
@@ -165,11 +165,13 @@ const EXCEPTION_CONTINUE_SEARCH: i32 = 0;
 /// Continue execution at the point of the exception.
 const EXCEPTION_CONTINUE_EXECUTION: i32 = -1;
 /// Enter the exception handler.
-const EXCEPTION_EXECUTE_HANDLER: i32 = 1;
+pub(super) const EXCEPTION_EXECUTE_HANDLER: i32 = 1;
 
 /// Called on the exception thread when an unhandled exception occurs.
 /// Signals the exception handler thread to handle the exception.
-unsafe extern "system" fn handle_exception(except_info: *const EXCEPTION_POINTERS) -> i32 {
+pub(super) unsafe extern "system" fn handle_exception(
+    except_info: *const EXCEPTION_POINTERS,
+) -> i32 {
     let lock = HANDLER_STACK.lock();
     let current_handler = AutoHandler::new(lock);
 
