@@ -348,7 +348,7 @@ unsafe extern "C" fn handle_pure_virtual_call() {
         ContextRecord: &mut exception_context,
     };
 
-    RtlCaptureContext(&mut exception_context);
+    //RtlCaptureContext(&mut exception_context);
 
     exception_record.ExceptionCode = STATUS_NONCONTINUABLE_EXCEPTION;
 
