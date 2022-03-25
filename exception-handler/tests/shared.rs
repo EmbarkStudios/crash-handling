@@ -91,6 +91,7 @@ mod windows {
     use super::*;
     pub use exception_handler::ExceptionCode;
 
+    // Original code from: https://github.com/Snaipe/BoxFort/blob/master/src/asm/setjmp-x86_64.asm
     std::arch::global_asm! {
         ".text",
         ".global ehsetjmp",
@@ -146,6 +147,8 @@ mod windows {
             __jmp_buf: [u128; 16],
         }
 
+        // Note that we use our own set/longjmp functions here because the
+        // MSVCRT versions actually unwind the stack :p
         #[allow(improper_ctypes)] // u128 is actually ok on x86_64 :)
         extern "C" {
             fn ehsetjmp(jb: *mut JmpBuf) -> i32;
@@ -197,7 +200,6 @@ mod windows {
 
                 raiser();
             } else {
-                debug_print!("got here?");
                 loop {
                     std::thread::yield_now();
 
