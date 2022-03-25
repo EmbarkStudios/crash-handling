@@ -246,11 +246,13 @@ unsafe extern "C" fn handle_invalid_parameter(
     // as do regular crashes, and to make it humane for developers to
     // analyze them.
     let mut exception_record: EXCEPTION_RECORD = std::mem::zeroed();
-    let mut exception_context: CONTEXT = std::mem::zeroed();
+    let mut exception_context = std::mem::MaybeUninit::uninit();
 
     debug_print!("capturing context...");
-    RtlCaptureContext(&mut exception_context);
+    RtlCaptureContext(exception_context.as_mut_ptr());
     debug_print!("captured...");
+
+    let mut exception_context = exception_context.assume_init();
 
     let exception_ptrs = EXCEPTION_POINTERS {
         ExceptionRecord: &mut exception_record,
