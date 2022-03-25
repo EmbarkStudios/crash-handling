@@ -15,6 +15,7 @@ default = []
 # If enabled, will log out information when a signal is raised/exception thrown
 # but logged in a manner that is safe.
 debug-print = []
+jmp = []
 
 [dependencies]
 # Nicer handling of complex cfg expressions

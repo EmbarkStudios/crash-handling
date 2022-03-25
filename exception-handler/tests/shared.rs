@@ -102,45 +102,98 @@ pub enum ExceptionCode {
     Purecall = STATUS_NONCONTINUABLE_EXCEPTION,
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(all(target_os = "windows", feature = "jmp"))]
 pub fn handles_exception(ec: ExceptionCode, raiser: impl Fn()) {
-    // #[repr(C)]
-    // #[repr(align(16))]
-    // struct LargeFloat {
-    //     _inner: [u64; 2],
-    // }
+    #[cfg(target_arch = "x86_64")]
+    #[repr(C)]
+    #[repr(align(16))]
+    struct LargeFloat {
+        _inner: [u64; 2],
+    }
 
-    // /// Not available in libc for obvious reasons, definitions in setjmp.h
-    // #[repr(C)]
-    // struct JmpBuf {
-    //     #[cfg(target_arch = "x86")]
-    //     __jmp_buf: [i32; 16],
-    //     #[cfg(target_arch = "x86_64")]
-    //     __jmp_buf: [LargeFloat; 16],
-    //     #[cfg(target_arch = "arm")]
-    //     __jmp_buf: [i32; 28],
-    //     #[cfg(target_arch = "aarch64")]
-    //     __jmp_buf: [u64; 24],
-    // }
+    /// Not available in libc for obvious reasons, definitions in setjmp.h
+    #[repr(C)]
+    struct JmpBuf {
+        #[cfg(target_arch = "x86")]
+        __jmp_buf: [i32; 16],
+        #[cfg(target_arch = "x86_64")]
+        __jmp_buf: [LargeFloat; 16],
+        #[cfg(target_arch = "arm")]
+        __jmp_buf: [i32; 28],
+        #[cfg(target_arch = "aarch64")]
+        __jmp_buf: [u64; 24],
+    }
 
-    // // This warning is actually not relevant for u128 on x86_64
-    // #[cfg_attr(target_arch = "x86_64", allow(improper_ctypes))]
-    // extern "C" {
-    //     fn setjmp(jb: *mut JmpBuf) -> i32;
-    //     fn longjmp(jb: *mut JmpBuf, val: i32) -> !;
-    // }
+    extern "C" {
+        fn setjmp(jb: *mut JmpBuf) -> i32;
+        fn longjmp(jb: *mut JmpBuf, val: i32) -> !;
+    }
 
-    // let got_it = Arc::new((Mutex::new(false), Condvar::new()));
-    // let mut handler = None;
+    let got_it = Arc::new((Mutex::new(false), Condvar::new()));
+    let mut handler = None;
 
     unsafe {
-        //let jmpbuf = Arc::new(Mutex::new(mem::MaybeUninit::zeroed()));
+        let jmpbuf = Arc::new(Mutex::new(mem::MaybeUninit::zeroed()));
 
         // Set a jump point. The first time we are here we set up the signal
         // handler and raise the signal, the signal handler jumps back to here
         // and then we step over the initial block.
-        //let val = setjmp(jmpbuf.lock().as_mut_ptr());
+        let val = setjmp(jmpbuf.lock().as_mut_ptr());
 
+        if val == 0 {
+            let got_it_in_handler = got_it;
+
+            handler = Some(
+                exception_handler::ExceptionHandler::attach(exception_handler::make_crash_event(
+                    move |cc: &exception_handler::CrashContext| {
+                        assert_eq!(
+                            cc.exception_code, ec as i32,
+                            "0x{:x} != 0x{:x}",
+                            cc.exception_code, ec as i32
+                        );
+
+                        debug_print!("handling signal");
+                        {
+                            let (lock, cvar) = &*got_it_in_handler;
+                            let mut handled = lock.lock();
+                            *handled = true;
+                            cvar.notify_one();
+                        }
+
+                        // long jump back to before we crashed
+                        longjmp(jmpbuf.lock().as_mut_ptr(), 1);
+
+                        //true
+                    },
+                ))
+                .unwrap(),
+            );
+
+            raiser();
+        } else {
+            loop {
+                std::thread::yield_now();
+
+                let (lock, _cvar) = &*got_it;
+                let signaled = lock.lock();
+                if *signaled {
+                    debug_print!("signal handled");
+                    break;
+                }
+            }
+        }
+    }
+
+    // We can't actually clean up the handler since we long jump out of the signal
+    // handler, which leaves mutexes still locked since the stack is not unwound
+    // so if we don't just forget the hander we'll block infinitely waiting
+    // on mutex locks that will never be acquired
+    mem::forget(handler);
+}
+
+#[cfg(all(target_os = "windows", not(feature = "jmp")))]
+pub fn handles_exception(ec: ExceptionCode, raiser: impl Fn()) {
+    unsafe {
         let eh = exception_handler::ExceptionHandler::attach(exception_handler::make_crash_event(
             move |cc: &exception_handler::CrashContext| {
                 assert_eq!(
@@ -158,54 +211,5 @@ pub fn handles_exception(ec: ExceptionCode, raiser: impl Fn()) {
 
         std::thread::sleep(std::time::Duration::from_millis(1000));
         panic!("failed to exit process from exception handler");
-
-        // if val == 0 {
-        //     let got_it_in_handler = got_it;
-
-        //     handler = Some(
-        //         exception_handler::ExceptionHandler::attach(exception_handler::make_crash_event(
-        //             move |cc: &exception_handler::CrashContext| {
-        //                 assert_eq!(
-        //                     cc.exception_code, ec as i32,
-        //                     "0x{:x} != 0x{:x}",
-        //                     cc.exception_code, ec as i32
-        //                 );
-
-        //                 debug_print!("handling signal");
-        //                 {
-        //                     let (lock, cvar) = &*got_it_in_handler;
-        //                     let mut handled = lock.lock();
-        //                     *handled = true;
-        //                     cvar.notify_one();
-        //                 }
-
-        //                 // long jump back to before we crashed
-        //                 longjmp(jmpbuf.lock().as_mut_ptr(), 1);
-
-        //                 //true
-        //             },
-        //         ))
-        //         .unwrap(),
-        //     );
-
-        //     raiser();
-        // } else {
-        //     loop {
-        //         std::thread::yield_now();
-
-        //         let (lock, _cvar) = &*got_it;
-        //         let signaled = lock.lock();
-        //         if *signaled {
-        //             debug_print!("signal handled");
-        //             break;
-        //         }
-        //     }
-        // }
     }
-
-    // We can't actually clean up the handler since we long jump out of the signal
-    // handler, which leaves mutexes still locked since the stack is not unwound
-    // so if we don't just forget the hander we'll block infinitely waiting
-    // on mutex locks that will never be acquired
-    //mem::forget(handler);
 }
