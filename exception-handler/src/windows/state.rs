@@ -273,7 +273,9 @@ unsafe extern "C" fn handle_invalid_parameter(
         ContextRecord: &mut exception_context,
     };
 
+    debug_print!("capturing context...");
     RtlCaptureContext(&mut exception_context);
+    debug_print!("captured...");
 
     exception_record.ExceptionCode = STATUS_INVALID_PARAMETER;
 
