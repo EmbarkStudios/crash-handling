@@ -88,8 +88,6 @@ use scroll::{ctx, Pread, Pwrite, SizeWith};
 struct RequestDump {
     /// The address of an `EXCEPTION_POINTERS` in the client's memory
     exception_pointers: ProtoPointer,
-    /// The address of a `RawAssetionInfo` in the client's memory
-    assertion_info: ProtoPointer,
     /// The id of the thread in the client process in which the crash originated
     thread_id: u32,
     /// The top level exception code, also found in the `EXCEPTION_POINTERS.ExceptionRecord.ExceptionCode`

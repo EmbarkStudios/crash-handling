@@ -62,11 +62,6 @@ impl Client {
             return Err(last_os_error());
         }
 
-        // We're passing the pointer value to the server process
-        let assertion_info = crash_context
-            .assertion_info
-            .as_ref()
-            .map_or(0, |ai| ai as *const _ as super::ProtoPointer);
         // SAFETY: checking validity before dereferencing
         let exception_code = unsafe {
             if !crash_context.exception_pointers.is_null()
@@ -85,7 +80,6 @@ impl Client {
             Tags::RequestDump,
             super::RequestDump {
                 exception_pointers: crash_context.exception_pointers as _,
-                assertion_info,
                 thread_id: crash_context.thread_id,
                 exception_code,
             },

@@ -438,15 +438,9 @@ impl Server {
         // the processes memory as needed
         let exception_pointers = dump_request.exception_pointers
             as *const windows_sys::Win32::System::Diagnostics::Debug::EXCEPTION_POINTERS;
-        let assertion_info = if dump_request.assertion_info != 0 {
-            Some(dump_request.assertion_info as *const crash_context::RawAssertionInfo)
-        } else {
-            None
-        };
 
         let cc = crash_context::CrashContext {
             exception_pointers,
-            assertion_info,
             thread_id: dump_request.thread_id,
             exception_code: dump_request.exception_code,
         };

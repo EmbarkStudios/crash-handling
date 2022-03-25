@@ -82,8 +82,6 @@ impl HandlerInner {
         // to install, but for now we just install all of them
         unsafe {
             let previous_filter = SetUnhandledExceptionFilter(Some(handle_exception));
-
-            debug_print!("setting...");
             let previous_iph = _set_invalid_parameter_handler(Some(handle_invalid_parameter));
             let previous_pch = _set_purecall_handler(Some(handle_pure_virtual_call));
 
@@ -192,7 +190,6 @@ unsafe extern "system" fn handle_exception(except_info: *const EXCEPTION_POINTER
     if (current_handler.handle_debug_exceptions || !is_debug_exception)
         && current_handler.user_handler.on_crash(&crate::CrashContext {
             exception_pointers: except_info,
-            assertion_info: None,
             thread_id: GetCurrentThreadId(),
             exception_code: code,
         })
@@ -220,19 +217,6 @@ unsafe extern "system" fn handle_exception(except_info: *const EXCEPTION_POINTER
     }
 }
 
-use crash_context::RawAssertionInfo;
-
-/// Used for assertions that would be raised by the MSVC CRT but are directed to
-/// an invalid parameter handler instead.
-///
-/// <https://docs.rs/minidump-common/0.10.0/minidump_common/format/enum.AssertionType.html#variant.InvalidParameter>
-const MD_ASSERTION_INFO_TYPE_INVALID_PARAMETER: u32 = 1;
-/// Used for assertions that would be raised by the MSVC CRT but are directed to
-/// a pure virtual call handler instead.
-///
-/// <https://docs.rs/minidump-common/0.10.0/minidump_common/format/enum.AssertionType.html#variant.PureVirtualCall>
-const MD_ASSERTION_INFO_TYPE_PURE_VIRTUAL_CALL: u32 = 2;
-
 /// Handler for invalid parameters to CRT functions, this is not an exception so
 /// the context (shouldn't be) isn't compromised
 ///
@@ -257,11 +241,6 @@ unsafe extern "C" fn handle_invalid_parameter(
 
     debug_print!("excellent");
 
-    let mut assertion: crash_context::RawAssertionInfo = std::mem::zeroed();
-    assertion.kind = MD_ASSERTION_INFO_TYPE_INVALID_PARAMETER;
-
-    debug_print!("doing stuff");
-
     // Make up an exception record for the current thread and CPU context
     // to make it possible for the crash processor to classify these
     // as do regular crashes, and to make it humane for developers to
@@ -280,19 +259,10 @@ unsafe extern "C" fn handle_invalid_parameter(
 
     exception_record.ExceptionCode = STATUS_INVALID_PARAMETER;
 
-    // We store pointers to the the expression and function strings,
-    // and the line as exception parameters to make them easy to
-    // access by the developer on the far side.
-    exception_record.NumberParameters = 3;
-    exception_record.ExceptionInformation[0] = assertion.expression.as_ptr() as usize;
-    exception_record.ExceptionInformation[1] = assertion.file.as_ptr() as usize;
-    exception_record.ExceptionInformation[2] = assertion.line as usize;
-
     debug_print!("calling...");
 
     if current_handler.user_handler.on_crash(&crate::CrashContext {
         exception_pointers: &exception_ptrs,
-        assertion_info: Some(&assertion),
         thread_id: GetCurrentThreadId(),
         exception_code: STATUS_INVALID_PARAMETER,
     }) {
@@ -334,9 +304,6 @@ unsafe extern "C" fn handle_pure_virtual_call() {
     let lock = HANDLER_STACK.lock();
     let current_handler = AutoHandler::new(lock);
 
-    let mut assertion: crash_context::RawAssertionInfo = std::mem::zeroed();
-    assertion.kind = MD_ASSERTION_INFO_TYPE_PURE_VIRTUAL_CALL;
-
     // Make up an exception record for the current thread and CPU context
     // to make it possible for the crash processor to classify these
     // as do regular crashes, and to make it humane for developers to
@@ -352,17 +319,8 @@ unsafe extern "C" fn handle_pure_virtual_call() {
 
     exception_record.ExceptionCode = STATUS_NONCONTINUABLE_EXCEPTION;
 
-    // We store pointers to the the expression and function strings,
-    // and the line as exception parameters to make them easy to
-    // access by the developer on the far side.
-    exception_record.NumberParameters = 3;
-    exception_record.ExceptionInformation[0] = assertion.expression.as_ptr() as usize;
-    exception_record.ExceptionInformation[1] = assertion.file.as_ptr() as usize;
-    exception_record.ExceptionInformation[2] = assertion.line as usize;
-
     if !current_handler.user_handler.on_crash(&crate::CrashContext {
         exception_pointers: &exception_ptrs,
-        assertion_info: Some(&assertion),
         thread_id: GetCurrentThreadId(),
         exception_code: STATUS_NONCONTINUABLE_EXCEPTION,
     }) {
