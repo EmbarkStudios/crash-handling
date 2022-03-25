@@ -106,6 +106,7 @@ pub enum ExceptionCode {
 pub fn handles_exception(ec: ExceptionCode, raiser: impl Fn()) {
     #[cfg(target_arch = "x86_64")]
     #[repr(C)]
+    #[derive(Copy, Clone)]
     #[repr(align(16))]
     struct LargeFloat {
         _inner: [u64; 2],
@@ -124,6 +125,10 @@ pub fn handles_exception(ec: ExceptionCode, raiser: impl Fn()) {
         __jmp_buf: [u64; 24],
     }
 
+    static mut JMP_BUF: JmpBuf = JmpBuf {
+        __jmp_buf: [LargeFloat { _inner: [0; 2] }; 16],
+    };
+
     extern "C" {
         fn setjmp(jb: *mut JmpBuf) -> i32;
         fn longjmp(jb: *mut JmpBuf, val: i32) -> !;
@@ -133,12 +138,12 @@ pub fn handles_exception(ec: ExceptionCode, raiser: impl Fn()) {
     let mut handler = None;
 
     unsafe {
-        let jmpbuf = Arc::new(Mutex::new(mem::MaybeUninit::uninit()));
+        //let jmpbuf = Arc::new(Mutex::new(mem::MaybeUninit::uninit()));
 
         // Set a jump point. The first time we are here we set up the signal
         // handler and raise the signal, the signal handler jumps back to here
         // and then we step over the initial block.
-        let val = setjmp(jmpbuf.lock().as_mut_ptr());
+        let val = setjmp(&mut JMP_BUF);
 
         if val == 0 {
             let got_it_in_handler = got_it;
@@ -161,7 +166,7 @@ pub fn handles_exception(ec: ExceptionCode, raiser: impl Fn()) {
                         }
 
                         // long jump back to before we crashed
-                        longjmp(jmpbuf.lock().as_mut_ptr(), 1);
+                        longjmp(&mut JMP_BUF, 1);
 
                         //true
                     },
