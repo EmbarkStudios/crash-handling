@@ -133,7 +133,7 @@ pub fn handles_exception(ec: ExceptionCode, raiser: impl Fn()) {
     let mut handler = None;
 
     unsafe {
-        let jmpbuf = Arc::new(Mutex::new(mem::MaybeUninit::zeroed()));
+        let jmpbuf = Arc::new(Mutex::new(mem::MaybeUninit::uninit()));
 
         // Set a jump point. The first time we are here we set up the signal
         // handler and raise the signal, the signal handler jumps back to here
