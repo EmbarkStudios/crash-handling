@@ -311,13 +311,16 @@ unsafe extern "C" fn handle_pure_virtual_call() {
     // as do regular crashes, and to make it humane for developers to
     // analyze them.
     let mut exception_record: EXCEPTION_RECORD = std::mem::zeroed();
-    let mut exception_context: CONTEXT = std::mem::zeroed();
+    let mut exception_context = std::mem::MaybeUninit::uninit();
+
+    RtlCaptureContext(exception_context.as_mut_ptr());
+
+    let mut exception_context = exception_context.assume_init();
+
     let exception_ptrs = EXCEPTION_POINTERS {
         ExceptionRecord: &mut exception_record,
         ContextRecord: &mut exception_context,
     };
-
-    //RtlCaptureContext(&mut exception_context);
 
     exception_record.ExceptionCode = STATUS_NONCONTINUABLE_EXCEPTION;
 
