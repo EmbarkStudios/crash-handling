@@ -173,8 +173,6 @@ unsafe extern "system" fn handle_exception(except_info: *const EXCEPTION_POINTER
     let lock = HANDLER_STACK.lock();
     let current_handler = AutoHandler::new(lock);
 
-    debug_print!("oh no");
-
     // Ignore EXCEPTION_BREAKPOINT and EXCEPTION_SINGLE_STEP exceptions.  This
     // logic will short-circuit before calling WriteMinidumpOnHandlerThread,
     // allowing something else to handle the breakpoint without incurring the
@@ -234,12 +232,8 @@ unsafe extern "C" fn handle_invalid_parameter(
     line: u32,
     reserved: usize,
 ) {
-    debug_print!("yes?");
-
     let lock = HANDLER_STACK.lock();
     let current_handler = AutoHandler::new(lock);
-
-    debug_print!("excellent");
 
     // Make up an exception record for the current thread and CPU context
     // to make it possible for the crash processor to classify these
@@ -248,9 +242,7 @@ unsafe extern "C" fn handle_invalid_parameter(
     let mut exception_record: EXCEPTION_RECORD = std::mem::zeroed();
     let mut exception_context = std::mem::MaybeUninit::uninit();
 
-    debug_print!("capturing context...");
     RtlCaptureContext(exception_context.as_mut_ptr());
-    debug_print!("captured...");
 
     let mut exception_context = exception_context.assume_init();
 
@@ -260,8 +252,6 @@ unsafe extern "C" fn handle_invalid_parameter(
     };
 
     exception_record.ExceptionCode = STATUS_INVALID_PARAMETER;
-
-    debug_print!("calling...");
 
     if current_handler.user_handler.on_crash(&crate::CrashContext {
         exception_pointers: &exception_ptrs,
