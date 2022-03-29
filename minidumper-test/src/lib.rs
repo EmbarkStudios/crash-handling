@@ -46,7 +46,7 @@ impl fmt::Display for Signal {
             #[cfg(windows)]
             Self::Purecall => "purecall",
             #[cfg(windows)]
-            Self::InvalidParameter => "invalid-params",
+            Self::InvalidParameter => "invalid-parameter",
         })
     }
 }
