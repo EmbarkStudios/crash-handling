@@ -114,7 +114,7 @@ pub fn make_temp_path(filename: impl AsRef<std::ffi::OsStr>) -> Result<std::path
     let mut max_path = [0u16; 261];
     // SAFETY: syscall
     let len = unsafe {
-        windows_sys::Win32::Storage::FileSystem::GetTempPath2W(
+        windows_sys::Win32::Storage::FileSystem::GetTempPathW(
             max_path.len() as u32,
             max_path.as_mut_ptr(),
         )
