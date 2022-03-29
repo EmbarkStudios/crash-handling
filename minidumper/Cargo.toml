@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 # Nicer cfg handling
 cfg-if = "1.0"
-crash-context = { version = "0.0.2", path = "../crash-context" }
+crash-context = { version = "0.0.3", path = "../crash-context" }
 libc = "0.2"
 # Basic log emitting
 log = "0.4"
@@ -36,6 +36,7 @@ version = "0.34" # Matches the version used in mio/miow
 features = [
     "Win32_Foundation",         # Core types eg HANDLE
     "Win32_Networking_WinSock", # Sockets
+    "Win32_System_IO",          # Sockets
     "Win32_Storage_FileSystem", # GetTempPath2W
     "Win32_System_Threading",   # *Event functions, OpenProcess
 ]
