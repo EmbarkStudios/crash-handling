@@ -9,10 +9,6 @@ publish = false
 name = "crash-client"
 path = "src/crash-client.rs"
 
-[[bin]]
-name = "crash-server"
-path = "src/crash-server.rs"
-
 [dependencies]
 anyhow = "1.0"
 clap = { version = "3.1", features = ["derive"] }

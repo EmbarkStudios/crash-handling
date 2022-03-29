@@ -259,7 +259,7 @@ impl UnixListener {
 
         // If we managed to bind, delete the file so that it removed once we
         // shutdown
-        std::fs::remove_file(path).unwrap(); // TODO: ignore probably?
+        //std::fs::remove_file(path).unwrap(); // TODO: ignore probably?
 
         // SAFETY: syscall
         if unsafe {
