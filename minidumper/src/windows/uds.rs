@@ -54,6 +54,12 @@ impl UnixSocketAddr {
         }
 
         sock_addr.sun_path[..path_bytes.len()].copy_from_slice(path_bytes);
+
+        eprintln!(
+            "socket path is {:?}",
+            std::str::from_utf8(&sock_addr.sun_path[..path_bytes.len()])
+        );
+
         Self::from_parts(
             sock_addr,
             (2 /* family */ + path_bytes.len() + 1/* path len + null */) as i32,
@@ -265,6 +271,7 @@ impl UnixListener {
             )
         } != 0
         {
+            eprintln!("failed to bind");
             return Err(io::Error::last_os_error());
         }
 
@@ -277,6 +284,7 @@ impl UnixListener {
             ws::listen(inner.as_raw_socket() as _, 128 /* backlog */)
         } != 0
         {
+            eprintln!("failed to listen");
             Err(last_socket_error())
         } else {
             Ok(Self(inner))
