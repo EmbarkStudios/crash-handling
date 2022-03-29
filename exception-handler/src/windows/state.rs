@@ -43,7 +43,7 @@ extern "C" {
     //     line: u32,
     //     reserved: usize,
     // );
-    fn _invalid_parameter_noinfo_noreturn();
+    fn _invalid_parameter_noinfo_noreturn() -> !;
 }
 
 type _invalid_parameter_handler = unsafe extern "C" fn(
