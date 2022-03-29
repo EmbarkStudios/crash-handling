@@ -57,9 +57,9 @@ fn as_mio(
 impl Server {
     /// Creates a new server bound to the given name in an appropriate temporary directory.
     pub fn with_name(filename: impl AsRef<std::ffi::OsStr>) -> Result<Self, Error> {
-        let tp = super::make_temp_path(filename)?;
+        //let tp = super::make_temp_path(filename)?;
 
-        Self::with_path(tp)
+        Self::with_path(filename.as_ref())
     }
 
     /// Creates a new server with the given path.

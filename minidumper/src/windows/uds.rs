@@ -62,7 +62,10 @@ impl UnixSocketAddr {
 
         Self::from_parts(
             sock_addr,
-            (2 /* family */ + path_bytes.len() + 1/* path len + null */) as i32,
+            // Found some example Windows code that seemed to give no shits
+            // about the "actual" size of the address, so if Microsoft doesn't
+            // care why should we? https://devblogs.microsoft.com/commandline/windowswsl-interop-with-af_unix/
+            std::mem::size_of_val(&sock_addr) as i32,
         )
     }
 
@@ -84,16 +87,7 @@ struct Socket(ws::SOCKET);
 impl Socket {
     pub fn new() -> io::Result<Socket> {
         // SAFETY: syscall
-        let socket = unsafe {
-            ws::WSASocketW(
-                ws::AF_UNIX as i32,
-                ws::SOCK_STREAM as i32,
-                0,
-                std::ptr::null_mut(),
-                0,
-                ws::WSA_FLAG_OVERLAPPED,
-            )
-        };
+        let socket = unsafe { ws::socket(ws::AF_UNIX as i32, ws::SOCK_STREAM as i32, 0) };
 
         if socket == ws::INVALID_SOCKET {
             Err(last_socket_error())
@@ -131,7 +125,7 @@ impl Socket {
 
     fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         let mut nonblocking = nonblocking as u32;
-        // SAFETY: sysclal
+        // SAFETY: syscall
         let r = unsafe { ws::ioctlsocket(self.0, ws::FIONBIO, &mut nonblocking) };
         if r == 0 {
             Ok(())
@@ -275,10 +269,6 @@ impl UnixListener {
             return Err(io::Error::last_os_error());
         }
 
-        // If we managed to bind, delete the file so that it removed once we
-        // shutdown
-        //std::fs::remove_file(path).unwrap(); // TODO: ignore probably?
-
         // SAFETY: syscall
         if unsafe {
             ws::listen(inner.as_raw_socket() as _, 128 /* backlog */)
@@ -355,6 +345,9 @@ impl UnixStream {
         {
             Err(last_socket_error())
         } else {
+            // We can immediately remove the file if the connect succeeds, windows
+            // will only remove it once all references are closed
+            //let _res = std::fs::remove_file(path);
             Ok(Self(inner))
         }
     }

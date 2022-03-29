@@ -27,9 +27,9 @@ impl Client {
     /// Creates a new client that will attempt to connect to a socket at with
     /// the given name in an appropriate temporary directory.
     pub fn with_name(filename: impl AsRef<std::ffi::OsStr>) -> Result<Self, Error> {
-        let tp = super::make_temp_path(filename)?;
+        //let tp = super::make_temp_path(filename)?;
 
-        Self::with_path(tp)
+        Self::with_path(filename.as_ref())
     }
 
     /// Creates a new client that will attempt to connect to a socket at the given
