@@ -31,6 +31,7 @@
 - `arm-linux-androideabi`
 - `arm-unknown-linux-gnueabi`
 - `arm-unknown-linux-musleabi`
+- `x86_64-pc-windows-msvc`
 
 ## Contribution
 
