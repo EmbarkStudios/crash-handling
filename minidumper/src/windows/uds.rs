@@ -260,6 +260,7 @@ impl UnixListener {
         let inner = Socket::new()?;
         let addr = UnixSocketAddr::from_path(path.as_ref())?;
 
+        eprintln!("binding...");
         // SAFETY: syscall
         if unsafe {
             ws::bind(
