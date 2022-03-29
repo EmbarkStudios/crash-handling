@@ -3,7 +3,7 @@ use crate::Error;
 use std::os::windows::io::IntoRawSocket;
 
 pub struct Server {
-    socket: uds::UnixListener,
+    listener: uds::UnixListener,
 }
 
 struct ClientConn {
@@ -11,13 +11,14 @@ struct ClientConn {
     socket: uds::UnixStream,
 
     /// The token we associated with the socket with the mio registry
-    token: mio::Token,
+    key: usize,
+    //token: mio::Token,
 }
 
 impl ClientConn {
     #[inline]
-    fn new(socket: uds::UnixStream, token: mio::Token) -> Self {
-        Self { socket, token }
+    fn new(socket: uds::UnixStream, key: usize) -> Self {
+        Self { socket, key }
     }
 
     fn recv(&mut self) -> Option<(u32, Vec<u8>)> {
@@ -64,9 +65,9 @@ impl Server {
 
     /// Creates a new server with the given path.
     pub fn with_path(path: impl AsRef<std::path::Path>) -> Result<Self, Error> {
-        let socket = uds::UnixListener::bind(path)?;
-        socket.set_nonblocking(true)?;
-        Ok(Self { socket })
+        let listener = uds::UnixListener::bind(path)?;
+        listener.set_nonblocking(true)?;
+        Ok(Self { listener })
     }
 
     /// Runs the server loop, accepting client connections and requests to
@@ -76,15 +77,18 @@ impl Server {
         handler: Box<dyn crate::ServerHandler>,
         shutdown: &std::sync::atomic::AtomicBool,
     ) -> Result<(), Error> {
-        use mio::{Events, Interest, Poll, Token};
+        //use mio::{Events, Interest, Poll, Token};
+        use polling::{Event, Poller};
 
-        let mut poll = Poll::new()?;
-        let mut events = Events::with_capacity(10);
+        let mut poll = Poller::new()?;
+        //let mut events = Events::with_capacity(10);
+        let mut events = Vec::new();
 
-        let mut mio_listener = self.socket.as_mio();
-        poll.registry()
-            .register(&mut mio_listener, Token(0), Interest::READABLE)?;
-        mio_listener.into_raw_socket();
+        //let mut mio_listener = self.socket.as_mio();
+        poll.add(&self.listener, Event::readable(0))?;
+        // poll.registry()
+        //     .register(&mut mio_listener, Token(0), Interest::READABLE)?;
+        // mio_listener.into_raw_socket();
 
         let mut clients = Vec::new();
         let mut id = 1;
@@ -94,7 +98,8 @@ impl Server {
                 return Ok(());
             }
 
-            poll.poll(&mut events, Some(std::time::Duration::from_millis(10)))?;
+            events.clear();
+            poll.wait(&mut events, Some(std::time::Duration::from_millis(10)))?;
 
             if events.is_empty() {
                 eprintln!("no events :(");
@@ -103,27 +108,31 @@ impl Server {
             }
 
             for event in events.iter() {
-                if event.token().0 == 0 {
-                    match self.socket.accept() {
+                if event.key == 0 {
+                    match self.listener.accept() {
                         Ok((mut accepted, _addr)) => {
-                            let token = Token(id);
+                            let token = id;
                             id += 1;
 
                             accepted.set_nonblocking(true)?;
+                            poll.add(&accepted, Event::readable(id))?;
 
-                            as_mio(&mut accepted, |ms| {
-                                poll.registry().register(ms, token, Interest::READABLE)
-                            })?;
+                            // as_mio(&mut accepted, |ms| {
+                            //     poll.registry().register(ms, token, Interest::READABLE)
+                            // })?;
 
-                            log::debug!("accepted connection {}", token.0);
-                            clients.push(ClientConn::new(accepted, token));
+                            log::debug!("accepted connection {}", id);
+                            clients.push(ClientConn::new(accepted, id));
                         }
                         Err(err) => {
                             log::error!("failed to accept socket connection: {}", err);
                         }
                     }
-                } else if let Some(pos) = clients.iter().position(|cc| cc.token == event.token()) {
-                    match clients[pos].recv() {
+
+                    // We need to reregister insterest every time
+                    poll.modify(&self.listener, Event::readable(0))?;
+                } else if let Some(pos) = clients.iter().position(|cc| cc.key == event.key) {
+                    let deregister = match clients[pos].recv() {
                         Some((0, crash_context)) => {
                             let mut cc = clients.swap_remove(pos);
 
@@ -141,12 +150,6 @@ impl Server {
                                 }
                             };
 
-                            if let Err(e) =
-                                as_mio(&mut cc.socket, |ms| poll.registry().deregister(ms))
-                            {
-                                log::error!("failed to deregister socket: {}", e);
-                            }
-
                             if let Err(e) = cc.socket.send(&[1]) {
                                 log::error!("failed to send ack: {}", e);
                             }
@@ -154,6 +157,8 @@ impl Server {
                             if exit {
                                 return Ok(());
                             }
+
+                            Some(cc.socket)
                         }
                         Some((kind, buffer)) => {
                             handler.on_message(
@@ -164,17 +169,22 @@ impl Server {
                             if let Err(e) = clients[pos].socket.send(&[1]) {
                                 log::error!("failed to send ack: {}", e);
                             }
+
+                            None
                         }
                         None => {
                             log::debug!("client closed socket {}", pos);
                             let mut cc = clients.swap_remove(pos);
-
-                            if let Err(e) =
-                                as_mio(&mut cc.socket, |ms| poll.registry().deregister(ms))
-                            {
-                                log::error!("failed to deregister socket: {}", e);
-                            }
+                            Some(cc.socket)
                         }
+                    };
+
+                    if let Some(socket) = deregister {
+                        if let Err(e) = poll.delete(&socket) {
+                            log::error!("failed to deregister socket: {}", e);
+                        }
+                    } else {
+                        poll.modify(&clients[pos].socket, Event::readable(clients[pos].key))?;
                     }
                 }
             }

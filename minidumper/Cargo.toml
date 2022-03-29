@@ -28,6 +28,7 @@ uds = { git = "https://github.com/EmbarkStudios/uds", branch = "master", feature
 [target.'cfg(target_os = "windows")'.dependencies]
 # Event loop + name pipes
 mio = { version = "0.8", features = ["os-ext"] }
+polling = "2.2"
 # Nicer binary interop
 scroll = "0.11"
 
