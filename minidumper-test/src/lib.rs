@@ -201,7 +201,12 @@ pub fn run_client(id: &str, signal: Signal, use_thread: bool) {
     eprintln!("{}", stderr);
 
     // Ensure it was interrupted and did not exit properly
+    #[cfg(unix)]
     assert!(output.status.code().is_none());
+    #[cfg(windows)]
+    {
+        println!("client exited with {:?}", output.status.code());
+    }
 }
 
 #[inline]
