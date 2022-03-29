@@ -35,7 +35,9 @@ impl Client {
     /// Creates a new client that will attempt to connect to a socket at the given
     /// path.
     pub fn with_path(path: impl AsRef<std::path::Path>) -> Result<Self, Error> {
+        eprintln!("connecting...");
         let mut socket = UnixStream::connect(path)?;
+        eprintln!("connected!");
 
         Ok(Self { socket })
     }

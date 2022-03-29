@@ -269,6 +269,8 @@ impl UnixListener {
             return Err(io::Error::last_os_error());
         }
 
+        eprintln!("bound!");
+
         // SAFETY: syscall
         if unsafe {
             ws::listen(inner.as_raw_socket() as _, 128 /* backlog */)
@@ -277,6 +279,7 @@ impl UnixListener {
             eprintln!("failed to listen");
             Err(last_socket_error())
         } else {
+            eprintln!("listening!");
             Ok(Self(inner))
         }
     }

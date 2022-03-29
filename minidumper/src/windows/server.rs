@@ -96,6 +96,10 @@ impl Server {
 
             poll.poll(&mut events, Some(std::time::Duration::from_millis(10)))?;
 
+            if events.is_empty() {
+                eprintln!("no events :(");
+            }
+
             for event in events.iter() {
                 if event.token().0 == 0 {
                     match self.socket.accept() {
