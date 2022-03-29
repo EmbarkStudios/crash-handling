@@ -65,6 +65,11 @@ impl Server {
 
     /// Creates a new server with the given path.
     pub fn with_path(path: impl AsRef<std::path::Path>) -> Result<Self, Error> {
+        // Windows is not good about cleaning these up, so we assume the user,
+        // who has control over what path they specify, is ok with deleting
+        // previous sockets that weren't cleaned up
+        let _res = std::fs::remove_file(path.as_ref());
+
         let listener = uds::UnixListener::bind(path)?;
         listener.set_nonblocking(true)?;
         Ok(Self { listener })

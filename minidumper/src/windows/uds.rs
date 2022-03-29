@@ -55,11 +55,6 @@ impl UnixSocketAddr {
 
         sock_addr.sun_path[..path_bytes.len()].copy_from_slice(path_bytes);
 
-        eprintln!(
-            "socket path is {:?}",
-            std::str::from_utf8(&sock_addr.sun_path[..path_bytes.len()])
-        );
-
         Self::from_parts(
             sock_addr,
             // Found some example Windows code that seemed to give no shits
@@ -253,14 +248,9 @@ impl UnixListener {
     pub(crate) fn bind(path: impl AsRef<std::path::Path>) -> io::Result<Self> {
         init();
 
-        if let Err(e) = std::fs::remove_file(path.as_ref()) {
-            eprintln!("didn't delete file: {}", e);
-        }
-
         let inner = Socket::new()?;
         let addr = UnixSocketAddr::from_path(path.as_ref())?;
 
-        eprintln!("binding...");
         // SAFETY: syscall
         if unsafe {
             ws::bind(
@@ -270,21 +260,16 @@ impl UnixListener {
             )
         } != 0
         {
-            eprintln!("failed to bind");
             return Err(io::Error::last_os_error());
         }
-
-        eprintln!("bound!");
 
         // SAFETY: syscall
         if unsafe {
             ws::listen(inner.as_raw_socket() as _, 128 /* backlog */)
         } != 0
         {
-            eprintln!("failed to listen");
             Err(last_socket_error())
         } else {
-            eprintln!("listening!");
             Ok(Self(inner))
         }
     }
