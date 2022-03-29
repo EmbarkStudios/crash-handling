@@ -64,9 +64,9 @@ impl Server {
 
     /// Creates a new server with the given path.
     pub fn with_path(path: impl AsRef<std::path::Path>) -> Result<Self, Error> {
-        Ok(Self {
-            socket: uds::UnixListener::bind(path)?,
-        })
+        let socket = uds::UnixListener::bind(path)?;
+        socket.set_nonblocking(true)?;
+        Ok(Self { socket })
     }
 
     /// Runs the server loop, accepting client connections and requests to
@@ -80,6 +80,7 @@ impl Server {
 
         let mut poll = Poll::new()?;
         let mut events = Events::with_capacity(10);
+
         let mut mio_listener = self.socket.as_mio();
         poll.registry()
             .register(&mut mio_listener, Token(0), Interest::READABLE)?;
@@ -101,6 +102,8 @@ impl Server {
                         Ok((mut accepted, _addr)) => {
                             let token = Token(id);
                             id += 1;
+
+                            accepted.set_nonblocking(true)?;
 
                             as_mio(&mut accepted, |ms| {
                                 poll.registry().register(ms, token, Interest::READABLE)

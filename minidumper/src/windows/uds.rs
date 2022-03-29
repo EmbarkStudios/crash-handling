@@ -123,6 +123,17 @@ impl Socket {
         }
     }
 
+    fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
+        let mut nonblocking = nonblocking as u32;
+        // SAFETY: sysclal
+        let r = unsafe { ws::ioctlsocket(self.0, ws::FIONBIO, &mut nonblocking) };
+        if r == 0 {
+            Ok(())
+        } else {
+            Err(last_socket_error())
+        }
+    }
+
     fn recv_with_flags(&self, buf: &mut [u8], flags: i32) -> io::Result<usize> {
         // On unix when a socket is shut down all further reads return 0, so we
         // do the same on windows to map a shut down socket to returning EOF.
@@ -283,6 +294,12 @@ impl UnixListener {
         Ok((UnixStream(sock), addr))
     }
 
+    #[inline]
+    pub(crate) fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
+        self.0.set_nonblocking(nonblocking)
+    }
+
+    #[inline]
     pub(crate) fn as_mio(&self) -> mio::net::TcpListener {
         // SAFETY: trait method is unsafe, but not really unsafe
         unsafe { mio::net::TcpListener::from_raw_socket(self.as_raw_socket()) }
@@ -359,6 +376,12 @@ impl UnixStream {
         self.0.send_vectored(bufs)
     }
 
+    #[inline]
+    pub(crate) fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
+        self.0.set_nonblocking(nonblocking)
+    }
+
+    #[inline]
     pub(crate) fn as_mio(&self) -> mio::net::TcpStream {
         // SAFETY: trait method is unsafe, but not really unsafe
         unsafe { mio::net::TcpStream::from_raw_socket(self.as_raw_socket()) }
