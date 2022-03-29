@@ -1,6 +1,6 @@
 [package]
 name = "crash-context"
-version = "0.0.2"
+version = "0.0.3"
 description = "Provides portable types containing target specific contextual information at the time of an exception"
 repository = "https://github.com/EmbarkStudios/crash-handling"
 authors = [
@@ -14,7 +14,7 @@ documentation = "https://docs.rs/crash-context"
 homepage = "https://github.com/EmbarkStudios/crash-context"
 categories = ["external-ffi-bindings"]
 keywords = ["crash", "libc", "getcontext"]
-rust-version = "1.59.0" # We use global_asm!
+rust-version = "1.59.0" # We use `global_asm!`
 
 [dependencies]
 cfg-if = "1.0"
