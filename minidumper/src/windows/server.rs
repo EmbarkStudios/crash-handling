@@ -101,12 +101,6 @@ impl Server {
             events.clear();
             poll.wait(&mut events, Some(std::time::Duration::from_millis(10)))?;
 
-            if events.is_empty() {
-                eprintln!("no events :(");
-            } else {
-                panic!("events!");
-            }
-
             for event in events.iter() {
                 if event.key == 0 {
                     match self.listener.accept() {
