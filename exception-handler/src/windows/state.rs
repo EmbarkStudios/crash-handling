@@ -43,7 +43,7 @@ extern "C" {
     //     line: u32,
     //     reserved: usize,
     // );
-    fn _invalid_parameter_noinfo();
+    fn _invalid_parameter_noinfo_noreturn();
 }
 
 type _invalid_parameter_handler = unsafe extern "C" fn(
@@ -277,7 +277,7 @@ unsafe extern "C" fn handle_invalid_parameter(
         // CRT source.
 
         // _invalid_parameter is only available in the debug CRT
-        _invalid_parameter_noinfo();
+        _invalid_parameter_noinfo_noreturn();
         // if expression.is_null() && function.is_null() && file.is_null() {
         //     _invalid_parameter_noinfo();
         // } else {

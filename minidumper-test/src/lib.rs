@@ -372,9 +372,7 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
             }
             #[cfg(windows)]
             Signal::Purecall => {
-                verify!(CrashReason::WindowsGeneral(
-                    format::ExceptionCodeWindows::EXCEPTION_NONCONTINUABLE_EXCEPTION
-                ));
+                verify!(CrashReason::from_windows_error(0xc000000d));
             }
             #[cfg(windows)]
             Signal::InvalidParameter => {
