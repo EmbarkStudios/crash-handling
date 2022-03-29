@@ -44,6 +44,7 @@ extern "C" {
     //     reserved: usize,
     // );
     fn _invalid_parameter_noinfo_noreturn() -> !;
+    fn _invoke_watson() -> !;
 }
 
 type _invalid_parameter_handler = unsafe extern "C" fn(
@@ -277,7 +278,7 @@ unsafe extern "C" fn handle_invalid_parameter(
         // CRT source.
 
         // _invalid_parameter is only available in the debug CRT
-        _invalid_parameter_noinfo_noreturn();
+        _invoke_watson();
         // if expression.is_null() && function.is_null() && file.is_null() {
         //     _invalid_parameter_noinfo();
         // } else {
