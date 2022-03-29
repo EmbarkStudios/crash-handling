@@ -98,6 +98,8 @@ impl Server {
 
             if events.is_empty() {
                 eprintln!("no events :(");
+            } else {
+                panic!("events!");
             }
 
             for event in events.iter() {
