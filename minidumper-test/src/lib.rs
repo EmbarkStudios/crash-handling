@@ -286,7 +286,11 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
 
     macro_rules! verify {
         ($expected:pat) => {
-            assert!(matches!(crash_reason, $expected));
+            assert!(
+                matches!(crash_reason, $expected),
+                "crash reason: {:?}",
+                crash_reason
+            );
         };
     }
 
