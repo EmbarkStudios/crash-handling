@@ -372,13 +372,11 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
             }
             #[cfg(windows)]
             Signal::Purecall => {
-                let expected = CrashReason::from_windows_error(0xc000000d);
-                verify!(expected);
+                assert_eq!(crash_reason, CrashReason::from_windows_error(0xc0000025));
             }
             #[cfg(windows)]
             Signal::InvalidParameter => {
-                let expected = CrashReason::from_windows_error(0xc000000d);
-                verify!(expected);
+                assert_eq!(crash_reason, CrashReason::from_windows_error(0xc000000d));
             }
             #[cfg(unix)]
             Signal::Bus | Signal::Abort => {
