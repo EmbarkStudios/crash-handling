@@ -253,6 +253,10 @@ impl UnixListener {
     pub(crate) fn bind(path: impl AsRef<std::path::Path>) -> io::Result<Self> {
         init();
 
+        if let Err(e) = std::fs::remove_file(path.as_ref()) {
+            eprintln!("didn't delete file: {}", e);
+        }
+
         let inner = Socket::new()?;
         let addr = UnixSocketAddr::from_path(path.as_ref())?;
 
