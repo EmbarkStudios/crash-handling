@@ -1,4 +1,4 @@
-#![allow(non_camel_case_types)]
+#![allow(non_camel_case_types, clippy::exit)]
 
 use super::HandleDebugExceptions;
 use std::sync::{
@@ -58,7 +58,7 @@ type _purecall_handler = unsafe extern "C" fn();
 
 /// Tracks which handler to use when handling an exception since none of the
 /// error handler functions take user data
-const HANDLER_STACK_INDEX: AtomicUsize = AtomicUsize::new(1);
+static HANDLER_STACK_INDEX: AtomicUsize = AtomicUsize::new(1);
 pub(crate) static HANDLER_STACK: parking_lot::Mutex<Vec<Weak<HandlerInner>>> =
     parking_lot::const_mutex(Vec::new());
 
@@ -104,6 +104,7 @@ impl HandlerInner {
 ///
 /// Note this keeps the `HANDLER_STACK` lock for the duration of the scope
 struct AutoHandler<'scope> {
+    #[allow(dead_code)]
     lock: parking_lot::MutexGuard<'scope, Vec<Weak<HandlerInner>>>,
     inner: Arc<HandlerInner>,
 }
@@ -163,8 +164,6 @@ impl<'scope> Drop for AutoHandler<'scope> {
 
 /// The handler is not entered, and the OS continues searching for an exception handler.
 const EXCEPTION_CONTINUE_SEARCH: i32 = 0;
-/// Continue execution at the point of the exception.
-const EXCEPTION_CONTINUE_EXECUTION: i32 = -1;
 /// Enter the exception handler.
 pub(super) const EXCEPTION_EXECUTE_HANDLER: i32 = 1;
 

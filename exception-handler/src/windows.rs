@@ -92,6 +92,7 @@ impl ExceptionHandler {
     }
 
     // Sends the specified user exception
+    #[allow(clippy::unused_self)]
     pub fn simulate_exception(&self, exception_code: Option<i32>) -> bool {
         // Normally this would be an unsafe function, since this unsafe encompasses
         // the entirety of the body, however the user is really not required to

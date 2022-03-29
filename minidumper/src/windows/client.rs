@@ -1,20 +1,6 @@
-use super::{last_os_error, uds::UnixStream, Tags};
-use crate::{write_stderr, Error};
-use std::{
-    fs::File,
-    io::{self, ErrorKind},
-    os::windows::io::AsRawHandle,
-};
-use windows_sys::Win32::{
-    Foundation::{CloseHandle, ERROR_PIPE_BUSY, HANDLE},
-    Storage::FileSystem as fs,
-    System::{
-        Pipes as pipe,
-        Threading::{ResetEvent, SetEvent, WaitForMultipleObjects, WAIT_OBJECT_0},
-    },
-};
-
-const SERVER_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(15000);
+use super::uds::UnixStream;
+use crate::Error;
+use std::io;
 
 pub struct Client {
     /// The pipe handle. Note that we don't use mio's `NamedPipe` here since the
@@ -24,20 +10,12 @@ pub struct Client {
 }
 
 impl Client {
-    /// Creates a new client that will attempt to connect to a socket at with
-    /// the given name in an appropriate temporary directory.
-    pub fn with_name(filename: impl AsRef<std::ffi::OsStr>) -> Result<Self, Error> {
-        //let tp = super::make_temp_path(filename)?;
-
-        Self::with_path(filename.as_ref())
-    }
-
     /// Creates a new client that will attempt to connect to a socket at the given
     /// path.
-    pub fn with_path(path: impl AsRef<std::path::Path>) -> Result<Self, Error> {
-        let mut socket = UnixStream::connect(path)?;
-
-        Ok(Self { socket })
+    pub fn with_name(path: impl AsRef<std::path::Path>) -> Result<Self, Error> {
+        Ok(Self {
+            socket: UnixStream::connect(path)?,
+        })
     }
 
     /// Requests that the server generate a minidump for the specified crash
@@ -47,7 +25,7 @@ impl Client {
     pub fn request_dump(
         &self,
         crash_context: &crash_context::CrashContext,
-        debug_print: bool,
+        _debug_print: bool,
     ) -> Result<(), Error> {
         use scroll::Pwrite;
         let mut buf = [0u8; 24];
@@ -61,7 +39,7 @@ impl Client {
             0,
         )?;
 
-        Self::transact(&self.socket, Tags::RequestDump as u32, &buf[..written])
+        Self::transact(&self.socket, 0, &buf[..written])
     }
 
     /// Sends a message to the server.

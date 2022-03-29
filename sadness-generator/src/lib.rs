@@ -43,6 +43,7 @@ impl SadnessFlavors {
             #[cfg(unix)]
             Self::Bus { path } => raise_bus(&path),
             Self::Trap => raise_trap(),
+            #[allow(unused_variables)]
             Self::StackOverflow {
                 native_thread,
                 long_jumps,
@@ -50,7 +51,14 @@ impl SadnessFlavors {
                 if !native_thread {
                     raise_stack_overflow()
                 } else {
-                    raise_stack_overflow_in_non_rust_thread(long_jumps)
+                    #[cfg(unix)]
+                    {
+                        raise_stack_overflow_in_non_rust_thread(long_jumps)
+                    }
+                    #[cfg(windows)]
+                    {
+                        raise_stack_overflow()
+                    }
                 }
             }
             #[cfg(windows)]
@@ -165,9 +173,8 @@ pub fn raise_stack_overflow() {
 ///
 /// This is raised inside of a non-Rust `std::thread::Thread` to ensure that
 /// alternate stacks apply to all threads, even ones not created from Rust
-///
+#[cfg(unix)]
 pub fn raise_stack_overflow_in_non_rust_thread(uses_longjmp: bool) {
-    #[cfg(unix)]
     unsafe {
         let mut native: libc::pthread_t = std::mem::zeroed();
         let mut attr: libc::pthread_attr_t = std::mem::zeroed();
@@ -207,12 +214,14 @@ pub fn raise_stack_overflow_in_non_rust_thread(uses_longjmp: bool) {
 
 /// [`SadnessFlavors::StackOverflow`]
 #[inline]
+#[cfg(unix)]
 pub fn raise_stack_overflow_in_non_rust_thread_normal() {
     raise_stack_overflow_in_non_rust_thread(false);
 }
 
 /// [`SadnessFlavors::StackOverflow`]
 #[inline]
+#[cfg(unix)]
 pub fn raise_stack_overflow_in_non_rust_thread_longjmp() {
     raise_stack_overflow_in_non_rust_thread(true);
 }

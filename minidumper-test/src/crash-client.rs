@@ -98,7 +98,14 @@ fn real_main() -> anyhow::Result<()> {
             sadness_generator::raise_stack_overflow();
         }
         Signal::StackOverflowCThread => {
-            sadness_generator::raise_stack_overflow_in_non_rust_thread_normal();
+            #[cfg(unix)]
+            {
+                sadness_generator::raise_stack_overflow_in_non_rust_thread_normal();
+            }
+            #[cfg(windows)]
+            {
+                unimplemented!();
+            }
         }
         #[cfg(windows)]
         Signal::Purecall => {

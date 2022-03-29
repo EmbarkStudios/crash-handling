@@ -157,7 +157,7 @@ impl Header {
 }
 
 #[inline]
-#[allow(unsafe_code)]
+#[allow(unsafe_code, dead_code)]
 pub(crate) fn write_stderr(s: &'static str) {
     unsafe {
         libc::write(2, s.as_ptr().cast(), s.len() as _);

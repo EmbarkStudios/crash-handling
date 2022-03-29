@@ -2,6 +2,8 @@
 //! into the `uds` crate or `mio` or some other crate, but all of the ones I have
 //! found currently are outdated prototypes
 
+#![allow(clippy::mem_forget)]
+
 use std::{
     io,
     os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket},
@@ -167,7 +169,7 @@ impl Socket {
         let result = unsafe {
             ws::WSARecv(
                 self.as_raw_socket() as _,
-                bufs.as_mut_ptr() as *mut ws::WSABUF,
+                bufs.as_mut_ptr().cast(),
                 length,
                 &mut nread,
                 &mut flags,
@@ -197,7 +199,7 @@ impl Socket {
         let result = unsafe {
             ws::WSASend(
                 self.as_raw_socket() as _,
-                bufs.as_ptr() as *const ws::WSABUF as *mut _,
+                bufs.as_ptr().cast::<ws::WSABUF>() as *mut _,
                 length,
                 &mut nwritten,
                 0,
@@ -289,12 +291,6 @@ impl UnixListener {
     pub(crate) fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         self.0.set_nonblocking(nonblocking)
     }
-
-    #[inline]
-    pub(crate) fn as_mio(&self) -> mio::net::TcpListener {
-        // SAFETY: trait method is unsafe, but not really unsafe
-        unsafe { mio::net::TcpListener::from_raw_socket(self.as_raw_socket()) }
-    }
 }
 
 impl AsRawSocket for UnixListener {
@@ -373,12 +369,6 @@ impl UnixStream {
     #[inline]
     pub(crate) fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         self.0.set_nonblocking(nonblocking)
-    }
-
-    #[inline]
-    pub(crate) fn as_mio(&self) -> mio::net::TcpStream {
-        // SAFETY: trait method is unsafe, but not really unsafe
-        unsafe { mio::net::TcpStream::from_raw_socket(self.as_raw_socket()) }
     }
 }
 
