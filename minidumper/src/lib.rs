@@ -115,8 +115,15 @@ pub trait ServerHandler: Send + Sync {
     /// A return value of true indicates that the message loop should exit and
     /// stop processing messages.
     fn on_minidump_created(&self, result: Result<MinidumpBinary, Error>) -> bool;
-    /// Called when the client sends a message _other_ than a crash event
+    /// Called when the client sends a user message sent from the client with
+    /// `send_message`
     fn on_message(&self, kind: u32, buffer: Vec<u8>);
+    /// Optional allocation function for the buffer used to store a message.
+    ///
+    /// Defaults to creating a new vec.
+    fn message_alloc(&self) -> Vec<u8> {
+        Vec::new()
+    }
 }
 
 #[derive(Copy, Clone)]

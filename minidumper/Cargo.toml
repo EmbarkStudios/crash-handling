@@ -34,9 +34,9 @@ scroll = "0.11"
 [target.'cfg(target_os = "windows")'.dependencies.windows-sys]
 version = "0.34" # Matches the version used in mio/miow
 features = [
-    "Win32_Foundation",               # Core types eg HANDLE
-    "Win32_System_Diagnostics_Debug", # ReadProcessMemory, WriteMinidump
-    "Win32_System_Threading",         # *Event functions, OpenProcess
+    "Win32_Foundation",         # Core types eg HANDLE
+    "Win32_System_Threading",   # *Event functions, OpenProcess
+    "Win32_Networking_WinSock", # Sockets
 ]
 
 [dev-dependencies]
