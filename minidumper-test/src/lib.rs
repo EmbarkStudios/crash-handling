@@ -205,6 +205,7 @@ pub fn run_client(id: &str, signal: Signal, use_thread: bool) {
     assert!(output.status.code().is_none());
     #[cfg(windows)]
     {
+        // TODO: check that the status code matches the underlying error value
         println!("client exited with {:?}", output.status.code());
     }
 }
@@ -272,7 +273,8 @@ pub fn get_native_cpu() -> Cpu {
 }
 
 pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
-    use minidump::{format, CrashReason};
+    use minidump::CrashReason;
+    use minidump_common::errors;
 
     let md = minidump::Minidump::read(md_buf).expect("failed to parse minidump");
 
@@ -299,29 +301,29 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
             #[cfg(unix)]
             Signal::Abort => {
                 verify!(CrashReason::LinuxGeneral(
-                    format::ExceptionCodeLinux::SIGABRT,
+                    errors::ExceptionCodeLinux::SIGABRT,
                     _
                 ));
             }
             #[cfg(unix)]
             Signal::Bus => {
                 verify!(CrashReason::LinuxSigbus(
-                    format::ExceptionCodeLinuxSigbusKind::BUS_ADRERR
+                    errors::ExceptionCodeLinuxSigbusKind::BUS_ADRERR
                 ));
             }
             Signal::Fpe => {
                 verify!(CrashReason::LinuxSigfpe(
-                    format::ExceptionCodeLinuxSigfpeKind::FPE_INTDIV
+                    errors::ExceptionCodeLinuxSigfpeKind::FPE_INTDIV
                 ));
             }
             Signal::Illegal => {
                 verify!(CrashReason::LinuxSigill(
-                    format::ExceptionCodeLinuxSigillKind::ILL_ILLOPN
+                    errors::ExceptionCodeLinuxSigillKind::ILL_ILLOPN
                 ));
             }
             Signal::Segv => {
                 verify!(CrashReason::LinuxSigsegv(
-                    format::ExceptionCodeLinuxSigsegvKind::SEGV_MAPERR
+                    errors::ExceptionCodeLinuxSigsegvKind::SEGV_MAPERR
                 ));
             }
             Signal::StackOverflow | Signal::StackOverflowCThread => {
@@ -329,13 +331,13 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                 // on the main thread is always reported as a SEGV_MAPERR rather than a SEGV_ACCERR like for
                 // non-main threads, so we just accept either ¯\_(ツ)_/¯
                 verify!(CrashReason::LinuxSigsegv(
-                    format::ExceptionCodeLinuxSigsegvKind::SEGV_ACCERR
-                        | format::ExceptionCodeLinuxSigsegvKind::SEGV_MAPERR
+                    errors::ExceptionCodeLinuxSigsegvKind::SEGV_ACCERR
+                        | errors::ExceptionCodeLinuxSigsegvKind::SEGV_MAPERR
                 ));
             }
             Signal::Trap => {
                 verify!(CrashReason::LinuxGeneral(
-                    format::ExceptionCodeLinux::SIGTRAP,
+                    errors::ExceptionCodeLinux::SIGTRAP,
                     _
                 ));
             }
@@ -347,27 +349,27 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
         Os::Windows => match signal {
             Signal::Fpe => {
                 verify!(CrashReason::WindowsGeneral(
-                    format::ExceptionCodeWindows::EXCEPTION_INT_DIVIDE_BY_ZERO
+                    errors::ExceptionCodeWindows::EXCEPTION_INT_DIVIDE_BY_ZERO
                 ));
             }
             Signal::Illegal => {
                 verify!(CrashReason::WindowsGeneral(
-                    format::ExceptionCodeWindows::EXCEPTION_ILLEGAL_INSTRUCTION
+                    errors::ExceptionCodeWindows::EXCEPTION_ILLEGAL_INSTRUCTION
                 ));
             }
             Signal::Segv => {
                 verify!(CrashReason::WindowsAccessViolation(
-                    format::ExceptionCodeWindowsAccessType::READ
+                    errors::ExceptionCodeWindowsAccessType::READ
                 ));
             }
             Signal::StackOverflow | Signal::StackOverflowCThread => {
                 verify!(CrashReason::WindowsGeneral(
-                    format::ExceptionCodeWindows::EXCEPTION_STACK_OVERFLOW
+                    errors::ExceptionCodeWindows::EXCEPTION_STACK_OVERFLOW
                 ));
             }
             Signal::Trap => {
                 verify!(CrashReason::WindowsGeneral(
-                    format::ExceptionCodeWindows::EXCEPTION_BREAKPOINT
+                    errors::ExceptionCodeWindows::EXCEPTION_BREAKPOINT
                 ));
             }
             #[cfg(windows)]

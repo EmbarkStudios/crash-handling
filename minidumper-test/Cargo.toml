@@ -15,6 +15,7 @@ clap = { version = "3.1", features = ["derive"] }
 cfg-if = "1.0"
 exception-handler = { path = "../exception-handler" }
 minidump = "0.10"
+minidump-common = "0.10"
 minidumper = { path = "../minidumper" }
 # This has some crazy dependencies, can enable manually if needed
 #notify-rust = "4.5"
