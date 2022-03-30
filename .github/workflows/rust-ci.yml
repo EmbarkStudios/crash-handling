@@ -6,6 +6,10 @@ on:
       - "*"
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 name: CI
 jobs:
   lint:
@@ -37,7 +41,7 @@ jobs:
     name: Test
     strategy:
       matrix:
-        os: [ubuntu-20.04]
+        os: [ubuntu-20.04, "windows-2022"]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2

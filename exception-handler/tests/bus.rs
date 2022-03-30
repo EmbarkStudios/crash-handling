@@ -1,3 +1,5 @@
+#![cfg(unix)]
+
 mod shared;
 
 #[test]

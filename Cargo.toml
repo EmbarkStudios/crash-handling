@@ -11,6 +11,6 @@ members = [
 debug = 2
 
 [patch.crates-io]
-minidump = { git = "https://github.com/luser/rust-minidump", branch = "master" }
-minidump-common = { git = "https://github.com/luser/rust-minidump", branch = "master" }
-minidump-writer = { git = "https://github.com/msirringhaus/minidump_writer_linux", branch = "main" }
+minidump-writer = { git = "https://github.com/EmbarkStudios/minidump_writer_linux", branch = "main" }
+#minidump-writer = { path = "../mdw" }
+crash-context = { path = "crash-context" }

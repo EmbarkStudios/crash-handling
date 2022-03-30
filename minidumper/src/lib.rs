@@ -88,6 +88,10 @@ cfg_if::cfg_if! {
         mod linux;
 
         pub use linux::{Client, Server};
+    } else if #[cfg(target_os = "windows")] {
+        mod windows;
+
+        pub use windows::{Client, Server};
     }
 }
 
@@ -96,14 +100,14 @@ pub struct MinidumpBinary {
     pub file: File,
     /// The path to the file as provided by [`ServerHandler::create_minidump_file`].
     pub path: PathBuf,
-    /// The in-memory contents of the minidump
+    /// The in-memory contents of the minidump, may be empty
     pub contents: Vec<u8>,
 }
 
 /// Allows user code to hook into the server to avoid hardcoding too many details
 pub trait ServerHandler: Send + Sync {
-    /// Called when a crash has been received and a backing file needs to be
-    /// created to store it.
+    /// Called when a crash request has been received and a backing file needs
+    /// to be created to store it.
     fn create_minidump_file(&self) -> Result<(File, PathBuf), std::io::Error>;
     /// Called when a crash has been fully written as a minidump to the provided
     /// file. Also returns the full heap buffer as well.
@@ -111,8 +115,15 @@ pub trait ServerHandler: Send + Sync {
     /// A return value of true indicates that the message loop should exit and
     /// stop processing messages.
     fn on_minidump_created(&self, result: Result<MinidumpBinary, Error>) -> bool;
-    /// Called when the client sends a message _other_ than a crash event
+    /// Called when the client sends a user message sent from the client with
+    /// `send_message`
     fn on_message(&self, kind: u32, buffer: Vec<u8>);
+    /// Optional allocation function for the buffer used to store a message.
+    ///
+    /// Defaults to creating a new vec.
+    fn message_alloc(&self) -> Vec<u8> {
+        Vec::new()
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -142,6 +153,14 @@ impl Header {
         unsafe {
             Some(*buf.as_ptr().cast::<Self>())
         }
+    }
+}
+
+#[inline]
+#[allow(unsafe_code, dead_code)]
+pub(crate) fn write_stderr(s: &'static str) {
+    unsafe {
+        libc::write(2, s.as_ptr().cast(), s.len() as _);
     }
 }
 

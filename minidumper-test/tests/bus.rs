@@ -1,3 +1,5 @@
+#![cfg(unix)]
+
 use minidumper_test::*;
 
 #[test]

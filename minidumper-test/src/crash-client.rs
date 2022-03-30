@@ -5,7 +5,7 @@ use clap::Parser;
 #[derive(Parser)]
 struct Command {
     /// The unique identifier for the socket connection and the minidump file
-    /// that should be produced when this clietn
+    /// that should be produced when this client crashes
     #[clap(long)]
     id: String,
     /// The signal/exception to raise
@@ -80,9 +80,11 @@ fn real_main() -> anyhow::Result<()> {
             // cheat?
             sadness_generator::raise_abort();
         }
+        #[cfg(unix)]
         Signal::Abort => {
             sadness_generator::raise_abort();
         }
+        #[cfg(unix)]
         Signal::Bus => {
             sadness_generator::raise_bus(bf.to_str().unwrap());
         }
@@ -96,7 +98,22 @@ fn real_main() -> anyhow::Result<()> {
             sadness_generator::raise_stack_overflow();
         }
         Signal::StackOverflowCThread => {
-            sadness_generator::raise_stack_overflow_in_non_rust_thread_normal();
+            #[cfg(unix)]
+            {
+                sadness_generator::raise_stack_overflow_in_non_rust_thread_normal();
+            }
+            #[cfg(windows)]
+            {
+                unimplemented!();
+            }
+        }
+        #[cfg(windows)]
+        Signal::Purecall => {
+            sadness_generator::raise_purecall();
+        }
+        #[cfg(windows)]
+        Signal::InvalidParameter => {
+            sadness_generator::raise_invalid_parameter();
         }
     };
 
