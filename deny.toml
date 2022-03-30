@@ -1,6 +1,7 @@
 targets = [
     { triple = "x86_64-unknown-linux-gnu" },
     { triple = "x86_64-unknown-linux-musl" },
+    { triple = "x86_64-pc-windows-msvc" },
 ]
 
 [advisories]
@@ -53,15 +54,14 @@ skip = [
     # range-map uses an old version, and is unfortunately unmaintained and has
     # not seen a release in 5 years
     { name = "num-traits", version = "=0.1.43" },
+    # parking_lot unfortunatley uses an outdated version
+    { name = "windows-sys", version = "=0.32.0" },
 ]
 
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
-allow-git = [
-    "https://github.com/luser/rust-minidump",
-    "https://github.com/msirringhaus/minidump_writer_linux",
-]
+allow-git = []
 
 [sources.allow-org]
-github = ["EmbarkStudios"]
+github = ["EmbarkStudios", "rust-minidump"]
