@@ -8,10 +8,8 @@ pub struct Server {
 struct ClientConn {
     /// The actual socket connection we established with accept
     socket: uds::UnixStream,
-
-    /// The token we associated with the socket with the mio registry
+    /// The key we associated with the socket
     key: usize,
-    //token: mio::Token,
 }
 
 impl ClientConn {
@@ -20,7 +18,7 @@ impl ClientConn {
         Self { socket, key }
     }
 
-    fn recv(&mut self) -> Option<(u32, Vec<u8>)> {
+    fn recv(&mut self, handler: &dyn crate::ServerHandler) -> Option<(u32, Vec<u8>)> {
         use std::io::IoSliceMut;
 
         let mut hdr_buf = [0u8; std::mem::size_of::<crate::Header>()];
@@ -31,7 +29,7 @@ impl ClientConn {
         }
 
         let header = crate::Header::from_bytes(&hdr_buf)?;
-        let mut buffer = Vec::new();
+        let mut buffer = handler.message_alloc();
 
         buffer.resize(header.size as usize, 0);
 
@@ -102,7 +100,7 @@ impl Server {
                     // We need to reregister insterest every time
                     poll.modify(&self.listener, Event::readable(0))?;
                 } else if let Some(pos) = clients.iter().position(|cc| cc.key == event.key) {
-                    let deregister = match clients[pos].recv() {
+                    let deregister = match clients[pos].recv(handler.as_ref()) {
                         Some((0, crash_context)) => {
                             let cc = clients.swap_remove(pos);
 

@@ -3,23 +3,23 @@ use crate::Error;
 use uds::nonblocking::{UnixSeqpacketConn, UnixSeqpacketListener};
 
 pub struct Server {
-    socket: UnixSeqpacketListener,
+    listener: UnixSeqpacketListener,
 }
 
 struct ClientConn {
     /// The actual socket connection we established with accept
     socket: UnixSeqpacketConn,
-    /// The token we associated with the socket with the mio registry
-    token: mio::Token,
+    /// The key we associated with the socket
+    key: usize,
 }
 
 impl ClientConn {
     #[inline]
-    fn new(socket: UnixSeqpacketConn, token: mio::Token) -> Self {
-        Self { socket, token }
+    fn new(socket: UnixSeqpacketConn, key: usize) -> Self {
+        Self { socket, key }
     }
 
-    fn recv(&mut self) -> Option<(u32, Vec<u8>)> {
+    fn recv(&mut self, handler: &dyn crate::ServerHandler) -> Option<(u32, Vec<u8>)> {
         use std::io::IoSliceMut;
 
         let mut hdr_buf = [0u8; std::mem::size_of::<crate::Header>()];
@@ -30,7 +30,7 @@ impl ClientConn {
         }
 
         let header = crate::Header::from_bytes(&hdr_buf)?;
-        let mut buffer = Vec::new();
+        let mut buffer = handler.message_alloc();
 
         buffer.resize(header.size as usize, 0);
 
@@ -50,7 +50,7 @@ impl Server {
             uds::UnixSocketAddr::from_abstract(name.as_ref()).map_err(|_err| Error::InvalidName)?;
 
         Ok(Self {
-            socket: UnixSeqpacketListener::bind_unix_addr(&socket_addr)?,
+            listener: UnixSeqpacketListener::bind_unix_addr(&socket_addr)?,
         })
     }
 
@@ -61,12 +61,12 @@ impl Server {
         handler: Box<dyn crate::ServerHandler>,
         shutdown: &std::sync::atomic::AtomicBool,
     ) -> Result<(), Error> {
-        use mio::{Events, Interest, Poll, Token};
+        use polling::{Event, Poller};
 
-        let mut poll = Poll::new()?;
-        let mut events = Events::with_capacity(10);
-        poll.registry()
-            .register(&mut &self.socket, Token(0), Interest::READABLE)?;
+        let poll = Poller::new()?;
+        let mut events = Vec::new();
+
+        poll.add(&self.listener, Event::readable(0))?;
 
         let mut clients = Vec::new();
         let mut id = 1;
@@ -76,29 +76,32 @@ impl Server {
                 return Ok(());
             }
 
-            poll.poll(&mut events, Some(std::time::Duration::from_millis(10)))?;
+            events.clear();
+            poll.wait(&mut events, Some(std::time::Duration::from_millis(10)))?;
 
             for event in events.iter() {
-                if event.token().0 == 0 {
-                    match self.socket.accept_unix_addr() {
-                        Ok((mut accepted, _addr)) => {
-                            let token = Token(id);
+                if event.key == 0 {
+                    match self.listener.accept_unix_addr() {
+                        Ok((accepted, _addr)) => {
+                            let key = id;
                             id += 1;
 
-                            poll.registry()
-                                .register(&mut accepted, token, Interest::READABLE)?;
+                            poll.add(&accepted, Event::readable(key))?;
 
-                            log::debug!("accepted connection {}", token.0);
-                            clients.push(ClientConn::new(accepted, token));
+                            log::debug!("accepted connection {}", key);
+                            clients.push(ClientConn::new(accepted, key));
                         }
                         Err(err) => {
                             log::error!("failed to accept socket connection: {}", err);
                         }
                     }
-                } else if let Some(pos) = clients.iter().position(|cc| cc.token == event.token()) {
-                    match clients[pos].recv() {
+
+                    // We need to reregister insterest every time
+                    poll.modify(&self.listener, Event::readable(0))?;
+                } else if let Some(pos) = clients.iter().position(|cc| cc.key == event.key) {
+                    let deregister = match clients[pos].recv(handler.as_ref()) {
                         Some((0, crash_context)) => {
-                            let mut cc = clients.swap_remove(pos);
+                            let cc = clients.swap_remove(pos);
 
                             let exit = match Self::handle_crash_request(
                                 &cc.socket,
@@ -115,10 +118,6 @@ impl Server {
                                 }
                             };
 
-                            if let Err(e) = poll.registry().deregister(&mut cc.socket) {
-                                log::error!("failed to deregister socket: {}", e);
-                            }
-
                             if let Err(e) = cc.socket.send(&[1]) {
                                 log::error!("failed to send ack: {}", e);
                             }
@@ -126,6 +125,8 @@ impl Server {
                             if exit {
                                 return Ok(());
                             }
+
+                            Some(cc.socket)
                         }
                         Some((kind, buffer)) => {
                             handler.on_message(
@@ -136,15 +137,22 @@ impl Server {
                             if let Err(e) = clients[pos].socket.send(&[1]) {
                                 log::error!("failed to send ack: {}", e);
                             }
+
+                            None
                         }
                         None => {
                             log::debug!("client closed socket {}", pos);
-                            let mut cc = clients.swap_remove(pos);
-
-                            if let Err(e) = poll.registry().deregister(&mut cc.socket) {
-                                log::error!("failed to deregister socket: {}", e);
-                            }
+                            let cc = clients.swap_remove(pos);
+                            Some(cc.socket)
                         }
+                    };
+
+                    if let Some(socket) = deregister {
+                        if let Err(e) = poll.delete(&socket) {
+                            log::error!("failed to deregister socket: {}", e);
+                        }
+                    } else {
+                        poll.modify(&clients[pos].socket, Event::readable(clients[pos].key))?;
                     }
                 }
             }
