@@ -1,6 +1,6 @@
-//! Implements support for Unix domain sockets for Windows. This should be moved
-//! into the `uds` crate or `mio` or some other crate, but all of the ones I have
-//! found currently are outdated prototypes
+//! Implements support for Unix domain sockets for Windows. This should probably
+//! be a part of an external crate such as `uds`, but currently no Rust crates
+//! support them, or if they do, use outdated dependencies such as winapi
 
 #![allow(clippy::mem_forget)]
 
@@ -13,7 +13,6 @@ use windows_sys::Win32::{
     Networking::WinSock as ws,
 };
 
-// copy of mio's init since it isn't publicly exposed
 pub(crate) fn init() {
     static INIT: parking_lot::Once = parking_lot::Once::new();
     INIT.call_once(|| {

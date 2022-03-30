@@ -3,9 +3,6 @@ use crate::Error;
 use std::io;
 
 pub struct Client {
-    /// The pipe handle. Note that we don't use mio's `NamedPipe` here since the
-    /// client side is fairly simple and importantly uses eg. `TransactNamedPipe`
-    /// which might interfere with mio
     socket: UnixStream,
 }
 
