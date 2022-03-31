@@ -11,7 +11,7 @@ libc = "0.2"
 # Basic log emitting
 log = "0.4"
 # Minidump writing (currently linux/android only)
-minidump-writer = { git = "https://github.com/EmbarkStudios/minidump_writer_linux", branch = "main" }
+minidump-writer = { git = "https://github.com/EmbarkStudios/minidump_writer_linux", rev = "7f5b7d7" } # branch = "main"
 # Event loop
 polling = "2.2"
 # Nicer locking primitives
@@ -21,7 +21,7 @@ thiserror = "1.0"
 
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
 # Improved Unix domain socket support, includes features that are not available in std
-uds = { git = "https://github.com/EmbarkStudios/uds", branch = "master" }
+uds = "0.2.6"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 # Nicer binary interop

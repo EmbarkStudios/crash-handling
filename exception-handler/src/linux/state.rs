@@ -4,8 +4,6 @@ use std::{mem, ptr};
 const MIN_STACK_SIZE: usize = 16 * 1024;
 /// kill
 pub(crate) const SI_USER: i32 = 0;
-/// tkill, tgkill
-const SI_TKILL: i32 = -6;
 
 struct StackSave {
     old: Option<libc::stack_t>,
@@ -353,14 +351,8 @@ impl HandlerInner {
         // that we require
         let nix_info = &*((info as *const libc::siginfo_t).cast::<libc::signalfd_siginfo>());
 
-        // Allow ourselves to be dumped if the signal is trusted.
-        if info.si_code > 0
-            || ((info.si_code == SI_USER || info.si_code == SI_TKILL)
-                && nix_info.ssi_pid == std::process::id())
-        {
-            libc::syscall(libc::SYS_prctl, libc::PR_SET_DUMPABLE, 1, 0, 0, 0);
-        }
-
+        // Allow ourselves to be dumped, if that is what the user handler wishes to do
+        let _set_dumpable = SetDumpable::new();
         let mut crash_ctx = CRASH_CONTEXT.lock();
 
         {
@@ -391,5 +383,37 @@ impl HandlerInner {
         }
 
         self.handler.on_crash(&*crash_ctx.as_ptr())
+    }
+}
+
+/// We define these constans ourselves rather than use libc as they are missing
+/// from eg. Android
+const PR_GET_DUMPABLE: i32 = 3;
+const PR_SET_DUMPABLE: i32 = 4;
+
+/// Helper that sets the process as dumpable if it is not, and when dropped
+/// returns it back to the original state if needed
+struct SetDumpable {
+    was_dumpable: bool,
+}
+
+impl SetDumpable {
+    unsafe fn new() -> Self {
+        let is_dumpable = libc::syscall(libc::SYS_prctl, PR_GET_DUMPABLE, 0, 0, 0, 0);
+        let was_dumpable = is_dumpable > 0;
+
+        if !was_dumpable {
+            libc::syscall(libc::SYS_prctl, PR_SET_DUMPABLE, 1, 0, 0, 0);
+        }
+
+        Self { was_dumpable }
+    }
+}
+
+impl Drop for SetDumpable {
+    fn drop(&mut self) {
+        if !self.was_dumpable {
+            unsafe { libc::syscall(libc::SYS_prctl, PR_SET_DUMPABLE, 0, 0, 0, 0) };
+        }
     }
 }

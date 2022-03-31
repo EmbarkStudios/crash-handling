@@ -23,7 +23,7 @@ impl ClientConn {
         use std::io::IoSliceMut;
 
         let mut hdr_buf = [0u8; std::mem::size_of::<crate::Header>()];
-        let len = self.socket.peek(&mut hdr_buf).ok()?;
+        let (len, _trunc) = self.socket.peek(&mut hdr_buf).ok()?;
 
         if len == 0 {
             return None;
