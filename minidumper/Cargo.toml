@@ -11,7 +11,7 @@ libc = "0.2"
 # Basic log emitting
 log = "0.4"
 # Minidump writing (currently linux/android only)
-minidump-writer = "0.1"
+minidump-writer = { git = "https://github.com/EmbarkStudios/minidump_writer_linux", branch = "main" }
 # Event loop
 polling = "2.2"
 # Nicer locking primitives
