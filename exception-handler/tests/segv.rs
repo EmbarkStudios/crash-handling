@@ -2,11 +2,8 @@ mod shared;
 
 #[test]
 fn handles_segv() {
-    #[cfg(unix)]
-    shared::handles_signal(shared::Signal::Segv, sadness_generator::raise_segfault);
-    #[cfg(windows)]
     shared::handles_exception(
-        shared::ExceptionCode::Segv,
+        shared::ExceptionKind::SigSegv,
         sadness_generator::raise_segfault,
     );
 

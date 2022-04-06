@@ -2,19 +2,19 @@ mod shared;
 
 #[test]
 fn handles_stack_overflow() {
-    #[cfg(unix)]
-    {
-        // TODO: figure out why this hangs in GHA
-        if std::env::var("CI").is_err() {
-            shared::handles_signal(
-                shared::Signal::Segv,
-                sadness_generator::raise_stack_overflow,
-            );
-        }
-    }
-    #[cfg(windows)]
+    // #[cfg(unix)]
+    // {
+    //     // TODO: figure out why this hangs in GHA
+    //     if std::env::var("CI").is_err() {
+    //         shared::handles_exception(
+    //             shared::ExceptionKind::StackOverflow,
+    //             sadness_generator::raise_stack_overflow,
+    //         );
+    //     }
+    // }
+    // #[cfg(windows)]
     shared::handles_exception(
-        shared::ExceptionCode::StackOverflow,
+        shared::ExceptionKind::StackOverflow,
         sadness_generator::raise_stack_overflow,
     );
 }
@@ -25,8 +25,8 @@ fn handles_stack_overflow() {
 #[cfg(unix)]
 #[test]
 fn handles_stack_overflow_in_c_thread() {
-    shared::handles_signal(
-        shared::Signal::Segv,
+    shared::handles_exception(
+        shared::ExceptionKind::StackOverflow,
         sadness_generator::raise_stack_overflow_in_non_rust_thread_longjmp,
     );
 }

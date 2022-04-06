@@ -244,14 +244,14 @@ unsafe extern "C" fn signal_handler(
     {
         let handlers = HANDLER_STACK.lock();
 
-        // Sometimes, Breakpad runs inside a process where some other buggy code
-        // saves and restores signal handlers temporarily with 'signal'
-        // instead of 'sigaction'. This loses the SA_SIGINFO flag associated
-        // with this function. As a consequence, the values of 'info' and 'uc'
-        // become totally bogus, generally inducing a crash.
+        // We might run inside a process where some other buggy code saves and
+        // restores signal handlers temporarily with `signal` instead of `sigaction`.
+        // This loses the `SA_SIGINFO` flag associated with this function. As a
+        // consequence, the values of `info` and `uc` become totally bogus,
+        // generally inducing a crash.
         //
         // The following code tries to detect this case. When it does, it
-        // resets the signal handlers with sigaction + SA_SIGINFO and returns.
+        // resets the signal handlers with `sigaction` & `SA_SIGINFO` and returns.
         // This forces the signal to be thrown again, but this time the kernel
         // will call the function with the right arguments.
         {

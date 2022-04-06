@@ -44,11 +44,6 @@ impl ExceptionHandler {
     /// The provided callback will be invoked if an exception is caught,
     /// providing a [`CrashContext`] with the details of the thread where the
     /// exception was thrown.
-    ///
-    /// The callback runs in a compromised context, so it is highly recommended
-    /// to not perform actions that may fail due to corrupted state that caused
-    /// or is a symptom of the original exception. This includes doing heap
-    /// allocations from the same allocator as the crashing code.
     pub fn attach(on_crash: Box<dyn crate::CrashEvent>) -> Result<Self, Error> {
         let inner = {
             let mut handlers = state::HANDLER_STACK.lock();

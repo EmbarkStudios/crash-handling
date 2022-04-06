@@ -113,7 +113,12 @@ pub fn write_stderr(s: &'static str) {
 }
 
 cfg_if::cfg_if! {
-    if #[cfg(unix)] {
+    if #[cfg(all(unix, not(target_os = "macos")))] {
+        /// The sole purpose of the unix module is to hook pthread_create to ensure
+        /// an alternate stack is installed for every native thread in case of a
+        /// stack overflow. This doesn't apply to MacOS as it uses exception ports,
+        /// which are always delivered to a specific thread owned by the exception
+        /// handler
         pub mod unix;
     }
 }
@@ -124,15 +129,31 @@ pub use crash_context::CrashContext;
 ///
 /// # Safety
 ///
-/// This trait is marked unsafe as  care needs to be taken when implementing it
-/// due to running in a compromised context. Notably, only a small subset of
-/// libc functions are [async signal safe](https://man7.org/linux/man-pages/man7/signal-safety.7.html)
+/// This trait is marked unsafe as care needs to be taken when implementing it
+/// due to running in a compromised context. In general, it is advised to do as
+/// _little_ as possible when handling an exception, with more complicated or
+/// dangerous (in a compromised context) code being intialized before the
+/// [`ExceptionHandler`] is installed, or hoisted out to another process entirely.
+///
+/// ## Linux
+///
+/// Notably, only a small subset of libc functions are
+/// [async signal safe](https://man7.org/linux/man-pages/man7/signal-safety.7.html)
 /// and calling non-safe ones can have undefined behavior, including such common
-/// ones as `malloc` (if using a multi-threaded allocator). In general, it is
-/// advised to do as _little_ as possible when handling a signal, with more
-/// complicated or dangerous (in a compromised context) code being intialized
-/// before the signal handler is installed, or hoisted out to an entirely
-/// different sub-process.
+/// ones as `malloc` (especially if using a multi-threaded allocator).
+///
+/// ## Windows
+///
+/// Windows [structured exceptions](https://docs.microsoft.com/en-us/windows/win32/debug/structured-exception-handling)
+/// don't have the a notion similar to signal safety, but it is again recommended
+/// to do as little work as possible in response to an exception.
+///
+/// ## Macos
+///
+/// Mac uses exception ports (sorry, can't give a good link here since Apple
+/// documentation is terrible) which are handled by a thread owned by the
+/// exception handler which makes them slightly safer to handle than UNIX signals,
+/// but it is again recommended to do as little work as possible.
 pub unsafe trait CrashEvent: Send + Sync {
     /// Method invoked when a crash occurs. Returning true indicates your handler
     /// has processed the crash and that no further handlers should run.
@@ -167,14 +188,16 @@ where
 
 cfg_if::cfg_if! {
     if #[cfg(any(target_os = "linux", target_os = "android"))] {
-        #[macro_use]
         pub mod linux;
 
         pub use linux::{ExceptionHandler, Signal};
     } else if #[cfg(target_os = "windows")] {
-        #[macro_use]
         pub mod windows;
 
         pub use windows::{ExceptionHandler, ExceptionCode};
+    } else if #[cfg(target_os = "macos")] {
+        pub mod mac;
+
+        pub use mac::{ExceptionHandler, ExceptionType};
     }
 }

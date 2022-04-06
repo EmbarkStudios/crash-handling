@@ -11,7 +11,7 @@ pub enum SadnessFlavors {
     Illegal,
     /// Raises `SIGBUS` on unix
     #[cfg(unix)]
-    Bus { path: String },
+    Bus,
     /// Raises `SIGTRAP` on unix and a `EXCEPTION_BREAKPOINT` exception on windows
     Trap,
     /// Raises `SIGSEGV` on unix and a `EXCEPTION_STACK_OVERFLOW` exception on windows
@@ -41,7 +41,7 @@ impl SadnessFlavors {
             Self::DivideByZero => raise_floating_point_exception(),
             Self::Illegal => raise_illegal_instruction(),
             #[cfg(unix)]
-            Self::Bus { path } => raise_bus(&path),
+            Self::Bus => raise_bus(),
             Self::Trap => raise_trap(),
             #[allow(unused_variables)]
             Self::StackOverflow {
@@ -126,26 +126,41 @@ pub fn raise_illegal_instruction() {
 
 /// [`SadnessFlavors::Bus`]
 #[cfg(unix)]
-pub fn raise_bus(path: &str) {
-    let path = std::ffi::CString::new(path).unwrap();
-
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+pub fn raise_bus() {
     unsafe {
-        let bus_fd = libc::open(path.as_ptr(), libc::O_RDWR | libc::O_CREAT, 0o666);
-        let mapping = std::slice::from_raw_parts_mut(
-            libc::mmap(
-                std::ptr::null_mut(),
-                128,
-                libc::PROT_READ | libc::PROT_WRITE,
-                libc::MAP_SHARED,
-                bus_fd,
-                0,
-            )
-            .cast::<u8>(),
-            128,
-        );
+        {
+            let bus_fd = libc::open(
+                "sigbus.txt\0".as_ptr().cast(),
+                libc::O_RDWR | libc::O_CREAT,
+                0o666,
+            );
 
-        println!("{}", mapping[1]);
+            let page_size = libc::sysconf(libc::_SC_PAGESIZE) as usize;
+
+            let mapping = std::slice::from_raw_parts_mut(
+                libc::mmap(
+                    std::ptr::null_mut(),
+                    128,
+                    libc::PROT_READ | libc::PROT_WRITE,
+                    libc::MAP_SHARED,
+                    bus_fd,
+                    0,
+                )
+                .cast::<u8>(),
+                page_size + page_size / 2,
+            );
+
+            libc::unlink("sigbus.txt\0".as_ptr().cast());
+
+            // https://pubs.opengroup.org/onlinepubs/9699919799/functions/mmap.html
+            // The system shall always zero-fill any partial page at the end of
+            // an object. Further, the system shall never write out any modified
+            // portions of the last page of an object which are beyond its end.
+            // References within the address range starting at pa and continuing
+            // for len bytes to whole pages following the end of an object shall
+            // result in delivery of a SIGBUS signal.
+            println!("{}", mapping[page_size + 20]);
+        }
     }
 }
 

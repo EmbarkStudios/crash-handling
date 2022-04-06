@@ -19,7 +19,7 @@ rust-version = "1.59.0" # We use `global_asm!`
 [dependencies]
 cfg-if = "1.0"
 
-[target.'cfg(unix)'.dependencies]
+[target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
 libc = "0.2"
 
 [target.'cfg(target_os = "windows")'.dependencies.windows-sys]
@@ -29,3 +29,6 @@ features = [
     "Win32_System_Diagnostics_Debug",
     "Win32_System_Kernel",
 ]
+
+[target.'cfg(target_os = "macos")'.dependencies]
+mach2 = "0.4"

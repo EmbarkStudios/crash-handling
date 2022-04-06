@@ -36,5 +36,10 @@ features = [
     "Win32_System_Threading",
 ]
 
+[target.'cfg(target_os = "macos")'.dependencies]
+# Bindings to MacOS specific APIs that are used. Note we don't use the `mach`
+# crate as it is unmaintained
+mach2 = "0.4"
+
 [dev-dependencies]
 sadness-generator = { path = "../sadness-generator" }
