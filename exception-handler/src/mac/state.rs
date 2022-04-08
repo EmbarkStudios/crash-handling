@@ -296,6 +296,11 @@ unsafe fn handler_thread(port: mach_port_t) {
 
         match MessageIds::try_from(request.header.msgh_id) {
             Ok(MessageIds::Exception) => {
+                eprintln!(
+                    "got exception {0:x}, code: ",
+                    request.exception, request.code[0]
+                );
+
                 // When forking a child process with the exception handler installed,
                 // if the child crashes, it will send the exception back to the parent
                 // process.  The check for task == self_task() ensures that only
@@ -327,6 +332,7 @@ unsafe fn handler_thread(port: mach_port_t) {
 
                     // note that we don't resume threads here to match breakpad's
                     // behavior, but I'm not sure if that was an oversight?
+                    resume_threads();
                 }
 
                 // This magic incantation to send a reply back to the kernel was
