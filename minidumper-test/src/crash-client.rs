@@ -60,14 +60,6 @@ fn real_main() -> anyhow::Result<()> {
 
     let signal = cmd.signal;
 
-    let mut bf = std::env::current_dir().unwrap();
-    if bf.file_name() != Some(std::ffi::OsStr::new("minidumper-test")) {
-        bf.push("minidumper-test");
-    }
-
-    bf.push(".dumps");
-    bf.push(format!("bus-{}.txt", cmd.id));
-
     let raise_signal = move || match signal {
         Signal::Illegal => {
             sadness_generator::raise_illegal_instruction();
@@ -86,7 +78,7 @@ fn real_main() -> anyhow::Result<()> {
         }
         #[cfg(unix)]
         Signal::Bus => {
-            sadness_generator::raise_bus(bf.to_str().unwrap());
+            sadness_generator::raise_bus();
         }
         Signal::Fpe => {
             sadness_generator::raise_floating_point_exception();
