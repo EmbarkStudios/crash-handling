@@ -296,7 +296,7 @@ unsafe fn handler_thread(port: mach_port_t) {
 
         match MessageIds::try_from(request.header.msgh_id) {
             Ok(MessageIds::Exception) => {
-                eprintln!(
+                panic!(
                     "got exception {:x}, code: {:x}",
                     request.exception, request.code[0]
                 );
