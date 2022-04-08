@@ -1,3 +1,4 @@
+pub mod jmp;
 mod state;
 
 use crate::Error;
@@ -87,7 +88,7 @@ impl ExceptionHandler {
     }
 
     /// Sends the specified user signal.
-    pub fn simulate_signal(&self, signal: Signal) -> bool {
+    pub fn simulate_signal(&self, signal: Signal) -> crate::CrashEventResult {
         // Normally this would be an unsafe function, since this unsafe encompasses
         // the entirety of the body, however the user is really not required to
         // uphold any guarantees on their end, so no real need to declare the

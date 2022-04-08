@@ -241,7 +241,13 @@ unsafe extern "C" fn signal_handler(
     let info = &mut *info;
     let uc = &mut *uc;
 
-    {
+    enum Action {
+        RestoreDefault,
+        RestorePrevious,
+        Jump((*mut super::jmp::JmpBuf, i32)),
+    }
+
+    let action = {
         let handlers = HANDLER_STACK.lock();
 
         // We might run inside a process where some other buggy code saves and
@@ -278,29 +284,40 @@ unsafe extern "C" fn signal_handler(
             }
         }
 
-        let handled = (|| {
+        (|| {
             for handler in handlers.iter() {
                 if let Some(handler) = handler.upgrade() {
-                    if handler.handle_signal(sig as i32, info, uc) {
-                        return true;
+                    match handler.handle_signal(sig as i32, info, uc) {
+                        crate::CrashEventResult::Handled(true) => return Action::RestoreDefault,
+                        crate::CrashEventResult::Handled(false) => {}
+                        crate::CrashEventResult::Jump { jmp_buf, value } => {
+                            return Action::Jump((jmp_buf, value));
+                        }
                     }
                 }
             }
 
-            false
-        })();
+            Action::RestorePrevious
+        })()
+    };
 
-        // Upon returning from this signal handler, sig will become unmasked and
-        // then it will be retriggered. If one of the ExceptionHandlers handled
-        // it successfully, restore the default handler. Otherwise, restore the
-        // previously installed handler. Then, when the signal is retriggered,
-        // it will be delivered to the appropriate handler.
-        if handled {
+    // Upon returning from this signal handler, sig will become unmasked and
+    // then it will be retriggered. If one of the ExceptionHandlers handled
+    // it successfully, restore the default handler. Otherwise, restore the
+    // previously installed handler. Then, when the signal is retriggered,
+    // it will be delivered to the appropriate handler.
+    match action {
+        Action::RestoreDefault => {
             debug_print!("installing default handler");
             install_default_handler(sig);
-        } else {
+        }
+        Action::RestorePrevious => {
             debug_print!("restoring handlers");
             restore_handlers();
+        }
+        Action::Jump((jmp_buf, value)) => {
+            debug_print!("jumping");
+            super::jmp::siglongjmp(jmp_buf, value);
         }
     }
 
@@ -345,7 +362,7 @@ impl HandlerInner {
         _sig: libc::c_int,
         info: &mut libc::siginfo_t,
         uc: &mut libc::c_void,
-    ) -> bool {
+    ) -> crate::CrashEventResult {
         // The siginfo_t in libc is lowest common denominator, but this code is
         // specifically targeting linux/android, which contains the si_pid field
         // that we require

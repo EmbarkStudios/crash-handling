@@ -125,6 +125,26 @@ cfg_if::cfg_if! {
 
 pub use crash_context::CrashContext;
 
+pub enum CrashEventResult {
+    /// The event was handled in some way
+    Handled(bool),
+    /// The handler wishes to jump somewhere else, presumably to return
+    /// execution and skip the code that caused the exception
+    Jump {
+        /// The location to jump back to, retrieved via sig/setjmp
+        jmp_buf: *mut jmp::JmpBuf,
+        /// The value that will be returned from the sig/setjmp call that we
+        /// jump to. Note that if the value is 0 it will be corrected to 1
+        value: i32,
+    },
+}
+
+impl From<bool> for CrashEventResult {
+    fn from(b: bool) -> Self {
+        Self::Handled(b)
+    }
+}
+
 /// User implemented trait for handling a signal that has ocurred.
 ///
 /// # Safety
@@ -157,7 +177,7 @@ pub use crash_context::CrashContext;
 pub unsafe trait CrashEvent: Send + Sync {
     /// Method invoked when a crash occurs. Returning true indicates your handler
     /// has processed the crash and that no further handlers should run.
-    fn on_crash(&self, context: &CrashContext) -> bool;
+    fn on_crash(&self, context: &CrashContext) -> CrashEventResult;
 }
 
 /// Creates a [`CrashEvent`] using the supplied closure as the implementation.
@@ -168,7 +188,7 @@ pub unsafe trait CrashEvent: Send + Sync {
 #[inline]
 pub unsafe fn make_crash_event<F>(closure: F) -> Box<dyn CrashEvent>
 where
-    F: Send + Sync + Fn(&CrashContext) -> bool + 'static,
+    F: Send + Sync + Fn(&CrashContext) -> CrashEventResult + 'static,
 {
     struct Wrapper<F> {
         inner: F,
@@ -176,9 +196,9 @@ where
 
     unsafe impl<F> CrashEvent for Wrapper<F>
     where
-        F: Send + Sync + Fn(&CrashContext) -> bool,
+        F: Send + Sync + Fn(&CrashContext) -> CrashEventResult,
     {
-        fn on_crash(&self, context: &CrashContext) -> bool {
+        fn on_crash(&self, context: &CrashContext) -> CrashEventResult {
             (self.inner)(context)
         }
     }
@@ -190,14 +210,14 @@ cfg_if::cfg_if! {
     if #[cfg(any(target_os = "linux", target_os = "android"))] {
         pub mod linux;
 
-        pub use linux::{ExceptionHandler, Signal};
+        pub use linux::{ExceptionHandler, Signal, jmp};
     } else if #[cfg(target_os = "windows")] {
         pub mod windows;
 
-        pub use windows::{ExceptionHandler, ExceptionCode};
+        pub use windows::{ExceptionHandler, ExceptionCode, jmp};
     } else if #[cfg(target_os = "macos")] {
         pub mod mac;
 
-        pub use mac::{ExceptionHandler, ExceptionType};
+        pub use mac::{ExceptionHandler, ExceptionType, jmp};
     }
 }
