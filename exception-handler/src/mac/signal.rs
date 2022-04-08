@@ -40,20 +40,34 @@ unsafe extern "C" fn signal_handler(
     // Sanity check
     assert_eq!(signal, libc::SIGABRT);
 
-    let lock = super::state::HANDLER.lock();
-    if let Some(handler) = &*lock {
-        let exc_info = crash_context::ExceptionInfo {
-            kind: ffi::et::EXC_SOFTWARE as i32, // 5
-            code: ffi::EXC_SOFT_SIGNAL as _,    // Unix signal
-            subcode: Some(signal as _),
-        };
+    let jump = {
+        let lock = super::state::HANDLER.lock();
+        if let Some(handler) = &*lock {
+            let exc_info = crash_context::ExceptionInfo {
+                kind: ffi::et::EXC_SOFTWARE as i32, // 5
+                code: ffi::EXC_SOFT_SIGNAL as _,    // Unix signal
+                subcode: Some(signal as _),
+            };
 
-        let cc = crash_context::CrashContext {
-            task: ffi::mach_task_self(),
-            thread: ffi::mach_thread_self(),
-            exception: Some(exc_info),
-        };
+            let cc = crash_context::CrashContext {
+                task: ffi::mach_task_self(),
+                thread: ffi::mach_thread_self(),
+                exception: Some(exc_info),
+            };
 
-        handler.crash_event.on_crash(&cc);
+            if let crate::CrashEventResult::Jump { jmp_buf, value } =
+                handler.crash_event.on_crash(&cc)
+            {
+                Some((jmp_buf, value))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    };
+
+    if let Some((jmp_buf, value)) = jump {
+        super::jmp::siglongjmp(jmp_buf, value);
     }
 }
