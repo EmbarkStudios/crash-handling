@@ -17,6 +17,8 @@ pub struct CrashContext {
     pub task: mt::task_t,
     /// The thread in the process that crashed
     pub thread: mt::thread_t,
+    /// The thread that handled the exception. This may be useful to ignore.
+    pub handler_thread: mt::thread_t,
     /// Optional exception information
     pub exception: Option<ExceptionInfo>,
 }
