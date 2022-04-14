@@ -52,6 +52,9 @@ unsafe extern "C" fn signal_handler(
             let cc = crash_context::CrashContext {
                 task: ffi::mach_task_self(),
                 thread: ffi::mach_thread_self(),
+                handler_thread: super::state::HANDLER_THREAD
+                    .lock()
+                    .unwrap_or(ffi::MACH_PORT_NULL),
                 exception: Some(exc_info),
             };
 

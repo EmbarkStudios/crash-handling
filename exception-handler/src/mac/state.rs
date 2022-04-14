@@ -125,6 +125,10 @@ impl HandlerInner {
     }
 }
 
+/// The thread that is actually handling the exception port.
+pub(super) static HANDLER_THREAD: parking_lot::Mutex<Option<mach_port_t>> =
+    parking_lot::const_mutex(None);
+
 /// Creates a new `mach_port` and installs it as the new task (process) exception
 /// port so that any exceptions not handled by a thread specific exception port
 /// are sent to it, as well as a signal handler for `SIGABRT` as it is not an
@@ -206,7 +210,11 @@ pub(super) fn attach(crash_event: Box<dyn crate::CrashEvent>) -> Result<(), Erro
         // Spawn a thread that will handle the actual exception/user messages sent
         // to the exception port we've just created
         let handler_thread = std::thread::spawn(move || {
+            *HANDLER_THREAD.lock() = Some(mach_thread_self());
+
             exception_handler(handler_port);
+
+            *HANDLER_THREAD.lock() = None;
         });
 
         *lock = Some(HandlerInner {
@@ -321,6 +329,7 @@ unsafe fn exception_handler(port: mach_port_t) {
                     let cc = crash_context::CrashContext {
                         thread: request.thread.name,
                         task: request.task.name,
+                        handler_thread: mach_thread_self(),
                         exception: Some(exc_info),
                     };
 
@@ -389,6 +398,7 @@ unsafe fn exception_handler(port: mach_port_t) {
                     } else {
                         MACH_PORT_NULL
                     },
+                    handler_thread: mach_thread_self(),
                     exception,
                 };
 
