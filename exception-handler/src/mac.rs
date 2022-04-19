@@ -73,7 +73,7 @@ impl ExceptionHandler {
     #[allow(clippy::unused_self)]
     #[inline]
     pub fn detach(self) {
-        state::detach();
+        state::detach(false);
     }
 
     // Raises the specified user exception
@@ -86,6 +86,6 @@ impl ExceptionHandler {
 
 impl Drop for ExceptionHandler {
     fn drop(&mut self) {
-        state::detach();
+        state::detach(false);
     }
 }

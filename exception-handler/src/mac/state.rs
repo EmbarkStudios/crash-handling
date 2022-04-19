@@ -90,7 +90,7 @@ impl HandlerInner {
     }
 
     /// SAFETY: syscalls
-    unsafe fn shutdown(self) -> Result<(), Error> {
+    unsafe fn shutdown(self, is_handler_thread: bool) -> Result<(), Error> {
         self.uninstall()?;
 
         let mut exc_msg: ExceptionMessage = mem::zeroed();
@@ -102,7 +102,7 @@ impl HandlerInner {
             // We don't really care if there was some error in the thread, note
             // that we check the thread in case we're being uninstalled from
             // the handler thread itself
-            if self.handler_thread.id() != std::thread::current().id() {
+            if !is_handler_thread {
                 let _res = self.handler_thread.join();
             }
         }
@@ -234,13 +234,13 @@ pub(super) fn attach(crash_event: Box<dyn crate::CrashEvent>) -> Result<(), Erro
     Ok(())
 }
 
-pub(super) fn detach() {
+pub(super) fn detach(is_handler_thread: bool) {
     let mut lock = HANDLER.lock();
     if let Some(handler) = lock.take() {
         // user can't really do anything if something fails at this point, but
         // should have a clean way of surfacing the error happened
         // SAFETY: syscalls
-        let _result = unsafe { handler.shutdown() };
+        let _result = unsafe { handler.shutdown(is_handler_thread) };
     }
 }
 
@@ -350,7 +350,7 @@ unsafe fn exception_handler(port: mach_port_t) {
                     // Restores the previous exception ports, in most cases
                     // this will be the default for the OS, which will kill this
                     // process when we reply that we've handled the exception
-                    detach();
+                    detach(true);
 
                     jump
                 } else {
