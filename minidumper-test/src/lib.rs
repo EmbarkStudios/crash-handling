@@ -421,13 +421,13 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
             Signal::StackOverflow | Signal::StackOverflowCThread => {
                 verify!(CrashReason::MacGeneral(
                     errors::ExceptionCodeMac::EXC_BAD_ACCESS,
-                    0
+                    _ // This will be the an actual address
                 ));
             }
             Signal::Trap => {
                 verify!(CrashReason::MacGeneral(
                     errors::ExceptionCodeMac::EXC_BREAKPOINT,
-                    0
+                    _ // EXC_BREAKPOINT says "details in the code field" but doesn't elaborate what that means and I'm too lazy to look at more mac source code right now
                 ));
             }
             #[cfg(windows)]

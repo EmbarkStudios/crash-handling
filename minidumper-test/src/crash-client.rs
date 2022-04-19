@@ -71,7 +71,9 @@ fn real_main() -> anyhow::Result<()> {
             // For some reason on linux the default SIGTRAP action is not core
             // dumping as it is supposed to, and thus we exit normally, so..
             // cheat?
-            sadness_generator::raise_abort();
+            if cfg!(any(target_os = "linux", target_os = "android")) {
+                sadness_generator::raise_abort();
+            }
         }
         #[cfg(unix)]
         Signal::Abort => {
@@ -80,6 +82,11 @@ fn real_main() -> anyhow::Result<()> {
         #[cfg(unix)]
         Signal::Bus => {
             sadness_generator::raise_bus();
+
+            // MacOS will happily continue on after a SIGBUS, but...no
+            if cfg!(target_os = "macos") {
+                sadness_generator::raise_abort();
+            }
         }
         Signal::Fpe => {
             sadness_generator::raise_floating_point_exception();
