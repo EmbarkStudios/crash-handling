@@ -388,8 +388,9 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
         Os::MacOs => match signal {
             #[cfg(unix)]
             Signal::Abort => {
-                verify!(CrashReason::MacSoftware(
-                    errors::ExceptionCodeMacSoftwareType::SIGABRT
+                verify!(CrashReason::MacGeneral(
+                    errors::ExceptionCodeMac::EXC_SOFTWARE,
+                    0x10003, // EXC_SOFT_SIGNAL
                 ));
             }
             #[cfg(unix)]
