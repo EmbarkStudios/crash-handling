@@ -443,7 +443,16 @@ pub fn run_threaded_test(signal: Signal) {
     use rayon::prelude::*;
 
     // Github actions run on potatoes, so we limit concurrency when running CI
-    let count = if std::env::var("CI").is_ok() { 1 } else { 16 };
+    // TODO: Macos has unpredictable behavior when multiple processes are handling/dumping
+    // exceptions, I don't have time to look into this now, so for now the simple
+    // workaround is just to reduce concurrency
+    let count = if std::env::var("CI").is_ok() {
+        1
+    } else if cfg!(target_os = "macos") {
+        4
+    } else {
+        16
+    };
 
     (0..count).into_par_iter().for_each(|i| {
         run_test(signal, i, true);
