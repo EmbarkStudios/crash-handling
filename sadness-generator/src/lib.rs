@@ -131,8 +131,8 @@ pub fn raise_bus() {
         {
             let mut temp_name = [0; 14];
             temp_name.copy_from_slice(b"sigbus.XXXXXX\0");
-            let bus_fd = libc::mkostemp(temp_name.as_mut_ptr().cast(), 0);
 
+            let bus_fd = libc::mkstemp(temp_name.as_mut_ptr().cast());
             assert!(bus_fd != -1);
 
             let page_size = libc::sysconf(libc::_SC_PAGESIZE) as usize;
