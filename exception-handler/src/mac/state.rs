@@ -98,8 +98,13 @@ impl HandlerInner {
 
         if self.send_message(exc_msg) {
             mp::mach_port_deallocate(mach_task_self(), self.handler_port);
-            // We don't really care if there was some error in the thread
-            let _res = self.handler_thread.join();
+
+            // We don't really care if there was some error in the thread, note
+            // that we check the thread in case we're being uninstalled from
+            // the handler thread itself
+            if self.handler_thread.id() != std::thread::current().id() {
+                let _res = self.handler_thread.join();
+            }
         }
 
         Ok(())
