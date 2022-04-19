@@ -1,18 +1,16 @@
+use super::uds::UnixStream;
 use crate::{write_stderr, Error};
 use std::io;
 
 pub struct Client {
-    socket: uds::UnixSeqpacketConn,
+    socket: UnixStream,
 }
 
 impl Client {
     /// Creates a new client with the given name.
     pub fn with_name(path: impl AsRef<std::path::Path>) -> Result<Self, Error> {
-        let socket_addr =
-            uds::UnixSocketAddr::from_path(path.as_ref()).map_err(|_err| Error::InvalidName)?;
-
         Ok(Self {
-            socket: uds::UnixSeqpacketConn::connect_unix_addr(&socket_addr)?,
+            socket: UnixStream::connect(path)?,
         })
     }
 
@@ -69,7 +67,7 @@ impl Client {
     }
 
     /// Sends a payload to the server and receives an ack
-    fn transact(socket: &uds::UnixSeqpacketConn, kind: u32, buffer: &[u8]) -> Result<(), Error> {
+    fn transact(socket: &UnixStream, kind: u32, buffer: &[u8]) -> Result<(), Error> {
         let buffer_len = buffer.len() as u32;
 
         let header = crate::Header {

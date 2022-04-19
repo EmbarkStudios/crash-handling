@@ -1,21 +1,21 @@
 use crate::Error;
 
-use uds::nonblocking::{UnixSeqpacketConn, UnixSeqpacketListener};
+use super::uds::{UnixListener, UnixStream};
 
 pub struct Server {
-    listener: UnixSeqpacketListener,
+    listener: UnixListener,
 }
 
 struct ClientConn {
     /// The actual socket connection we established with accept
-    socket: UnixSeqpacketConn,
+    socket: UnixStream,
     /// The key we associated with the socket
     key: usize,
 }
 
 impl ClientConn {
     #[inline]
-    fn new(socket: UnixSeqpacketConn, key: usize) -> Self {
+    fn new(socket: UnixStream, key: usize) -> Self {
         Self { socket, key }
     }
 
@@ -23,7 +23,7 @@ impl ClientConn {
         use std::io::IoSliceMut;
 
         let mut hdr_buf = [0u8; std::mem::size_of::<crate::Header>()];
-        let (len, _trunc) = self.socket.peek(&mut hdr_buf).ok()?;
+        let len = self.socket.peek(&mut hdr_buf).ok()?;
 
         if len == 0 {
             return None;
@@ -34,7 +34,7 @@ impl ClientConn {
 
         buffer.resize(header.size as usize, 0);
 
-        let (_len, _trunc) = self
+        let _len = self
             .socket
             .recv_vectored(&mut [IoSliceMut::new(&mut hdr_buf), IoSliceMut::new(&mut buffer)])
             .ok()?;
@@ -46,17 +46,15 @@ impl ClientConn {
 impl Server {
     /// Creates a new server with the given path.
     pub fn with_name(path: impl AsRef<std::path::Path>) -> Result<Self, Error> {
-        // Windows is not good about cleaning these up, so we assume the user,
+        // Dunno if Mac is good about cleaning these up, so we assume the user,
         // who has control over what path they specify, is ok with deleting
         // previous sockets that weren't cleaned up
         let _res = std::fs::remove_file(path.as_ref());
 
-        let socket_addr =
-            uds::UnixSocketAddr::from_path(path.as_ref()).map_err(|_err| Error::InvalidName)?;
+        let listener = UnixListener::bind(path)?;
+        listener.set_nonblocking(true)?;
 
-        Ok(Self {
-            listener: UnixSeqpacketListener::bind_unix_addr(&socket_addr)?,
-        })
+        Ok(Self { listener })
     }
 
     /// Runs the server loop, accepting client connections and requests to
@@ -86,11 +84,12 @@ impl Server {
 
             for event in events.iter() {
                 if event.key == 0 {
-                    match self.listener.accept_unix_addr() {
+                    match self.listener.accept() {
                         Ok((accepted, _addr)) => {
                             let key = id;
                             id += 1;
 
+                            accepted.set_nonblocking(true)?;
                             poll.add(&accepted, Event::readable(key))?;
 
                             log::debug!("accepted connection {}", key);

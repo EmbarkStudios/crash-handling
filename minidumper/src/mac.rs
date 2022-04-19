@@ -1,5 +1,6 @@
 mod client;
 mod server;
+mod uds;
 
 pub use client::Client;
 pub use server::Server;

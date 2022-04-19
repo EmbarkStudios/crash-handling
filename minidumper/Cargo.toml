@@ -20,7 +20,7 @@ parking_lot = "0.12"
 # Nicer error creation
 thiserror = "1.0"
 
-[target.'cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))'.dependencies]
+[target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
 # Improved Unix domain socket support, includes features that are not available in std
 uds = "0.2.6"
 
