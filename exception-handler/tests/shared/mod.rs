@@ -89,7 +89,7 @@ pub fn handles_exception(signal: ExceptionKind, raiser: impl Fn()) {
 
                         // Unlike other platforms, the mac handler is run in its
                         // own thread, this means that we can't realistically
-                        // so a longjmp since the exception was raised on a
+                        // do a longjmp since the exception was raised on a
                         // different thread, so instead we just take advantage
                         // of the fact that we only run a single test per executable
                         // in these integration tests and just exit the entire

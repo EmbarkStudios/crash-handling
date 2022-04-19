@@ -397,7 +397,7 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
             Signal::Bus => {
                 verify!(CrashReason::MacGeneral(
                     errors::ExceptionCodeMac::EXC_BAD_ACCESS,
-                    0
+                    _ // This will be an actual address
                 ));
             }
             Signal::Fpe => {
