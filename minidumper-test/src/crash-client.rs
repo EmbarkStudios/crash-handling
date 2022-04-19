@@ -54,7 +54,8 @@ fn real_main() -> anyhow::Result<()> {
 
     let _handler = exception_handler::ExceptionHandler::attach(unsafe {
         exception_handler::make_crash_event(move |cc: &exception_handler::CrashContext| {
-            md_client.request_dump(cc, true).is_ok()
+            let handled = md_client.request_dump(cc, true).is_ok();
+            exception_handler::CrashEventResult::Handled(handled)
         })
     });
 

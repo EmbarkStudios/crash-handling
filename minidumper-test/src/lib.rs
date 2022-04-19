@@ -252,7 +252,7 @@ pub fn get_native_os() -> Os {
         } else if #[cfg(target_os = "windows")] {
             Os::Windows
         } else {
-            compile_error!("implement me");
+            Os::MacOs
         }
     }
 }
@@ -383,6 +383,55 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
             #[cfg(unix)]
             Signal::Bus | Signal::Abort => {
                 unreachable!();
+            }
+        },
+        Os::MacOs => match signal {
+            #[cfg(unix)]
+            Signal::Abort => {
+                verify!(CrashReason::MacSoftware(
+                    errors::ExceptionCodeMacSoftwareType::SIGABRT
+                ));
+            }
+            #[cfg(unix)]
+            Signal::Bus => {
+                verify!(CrashReason::MacGeneral(
+                    errors::ExceptionCodeMac::EXC_BAD_ACCESS,
+                    0
+                ));
+            }
+            Signal::Fpe => {
+                verify!(CrashReason::MacGeneral(
+                    errors::ExceptionCodeMac::EXC_ARITHMETIC,
+                    0
+                ));
+            }
+            Signal::Illegal => {
+                verify!(CrashReason::MacGeneral(
+                    errors::ExceptionCodeMac::EXC_BAD_INSTRUCTION,
+                    0
+                ));
+            }
+            Signal::Segv => {
+                verify!(CrashReason::MacGeneral(
+                    errors::ExceptionCodeMac::EXC_BAD_ACCESS,
+                    0
+                ));
+            }
+            Signal::StackOverflow | Signal::StackOverflowCThread => {
+                verify!(CrashReason::MacGeneral(
+                    errors::ExceptionCodeMac::EXC_BAD_ACCESS,
+                    0
+                ));
+            }
+            Signal::Trap => {
+                verify!(CrashReason::MacGeneral(
+                    errors::ExceptionCodeMac::EXC_BREAKPOINT,
+                    0
+                ));
+            }
+            #[cfg(windows)]
+            Signal::Purecall | Signal::InvalidParameter => {
+                unreachable!("windows only");
             }
         },
         _ => unimplemented!(),
