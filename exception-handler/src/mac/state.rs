@@ -232,9 +232,9 @@ pub(super) fn attach(crash_event: Box<dyn crate::CrashEvent>) -> Result<(), Erro
 pub(super) fn detach() {
     let mut lock = HANDLER.lock();
     if let Some(handler) = lock.take() {
-        // SAFETY: syscalls
         // user can't really do anything if something fails at this point, but
         // should have a clean way of surfacing the error happened
+        // SAFETY: syscalls
         let _result = unsafe { handler.shutdown() };
     }
 }
@@ -340,7 +340,12 @@ unsafe fn exception_handler(port: mach_port_t) {
 
                     // note that we don't resume threads here to match breakpad's
                     // behavior, but I'm not sure if that was an oversight?
-                    resume_threads();
+                    //resume_threads();
+
+                    // Restores the previous exception ports, in most cases
+                    // this will be the default for the OS, which will kill this
+                    // process when we reply that we've handled the exception
+                    detach();
 
                     jump
                 } else {
