@@ -129,11 +129,11 @@ pub fn raise_illegal_instruction() {
 pub fn raise_bus() {
     unsafe {
         {
-            let bus_fd = libc::open(
-                "sigbus.txt\0".as_ptr().cast(),
-                libc::O_RDWR | libc::O_CREAT,
-                0o666,
-            );
+            let mut temp_name = [0; 14];
+            temp_name.copy_from_slice(b"sigbus.XXXXXX\0");
+            let bus_fd = libc::mkostemp(temp_name.as_mut_ptr().cast(), 0);
+
+            assert!(bus_fd != -1);
 
             let page_size = libc::sysconf(libc::_SC_PAGESIZE) as usize;
 
@@ -150,7 +150,7 @@ pub fn raise_bus() {
                 page_size + page_size / 2,
             );
 
-            libc::unlink("sigbus.txt\0".as_ptr().cast());
+            libc::unlink(temp_name.as_ptr().cast());
 
             // https://pubs.opengroup.org/onlinepubs/9699919799/functions/mmap.html
             // The system shall always zero-fill any partial page at the end of
@@ -159,7 +159,8 @@ pub fn raise_bus() {
             // References within the address range starting at pa and continuing
             // for len bytes to whole pages following the end of an object shall
             // result in delivery of a SIGBUS signal.
-            println!("{}", mapping[page_size + 20]);
+            mapping[20] = 20;
+            println!("{}", mapping[20]);
         }
     }
 }
