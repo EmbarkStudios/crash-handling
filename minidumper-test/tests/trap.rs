@@ -7,5 +7,5 @@ fn trap_simple() {
 
 #[test]
 fn trap_threaded() {
-    run_threaded_test(Signal::Trap, 32);
+    run_threaded_test(Signal::Trap);
 }

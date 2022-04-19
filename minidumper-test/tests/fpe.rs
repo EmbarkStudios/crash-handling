@@ -12,5 +12,5 @@ fn fpe_simple() {
 
 #[test]
 fn fpe_threaded() {
-    run_threaded_test(Signal::Fpe, 32);
+    run_threaded_test(Signal::Fpe);
 }

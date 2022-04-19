@@ -9,5 +9,5 @@ fn bus_simple() {
 
 #[test]
 fn bus_threaded() {
-    run_threaded_test(Signal::Bus, 16);
+    run_threaded_test(Signal::Bus);
 }

@@ -9,7 +9,7 @@ fn purecall_simple() {
 
 #[test]
 fn purecall_threaded() {
-    run_threaded_test(Signal::Purecall, 32);
+    run_threaded_test(Signal::Purecall);
 }
 
 #[test]
@@ -19,5 +19,5 @@ fn invalid_param_simple() {
 
 #[test]
 fn invalid_param_threaded() {
-    run_threaded_test(Signal::InvalidParameter, 32);
+    run_threaded_test(Signal::InvalidParameter);
 }

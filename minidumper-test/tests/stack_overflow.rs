@@ -7,7 +7,7 @@ fn stack_overflow_simple() {
 
 #[test]
 fn stack_overflow_threaded() {
-    run_threaded_test(Signal::StackOverflow, 32);
+    run_threaded_test(Signal::StackOverflow);
 }
 
 #[cfg(unix)]
@@ -19,5 +19,5 @@ fn stack_overflow_c_thread() {
 #[cfg(unix)]
 #[test]
 fn stack_overflow_c_thread_threaded() {
-    run_threaded_test(Signal::StackOverflowCThread, 32);
+    run_threaded_test(Signal::StackOverflowCThread);
 }

@@ -439,15 +439,11 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
     }
 }
 
-pub fn run_threaded_test(signal: Signal, count: u32) {
+pub fn run_threaded_test(signal: Signal) {
     use rayon::prelude::*;
 
     // Github actions run on potatoes, so we limit concurrency when running CI
-    let count = if std::env::var("CI").is_ok() {
-        1
-    } else {
-        count
-    };
+    let count = if std::env::var("CI").is_ok() { 1 } else { 16 };
 
     (0..count).into_par_iter().for_each(|i| {
         run_test(signal, i, true);
