@@ -338,9 +338,9 @@ unsafe fn exception_handler(port: mach_port_t) {
                         CrashEventResult::Jump { jmp_buf, value } => Some((jmp_buf, value)),
                     };
 
-                    // note that we don't resume threads here to match breakpad's
-                    // behavior, but I'm not sure if that was an oversight?
-                    //resume_threads();
+                    // note that breakpad doesn't do this, but this seems more
+                    // correct?
+                    resume_threads();
 
                     // Restores the previous exception ports, in most cases
                     // this will be the default for the OS, which will kill this
