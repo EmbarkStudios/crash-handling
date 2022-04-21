@@ -52,10 +52,10 @@ fn real_main() -> anyhow::Result<()> {
         }
     };
 
-    let _handler = exception_handler::ExceptionHandler::attach(unsafe {
-        exception_handler::make_crash_event(move |cc: &exception_handler::CrashContext| {
+    let _handler = crash_handler::CrashHandler::attach(unsafe {
+        crash_handler::make_crash_event(move |cc: &crash_handler::CrashContext| {
             let handled = md_client.request_dump(cc, true).is_ok();
-            exception_handler::CrashEventResult::Handled(handled)
+            crash_handler::CrashEventResult::Handled(handled)
         })
     });
 
@@ -68,10 +68,14 @@ fn real_main() -> anyhow::Result<()> {
         Signal::Trap => {
             sadness_generator::raise_trap();
 
-            // For some reason on linux the default SIGTRAP action is not core
-            // dumping as it is supposed to, and thus we exit normally, so..
-            // cheat?
-            if cfg!(any(target_os = "linux", target_os = "android")) {
+            // For some reason on linux (and macos) the default SIGTRAP action
+            // is not core dumping as it is supposed to, and thus we exit
+            // normally, so..cheat?
+            if cfg!(any(
+                target_os = "linux",
+                target_os = "android",
+                target_os = "macos"
+            )) {
                 sadness_generator::raise_abort();
             }
         }

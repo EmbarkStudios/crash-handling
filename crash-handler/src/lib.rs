@@ -125,9 +125,11 @@ cfg_if::cfg_if! {
 
 pub use crash_context::CrashContext;
 
+/// The result of the user code executed during a crash event
 pub enum CrashEventResult {
     /// The event was handled in some way
     Handled(bool),
+    #[cfg(not(target_os = "macos"))]
     /// The handler wishes to jump somewhere else, presumably to return
     /// execution and skip the code that caused the exception
     Jump {
@@ -145,7 +147,7 @@ impl From<bool> for CrashEventResult {
     }
 }
 
-/// User implemented trait for handling a signal that has ocurred.
+/// User implemented trait for handling a crash event that has ocurred.
 ///
 /// # Safety
 ///
@@ -210,14 +212,14 @@ cfg_if::cfg_if! {
     if #[cfg(any(target_os = "linux", target_os = "android"))] {
         pub mod linux;
 
-        pub use linux::{ExceptionHandler, Signal, jmp};
+        pub use linux::{CrashHandler, Signal, jmp};
     } else if #[cfg(target_os = "windows")] {
         pub mod windows;
 
-        pub use windows::{ExceptionHandler, ExceptionCode, jmp};
+        pub use windows::{CrashHandler, ExceptionCode, jmp};
     } else if #[cfg(target_os = "macos")] {
         pub mod mac;
 
-        pub use mac::{ExceptionHandler, ExceptionType, jmp};
+        pub use mac::{CrashHandler, ExceptionType};
     }
 }

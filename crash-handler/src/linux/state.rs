@@ -1,7 +1,22 @@
 use crate::{Error, Signal};
 use std::{mem, ptr};
 
-const MIN_STACK_SIZE: usize = 16 * 1024;
+// std::cmp::max is not const :(
+const fn get_stack_size() -> usize {
+    if libc::SIGSTKSZ > 16 * 1024 {
+        libc::SIGSTKSZ
+    } else {
+        16 * 1024
+    }
+}
+
+/// The size of the alternate stack that is mapped for every thread.
+///
+/// This has a minimum size of 16k, which might seem a bit large, but this
+/// memory will only ever be committed in case we actually get a stack overflow,
+/// which is (hopefully) exceedingly rare
+const SIG_STACK_SIZE: usize = get_stack_size();
+
 /// kill
 pub(crate) const SI_USER: i32 = 0;
 
@@ -28,14 +43,14 @@ pub unsafe fn install_sigaltstack() -> Result<(), Error> {
         std::io::Error::last_os_error()
     );
 
-    if old_stack.ss_flags & libc::SS_DISABLE == 0 && old_stack.ss_size >= MIN_STACK_SIZE {
+    if old_stack.ss_flags & libc::SS_DISABLE == 0 && old_stack.ss_size >= SIG_STACK_SIZE {
         return Ok(());
     }
 
     // ... but failing that we need to allocate our own, so do all that
     // here.
     let guard_size = libc::sysconf(libc::_SC_PAGESIZE) as usize;
-    let alloc_size = guard_size + MIN_STACK_SIZE;
+    let alloc_size = guard_size + SIG_STACK_SIZE;
 
     let ptr = libc::mmap(
         ptr::null_mut(),
@@ -54,7 +69,7 @@ pub unsafe fn install_sigaltstack() -> Result<(), Error> {
     let stack_ptr = (ptr as usize + guard_size) as *mut libc::c_void;
     let r = libc::mprotect(
         stack_ptr,
-        MIN_STACK_SIZE,
+        SIG_STACK_SIZE,
         libc::PROT_READ | libc::PROT_WRITE,
     );
     assert_eq!(
@@ -66,7 +81,7 @@ pub unsafe fn install_sigaltstack() -> Result<(), Error> {
     let new_stack = libc::stack_t {
         ss_sp: stack_ptr,
         ss_flags: 0,
-        ss_size: MIN_STACK_SIZE,
+        ss_size: SIG_STACK_SIZE,
     };
     let r = libc::sigaltstack(&new_stack, ptr::null_mut());
     assert_eq!(
@@ -181,7 +196,7 @@ pub unsafe fn restore_handlers() {
         }
     }
 
-    *ohl = None;
+    ohl.take();
 }
 
 pub unsafe fn install_handlers() {
@@ -230,9 +245,43 @@ pub unsafe fn install_handlers() {
     *ohl = Some(mem::transmute::<_, [libc::sigaction; 6]>(old_handlers));
 }
 
-pub(crate) static HANDLER_STACK: parking_lot::Mutex<Vec<std::sync::Weak<HandlerInner>>> =
-    parking_lot::const_mutex(Vec::new());
+pub(super) fn attach(on_crash: Box<dyn crate::CrashEvent>) -> Result<(), Error> {
+    let mut lock = HANDLER.lock();
 
+    if lock.is_some() {
+        return Err(Error::HandlerAlreadyInstalled);
+    }
+
+    // SAFETY: syscalls
+    unsafe {
+        install_sigaltstack()?;
+        install_handlers();
+    }
+
+    *lock = Some(HandlerInner::new(on_crash));
+
+    Ok(())
+}
+
+/// Detaches our signal handle, restoring the previously installed or default
+/// handlers
+pub(super) fn detach() {
+    let mut lock = HANDLER.lock();
+    if lock.is_some() {
+        // SAFETY: syscalls
+        unsafe {
+            restore_sigaltstack();
+            restore_handlers();
+        }
+        lock.take();
+    }
+}
+
+pub(super) static HANDLER: parking_lot::Mutex<Option<HandlerInner>> =
+    parking_lot::const_mutex(None);
+
+/// This is the actual function installed for each signal we support, invoked
+/// by the kernel
 unsafe extern "C" fn signal_handler(
     sig: Signal,
     info: *mut libc::siginfo_t,
@@ -248,8 +297,6 @@ unsafe extern "C" fn signal_handler(
     }
 
     let action = {
-        let handlers = HANDLER_STACK.lock();
-
         // We might run inside a process where some other buggy code saves and
         // restores signal handlers temporarily with `signal` instead of `sigaction`.
         // This loses the `SA_SIGINFO` flag associated with this function. As a
@@ -284,21 +331,17 @@ unsafe extern "C" fn signal_handler(
             }
         }
 
-        (|| {
-            for handler in handlers.iter() {
-                if let Some(handler) = handler.upgrade() {
-                    match handler.handle_signal(sig as i32, info, uc) {
-                        crate::CrashEventResult::Handled(true) => return Action::RestoreDefault,
-                        crate::CrashEventResult::Handled(false) => {}
-                        crate::CrashEventResult::Jump { jmp_buf, value } => {
-                            return Action::Jump((jmp_buf, value));
-                        }
-                    }
-                }
-            }
+        let handler = HANDLER.lock();
 
+        if let Some(handler) = &*handler {
+            match handler.handle_signal(sig as i32, info, uc) {
+                crate::CrashEventResult::Handled(true) => Action::RestoreDefault,
+                crate::CrashEventResult::Handled(false) => Action::RestorePrevious,
+                crate::CrashEventResult::Jump { jmp_buf, value } => Action::Jump((jmp_buf, value)),
+            }
+        } else {
             Action::RestorePrevious
-        })()
+        }
     };
 
     // Upon returning from this signal handler, sig will become unmasked and
@@ -347,17 +390,17 @@ unsafe extern "C" fn signal_handler(
 static CRASH_CONTEXT: parking_lot::Mutex<mem::MaybeUninit<crash_context::CrashContext>> =
     parking_lot::const_mutex(mem::MaybeUninit::uninit());
 
-pub(crate) struct HandlerInner {
+pub(super) struct HandlerInner {
     handler: Box<dyn crate::CrashEvent>,
 }
 
 impl HandlerInner {
     #[inline]
-    pub(crate) fn new(handler: Box<dyn crate::CrashEvent>) -> Self {
+    pub(super) fn new(handler: Box<dyn crate::CrashEvent>) -> Self {
         Self { handler }
     }
 
-    pub(crate) unsafe fn handle_signal(
+    pub(super) unsafe fn handle_signal(
         &self,
         _sig: libc::c_int,
         info: &mut libc::siginfo_t,

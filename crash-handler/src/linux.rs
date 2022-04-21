@@ -30,61 +30,30 @@ impl Signal {
     }
 }
 
-pub struct ExceptionHandler {
-    inner: std::sync::Arc<state::HandlerInner>,
-}
+pub struct CrashHandler;
 
-impl ExceptionHandler {
-    /// Attaches a signal handler.
+#[allow(clippy::unused_self)]
+impl CrashHandler {
+    /// Attaches the signal handler.
     ///
     /// The provided callback will be invoked if a signal is caught, providing a
-    /// [`CrashContext`] with the details of the thread where the signal was thrown.
+    /// [`CrashContext`] with the details of the thread where the signal was raised.
     ///
     /// The callback runs in a compromised context, so it is highly recommended
     /// to not perform actions that may fail due to corrupted state that caused
     /// or is a symptom of the original signal. This includes doing heap
     /// allocations from the same allocator as the crashing code.
     pub fn attach(on_crash: Box<dyn crate::CrashEvent>) -> Result<Self, Error> {
-        unsafe {
-            state::install_sigaltstack()?;
-            state::install_handlers();
-        }
-
-        let inner = std::sync::Arc::new(state::HandlerInner::new(on_crash));
-
-        {
-            let mut handlers = state::HANDLER_STACK.lock();
-            handlers.push(std::sync::Arc::downgrade(&inner));
-        }
-
-        Ok(Self { inner })
+        state::attach(on_crash)?;
+        Ok(Self)
     }
 
-    /// Detaches this handler, removing it from the handler stack. This is done
-    /// automatically when this [`ExceptionHandler`] is dropped.
+    /// Detaches the handler.
+    ///
+    /// This is done automatically when this [`CrashHandler`] is dropped.
     #[inline]
     pub fn detach(self) {
-        self.do_detach();
-    }
-
-    /// Performs the actual
-    fn do_detach(&self) {
-        let mut handlers = state::HANDLER_STACK.lock();
-
-        if let Some(ind) = handlers.iter().position(|handler| {
-            handler.upgrade().map_or(false, |handler| {
-                std::sync::Arc::ptr_eq(&handler, &self.inner)
-            })
-        }) {
-            handlers.remove(ind);
-
-            if handlers.is_empty() {
-                unsafe {
-                    state::restore_sigaltstack();
-                    state::restore_handlers();
-                }
-            }
-        }
+        state::detach();
     }
 
     /// Sends the specified user signal.
@@ -101,17 +70,22 @@ impl ExceptionHandler {
             let mut context = std::mem::zeroed();
             crash_context::crash_context_getcontext(&mut context);
 
-            self.inner.handle_signal(
-                signal as i32,
-                &mut *(&mut siginfo as *mut libc::signalfd_siginfo).cast::<libc::siginfo_t>(),
-                &mut *(&mut context as *mut crash_context::ucontext_t).cast::<libc::c_void>(),
-            )
+            let lock = state::HANDLER.lock();
+            if let Some(handler) = &*lock {
+                handler.handle_signal(
+                    signal as i32,
+                    &mut *(&mut siginfo as *mut libc::signalfd_siginfo).cast::<libc::siginfo_t>(),
+                    &mut *(&mut context as *mut crash_context::ucontext_t).cast::<libc::c_void>(),
+                )
+            } else {
+                crate::CrashEventResult::Handled(false)
+            }
         }
     }
 }
 
-impl Drop for ExceptionHandler {
+impl Drop for CrashHandler {
     fn drop(&mut self) {
-        self.do_detach();
+        state::detach();
     }
 }

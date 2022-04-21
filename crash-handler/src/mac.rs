@@ -1,5 +1,4 @@
 mod ffi;
-pub mod jmp;
 mod signal;
 mod state;
 
@@ -54,9 +53,10 @@ pub enum ExceptionType {
     CorpseNotify = 13,
 }
 
-pub struct ExceptionHandler;
+pub struct CrashHandler;
 
-impl ExceptionHandler {
+#[allow(clippy::unused_self)]
+impl CrashHandler {
     /// Attaches the exception handler.
     ///
     /// The provided callback will be invoked if an exception is caught,
@@ -69,22 +69,20 @@ impl ExceptionHandler {
 
     /// Detaches the handler.
     ///
-    /// This is done automatically when [`ExceptionHandler`] is dropped.
-    #[allow(clippy::unused_self)]
+    /// This is done automatically when [`CrashHandler`] is dropped.
     #[inline]
     pub fn detach(self) {
         state::detach(false);
     }
 
     // Raises the specified user exception
-    #[allow(clippy::unused_self)]
     #[inline]
     pub fn simulate_exception(&self, exception_info: Option<crash_context::ExceptionInfo>) -> bool {
         state::simulate_exception(exception_info)
     }
 }
 
-impl Drop for ExceptionHandler {
+impl Drop for CrashHandler {
     fn drop(&mut self) {
         state::detach(false);
     }

@@ -13,7 +13,7 @@ path = "src/crash-client.rs"
 anyhow = "1.0"
 clap = { version = "3.1", features = ["derive"] }
 cfg-if = "1.0"
-exception-handler = { path = "../exception-handler" }
+crash-handler = { path = "../crash-handler" }
 minidump = "0.10"
 minidump-common = "0.10"
 minidumper = { path = "../minidumper" }

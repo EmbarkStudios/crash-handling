@@ -11,7 +11,7 @@ libc = "0.2"
 # Basic log emitting
 log = "0.4"
 # Minidump writing (currently linux/android only)
-minidump-writer = { git = "https://github.com/EmbarkStudios/minidump_writer_linux", branch = "main" } # branch = "main"
+minidump-writer = { git = "https://github.com/EmbarkStudios/minidump_writer_linux", branch = "macos" } # branch = "main"
 #minidump-writer = { path = "../../mdw" }
 # Event loop
 polling = "2.2"
@@ -29,7 +29,7 @@ uds = "0.2.6"
 scroll = "0.11"
 
 [target.'cfg(target_os = "windows")'.dependencies.windows-sys]
-version = "0.34"
+version = "0.35"
 features = [
     "Win32_Foundation",         # Core types eg HANDLE
     "Win32_Networking_WinSock", # Sockets
@@ -38,8 +38,8 @@ features = [
 ]
 
 [dev-dependencies]
-# catching crashes to request minidumps
-exception-handler = { path = "../exception-handler" }
+# Diskwrite example
+crash-handler = { path = "../crash-handler" }
 # uuid generation
 uuid = { version = "1.0", features = ["v4"] }
 backtrace = "0.3"
