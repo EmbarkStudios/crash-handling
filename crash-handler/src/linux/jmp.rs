@@ -16,7 +16,7 @@ cfg_if::cfg_if! {
 
 /// A jump buffer, which is essentially the register state of a point in execution
 /// at the time of a [`sigestjmp`] call that can be returned to by passing this
-/// buffer to `
+/// buffer to [`siglongjmp`].
 #[repr(C)]
 pub struct JmpBuf {
     /// CPU context
