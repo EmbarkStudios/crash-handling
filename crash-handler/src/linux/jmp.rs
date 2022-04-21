@@ -14,6 +14,9 @@ cfg_if::cfg_if! {
     }
 }
 
+/// A jump buffer, which is essentially the register state of a point in execution
+/// at the time of a [`sigestjmp`] call that can be returned to by passing this
+/// buffer to `
 #[repr(C)]
 pub struct JmpBuf {
     /// CPU context
@@ -25,7 +28,23 @@ pub struct JmpBuf {
 }
 
 extern "C" {
+    /// Set jump point for a non-local goto.
+    ///
+    /// The return value will be 0 if this is a direct invocation (ie the "first
+    /// time" `sigsetjmp` is executed), and will be the value passed to `siglongjmp`
+    /// otherwise.
+    ///
+    /// See [sigsetjmp](https://man7.org/linux/man-pages/man3/sigsetjmp.3p.html)
+    /// for more information.
     #[cfg_attr(target_env = "gnu", link_name = "__sigsetjmp")]
     pub fn sigsetjmp(jb: *mut JmpBuf, save_mask: i32) -> i32;
+    /// Non-local goto with signal handling
+    ///
+    /// The value passed here will be returned by `sigsetjmp` when returning
+    /// to that callsite. Note that passing a value of 0 here will be changed
+    /// to a 1.
+    ///
+    /// See [siglongjmp](https://man7.org/linux/man-pages/man3/siglongjmp.3p.html)
+    /// for more information.
     pub fn siglongjmp(jb: *mut JmpBuf, val: i32) -> !;
 }

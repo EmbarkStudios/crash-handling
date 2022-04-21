@@ -318,7 +318,7 @@ unsafe fn exception_handler(port: mach_port_t) {
                 // still need to call into the exception server and have it return
                 // KERN_FAILURE (see catch_exception_raise) in order for the kernel
                 // to move onto the host exception handler for the child task
-                let jump = if request.task.name == mach_task_self() {
+                let ret_code = if request.task.name == mach_task_self() {
                     suspend_threads();
 
                     let subcode = (request.exception == et::EXC_BAD_ACCESS as i32 // 1
@@ -338,9 +338,11 @@ unsafe fn exception_handler(port: mach_port_t) {
                         exception: Some(exc_info),
                     };
 
-                    let jump = match call_user_callback(&cc) {
-                        CrashEventResult::Handled(_) => None,
-                        CrashEventResult::Jump { jmp_buf, value } => Some((jmp_buf, value)),
+                    let ret_code = if let CrashEventResult::Handled(true) = call_user_callback(&cc)
+                    {
+                        KERN_SUCCESS
+                    } else {
+                        mach2::kern_return::KERN_FAILURE
                     };
 
                     // note that breakpad doesn't do this, but this seems more
@@ -352,9 +354,9 @@ unsafe fn exception_handler(port: mach_port_t) {
                     // process when we reply that we've handled the exception
                     detach(true);
 
-                    jump
+                    ret_code
                 } else {
-                    None
+                    KERN_SUCCESS
                 };
 
                 // This magic incantation to send a reply back to the kernel was
@@ -371,7 +373,7 @@ unsafe fn exception_handler(port: mach_port_t) {
                 reply.header.msgh_local_port = MACH_PORT_NULL;
                 reply.header.msgh_id = request.header.msgh_id + 100;
                 reply.ndr = NDR_record;
-                reply.ret_code = KERN_SUCCESS;
+                reply.ret_code = ret_code;
 
                 msg::mach_msg(
                     &mut reply.header,
@@ -382,10 +384,6 @@ unsafe fn exception_handler(port: mach_port_t) {
                     msg::MACH_MSG_TIMEOUT_NONE,
                     MACH_PORT_NULL,
                 );
-
-                if let Some((jmp_buf, value)) = jump {
-                    super::jmp::siglongjmp(jmp_buf, value);
-                }
             }
             Ok(MessageIds::Shutdown) => return,
             Ok(MessageIds::SignalCrash) => {
@@ -412,12 +410,8 @@ unsafe fn exception_handler(port: mach_port_t) {
                     exception,
                 };
 
-                let res = call_user_callback(&cc);
+                call_user_callback(&cc);
                 resume_threads();
-
-                if let CrashEventResult::Jump { jmp_buf, value } = res {
-                    super::jmp::siglongjmp(jmp_buf, value);
-                }
             }
             Err(unknown) => unreachable!("received unknown message {unknown}"),
         }
