@@ -11,8 +11,8 @@ libc = "0.2"
 # Basic log emitting
 log = "0.4"
 # Minidump writing (currently linux/android only)
-#minidump-writer = { git = "https://github.com/EmbarkStudios/minidump_writer_linux", rev = "7f5b7d7" } # branch = "main"
-minidump-writer = { path = "../../mdw" }
+minidump-writer = { git = "https://github.com/EmbarkStudios/minidump_writer_linux", branch = "main" } # branch = "main"
+#minidump-writer = { path = "../../mdw" }
 # Event loop
 polling = "2.2"
 # Nicer locking primitives
@@ -41,5 +41,5 @@ features = [
 # catching crashes to request minidumps
 exception-handler = { path = "../exception-handler" }
 # uuid generation
-uuid = { version = "0.8", features = ["v4"] }
+uuid = { version = "1.0", features = ["v4"] }
 backtrace = "0.3"
