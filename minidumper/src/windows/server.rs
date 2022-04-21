@@ -173,8 +173,7 @@ impl Server {
         // the client process, and inform the dump writer that they are pointers
         // to a different process, as MiniDumpWriteDump will internally read
         // the processes memory as needed
-        let exception_pointers = dump_request.exception_pointers
-            as *const windows_sys::Win32::System::Diagnostics::Debug::EXCEPTION_POINTERS;
+        let exception_pointers = dump_request.exception_pointers as *const std::ffi::c_void;
 
         let cc = crash_context::CrashContext {
             exception_pointers,
