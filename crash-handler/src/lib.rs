@@ -210,14 +210,14 @@ cfg_if::cfg_if! {
     if #[cfg(any(target_os = "linux", target_os = "android"))] {
         pub mod linux;
 
-        pub use linux::{ExceptionHandler, Signal, jmp};
+        pub use linux::{CrashHandler, Signal, jmp};
     } else if #[cfg(target_os = "windows")] {
         pub mod windows;
 
-        pub use windows::{ExceptionHandler, ExceptionCode, jmp};
+        pub use windows::{CrashHandler, ExceptionCode, jmp};
     } else if #[cfg(target_os = "macos")] {
         pub mod mac;
 
-        pub use mac::{ExceptionHandler, ExceptionType, jmp};
+        pub use mac::{CrashHandler, ExceptionType, jmp};
     }
 }

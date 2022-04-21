@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "crash-context",
-    "exception-handler",
+    "crash-handler",
     "minidumper",
     "minidumper-test",
     "sadness-generator",

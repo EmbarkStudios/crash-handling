@@ -54,9 +54,9 @@ pub enum ExceptionType {
     CorpseNotify = 13,
 }
 
-pub struct ExceptionHandler;
+pub struct CrashHandler;
 
-impl ExceptionHandler {
+impl CrashHandler {
     /// Attaches the exception handler.
     ///
     /// The provided callback will be invoked if an exception is caught,
@@ -84,7 +84,7 @@ impl ExceptionHandler {
     }
 }
 
-impl Drop for ExceptionHandler {
+impl Drop for CrashHandler {
     fn drop(&mut self) {
         state::detach(false);
     }

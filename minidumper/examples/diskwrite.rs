@@ -82,23 +82,21 @@ fn main() {
     // Register our exception handler
     client.send_message(1, "mistakes will be made").unwrap();
 
-    let handler = exception_handler::ExceptionHandler::attach(unsafe {
-        exception_handler::make_crash_event(
-            move |crash_context: &exception_handler::CrashContext| {
-                // Before we request the crash, send a message to the server
-                client.send_message(2, "mistakes were made").unwrap();
+    let handler = crash_handler::CrashHandler::attach(unsafe {
+        crash_handler::make_crash_event(move |crash_context: &crash_handler::CrashContext| {
+            // Before we request the crash, send a message to the server
+            client.send_message(2, "mistakes were made").unwrap();
 
-                exception_handler::CrashEventResult::Handled(
-                    client.request_dump(crash_context, true).is_ok(),
-                )
-            },
-        )
+            crash_handler::CrashEventResult::Handled(
+                client.request_dump(crash_context, true).is_ok(),
+            )
+        })
     })
     .expect("failed to attach signal handler");
 
     cfg_if::cfg_if! {
         if #[cfg(any(target_os = "linux", target_os = "android"))] {
-            handler.simulate_signal(exception_handler::Signal::Segv);
+            handler.simulate_signal(crash_handler::Signal::Segv);
         } else if #[cfg(windows)] {
             handler.simulate_exception(None);
         } else if #[cfg(target_os = "macos")] {

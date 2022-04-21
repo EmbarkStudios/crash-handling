@@ -30,11 +30,11 @@ impl Signal {
     }
 }
 
-pub struct ExceptionHandler {
+pub struct CrashHandler {
     inner: std::sync::Arc<state::HandlerInner>,
 }
 
-impl ExceptionHandler {
+impl CrashHandler {
     /// Attaches a signal handler.
     ///
     /// The provided callback will be invoked if a signal is caught, providing a
@@ -110,7 +110,7 @@ impl ExceptionHandler {
     }
 }
 
-impl Drop for ExceptionHandler {
+impl Drop for CrashHandler {
     fn drop(&mut self) {
         self.do_detach();
     }

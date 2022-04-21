@@ -1,5 +1,5 @@
-pub use eh::debug_print;
-use exception_handler as eh;
+pub use ch::debug_print;
+use crash_handler as ch;
 use parking_lot::{Condvar, Mutex};
 use std::{mem, sync::Arc};
 
@@ -27,18 +27,18 @@ pub fn handles_exception(signal: ExceptionKind, raiser: impl Fn()) {
         // handler and raise the signal, the signal handler jumps back to here
         // and then we step over the initial block.
         #[cfg(unix)]
-        let val = eh::jmp::sigsetjmp(jmpbuf.lock().as_mut_ptr(), 1 /* save signal mask */);
+        let val = ch::jmp::sigsetjmp(jmpbuf.lock().as_mut_ptr(), 1 /* save signal mask */);
         #[cfg(windows)]
-        let val = eh::jmp::setjmp(jmpbuf.lock().as_mut_ptr());
+        let val = ch::jmp::setjmp(jmpbuf.lock().as_mut_ptr());
 
         if val == 0 {
             let got_it_in_handler = got_it;
 
             _handler = Some(
-                eh::ExceptionHandler::attach(eh::make_crash_event(move |cc: &eh::CrashContext| {
+                ch::CrashHandler::attach(ch::make_crash_event(move |cc: &ch::CrashContext| {
                     #[cfg(any(target_os = "linux", target_os = "android"))]
                     {
-                        use eh::Signal;
+                        use ch::Signal;
 
                         assert_eq!(
                             cc.siginfo.ssi_signo,
@@ -63,7 +63,7 @@ pub fn handles_exception(signal: ExceptionKind, raiser: impl Fn()) {
 
                     #[cfg(target_os = "macos")]
                     {
-                        use eh::ExceptionType;
+                        use ch::ExceptionType;
 
                         let exc = cc.exception.expect("we should have an exception");
 
@@ -99,7 +99,7 @@ pub fn handles_exception(signal: ExceptionKind, raiser: impl Fn()) {
 
                     #[cfg(target_os = "windows")]
                     {
-                        use eh::ExceptionCode;
+                        use ch::ExceptionCode;
 
                         let ec = match signal {
                             ExceptionKind::Abort | ExceptionKind::Bus => unimplemented!(),
@@ -119,18 +119,21 @@ pub fn handles_exception(signal: ExceptionKind, raiser: impl Fn()) {
                         );
                     }
 
-                    debug_print!("handling signal");
+                    #[cfg(not(target_os = "macos"))]
                     {
-                        let (lock, cvar) = &*got_it_in_handler;
-                        let mut handled = lock.lock();
-                        *handled = true;
-                        cvar.notify_one();
-                    }
+                        debug_print!("handling signal");
+                        {
+                            let (lock, cvar) = &*got_it_in_handler;
+                            let mut handled = lock.lock();
+                            *handled = true;
+                            cvar.notify_one();
+                        }
 
-                    // long jump back to before we crashed
-                    eh::CrashEventResult::Jump {
-                        jmp_buf: jmpbuf.lock().as_mut_ptr(),
-                        value: 1,
+                        // long jump back to before we crashed
+                        ch::CrashEventResult::Jump {
+                            jmp_buf: jmpbuf.lock().as_mut_ptr(),
+                            value: 1,
+                        }
                     }
                 }))
                 .unwrap(),

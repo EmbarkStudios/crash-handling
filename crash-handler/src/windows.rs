@@ -9,8 +9,8 @@ use windows_sys::Win32::Foundation as found;
 /// in the crash context.
 ///
 /// This is mainly for testing purposes, and is not exhaustive nor really accurate,
-/// as eg. a distinction is made between a floating point divide by zero between
-/// integers and floats.
+/// as eg. a distinction is made between a divide by zero between integers and
+/// floats.
 #[derive(Copy, Clone)]
 #[repr(i32)]
 pub enum ExceptionCode {
@@ -23,11 +23,11 @@ pub enum ExceptionCode {
     Purecall = found::STATUS_NONCONTINUABLE_EXCEPTION,
 }
 
-pub struct ExceptionHandler {
+pub struct CrashHandler {
     inner: std::sync::Arc<state::HandlerInner>,
 }
 
-impl ExceptionHandler {
+impl CrashHandler {
     /// Attaches an exception handler.
     ///
     /// The provided callback will be invoked if an exception is caught,
@@ -100,7 +100,7 @@ impl ExceptionHandler {
     }
 }
 
-impl Drop for ExceptionHandler {
+impl Drop for CrashHandler {
     fn drop(&mut self) {
         self.do_detach();
     }
