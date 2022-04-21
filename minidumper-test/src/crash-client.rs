@@ -54,19 +54,12 @@ fn real_main() -> anyhow::Result<()> {
 
     let _handler = exception_handler::ExceptionHandler::attach(unsafe {
         exception_handler::make_crash_event(move |cc: &exception_handler::CrashContext| {
-            md_client.request_dump(cc, true).is_ok()
+            let handled = md_client.request_dump(cc, true).is_ok();
+            exception_handler::CrashEventResult::Handled(handled)
         })
     });
 
     let signal = cmd.signal;
-
-    let mut bf = std::env::current_dir().unwrap();
-    if bf.file_name() != Some(std::ffi::OsStr::new("minidumper-test")) {
-        bf.push("minidumper-test");
-    }
-
-    bf.push(".dumps");
-    bf.push(format!("bus-{}.txt", cmd.id));
 
     let raise_signal = move || match signal {
         Signal::Illegal => {
@@ -78,7 +71,9 @@ fn real_main() -> anyhow::Result<()> {
             // For some reason on linux the default SIGTRAP action is not core
             // dumping as it is supposed to, and thus we exit normally, so..
             // cheat?
-            sadness_generator::raise_abort();
+            if cfg!(any(target_os = "linux", target_os = "android")) {
+                sadness_generator::raise_abort();
+            }
         }
         #[cfg(unix)]
         Signal::Abort => {
@@ -86,7 +81,12 @@ fn real_main() -> anyhow::Result<()> {
         }
         #[cfg(unix)]
         Signal::Bus => {
-            sadness_generator::raise_bus(bf.to_str().unwrap());
+            sadness_generator::raise_bus();
+
+            // MacOS will happily continue on after a SIGBUS, but...no
+            if cfg!(target_os = "macos") {
+                sadness_generator::raise_abort();
+            }
         }
         Signal::Fpe => {
             sadness_generator::raise_floating_point_exception();

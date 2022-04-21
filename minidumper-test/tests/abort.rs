@@ -18,5 +18,5 @@ fn abort_simple() {
 
 #[test]
 fn abort_threaded() {
-    run_threaded_test(Signal::Abort, 32);
+    run_threaded_test(Signal::Abort);
 }

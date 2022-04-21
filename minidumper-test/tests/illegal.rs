@@ -7,5 +7,5 @@ fn illegal_simple() {
 
 #[test]
 fn illegal_threaded() {
-    run_threaded_test(Signal::Illegal, 32);
+    run_threaded_test(Signal::Illegal);
 }

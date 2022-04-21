@@ -1,5 +1,5 @@
 use super::uds::UnixStream;
-use crate::Error;
+use crate::{write_stderr, Error};
 use std::io;
 
 pub struct Client {
@@ -7,8 +7,7 @@ pub struct Client {
 }
 
 impl Client {
-    /// Creates a new client that will attempt to connect to a socket at the given
-    /// path.
+    /// Creates a new client with the given name.
     pub fn with_name(path: impl AsRef<std::path::Path>) -> Result<Self, Error> {
         Ok(Self {
             socket: UnixStream::connect(path)?,
@@ -16,22 +15,44 @@ impl Client {
     }
 
     /// Requests that the server generate a minidump for the specified crash
-    /// context.
+    /// context. This blocks until the server has finished writing the minidump.
     ///
-    /// This blocks until the server has finished writing the minidump.
+    /// This uses a [`exception_handler::linux::CrashContext`] by reference as
+    /// the size of it can be larger than one would want in an alternate stack
+    /// handler, the use of a reference allows the context to be stored outside
+    /// of the stack and heap to avoid that complication, but you may of course
+    /// generate one however you like.
     pub fn request_dump(
         &self,
         crash_context: &crash_context::CrashContext,
-        _debug_print: bool,
+        debug_print: bool,
     ) -> Result<(), Error> {
+        let mut buf = [0u8; 48];
+
+        let (has_exception, kind, code, has_subcode, subcode) =
+            if let Some(exc) = crash_context.exception {
+                (
+                    1,
+                    exc.kind,
+                    exc.code,
+                    if exc.subcode.is_some() { 1 } else { 0 },
+                    exc.subcode.unwrap_or_default(),
+                )
+            } else {
+                (0, 0, 0, 0, 0)
+            };
+
         use scroll::Pwrite;
-        let mut buf = [0u8; 24];
         let written = buf.pwrite(
             super::DumpRequest {
-                exception_pointers: crash_context.exception_pointers as _,
-                thread_id: crash_context.thread_id,
-                exception_code: crash_context.exception_code,
-                process_id: std::process::id(),
+                task: crash_context.task,
+                thread: crash_context.thread,
+                handler_thread: crash_context.handler_thread,
+                has_exception,
+                kind,
+                code,
+                has_subcode,
+                subcode,
             },
             0,
         )?;

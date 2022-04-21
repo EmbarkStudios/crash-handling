@@ -86,5 +86,8 @@ cfg_if::cfg_if! {
     } else if #[cfg(target_os = "windows")] {
         mod windows;
         pub use windows::*;
+    } else if #[cfg(target_os = "macos")] {
+        mod mac;
+        pub use mac::*;
     }
 }

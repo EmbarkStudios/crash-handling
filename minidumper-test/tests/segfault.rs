@@ -7,5 +7,5 @@ fn segfault_simple() {
 
 #[test]
 fn segfault_threaded() {
-    run_threaded_test(Signal::Segv, 32);
+    run_threaded_test(Signal::Segv);
 }

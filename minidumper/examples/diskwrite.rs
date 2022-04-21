@@ -88,7 +88,9 @@ fn main() {
                 // Before we request the crash, send a message to the server
                 client.send_message(2, "mistakes were made").unwrap();
 
-                client.request_dump(crash_context, true).is_ok()
+                exception_handler::CrashEventResult::Handled(
+                    client.request_dump(crash_context, true).is_ok(),
+                )
             },
         )
     })
@@ -99,8 +101,8 @@ fn main() {
             handler.simulate_signal(exception_handler::Signal::Segv);
         } else if #[cfg(windows)] {
             handler.simulate_exception(None);
-        } else {
-            compiler_error!("not implemented");
+        } else if #[cfg(target_os = "macos")] {
+            handler.simulate_exception(None);
         }
     }
 }

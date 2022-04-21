@@ -252,7 +252,7 @@ pub fn get_native_os() -> Os {
         } else if #[cfg(target_os = "windows")] {
             Os::Windows
         } else {
-            compile_error!("implement me");
+            Os::MacOs
         }
     }
 }
@@ -385,18 +385,73 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                 unreachable!();
             }
         },
+        Os::MacOs => match signal {
+            #[cfg(unix)]
+            Signal::Abort => {
+                verify!(CrashReason::MacGeneral(
+                    errors::ExceptionCodeMac::EXC_SOFTWARE,
+                    0x10003, // EXC_SOFT_SIGNAL
+                ));
+            }
+            #[cfg(unix)]
+            Signal::Bus => {
+                verify!(CrashReason::MacGeneral(
+                    errors::ExceptionCodeMac::EXC_BAD_ACCESS,
+                    _ // This will be an actual address
+                ));
+            }
+            Signal::Fpe => {
+                verify!(CrashReason::MacGeneral(
+                    errors::ExceptionCodeMac::EXC_ARITHMETIC,
+                    0
+                ));
+            }
+            Signal::Illegal => {
+                verify!(CrashReason::MacGeneral(
+                    errors::ExceptionCodeMac::EXC_BAD_INSTRUCTION,
+                    0
+                ));
+            }
+            Signal::Segv => {
+                verify!(CrashReason::MacGeneral(
+                    errors::ExceptionCodeMac::EXC_BAD_ACCESS,
+                    0
+                ));
+            }
+            Signal::StackOverflow | Signal::StackOverflowCThread => {
+                verify!(CrashReason::MacGeneral(
+                    errors::ExceptionCodeMac::EXC_BAD_ACCESS,
+                    _ // This will be the an actual address
+                ));
+            }
+            Signal::Trap => {
+                verify!(CrashReason::MacGeneral(
+                    errors::ExceptionCodeMac::EXC_BREAKPOINT,
+                    _ // EXC_BREAKPOINT says "details in the code field" but doesn't elaborate what that means and I'm too lazy to look at more mac source code right now
+                ));
+            }
+            #[cfg(windows)]
+            Signal::Purecall | Signal::InvalidParameter => {
+                unreachable!("windows only");
+            }
+        },
         _ => unimplemented!(),
     }
 }
 
-pub fn run_threaded_test(signal: Signal, count: u32) {
+pub fn run_threaded_test(signal: Signal) {
     use rayon::prelude::*;
 
     // Github actions run on potatoes, so we limit concurrency when running CI
+    // TODO: Macos has unpredictable behavior when multiple processes are handling/dumping
+    // exceptions, I don't have time to look into this now, so for now the simple
+    // workaround is just to reduce concurrency
     let count = if std::env::var("CI").is_ok() {
         1
+    } else if cfg!(target_os = "macos") {
+        4
     } else {
-        count
+        16
     };
 
     (0..count).into_par_iter().for_each(|i| {

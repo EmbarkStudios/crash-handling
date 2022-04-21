@@ -92,6 +92,10 @@ cfg_if::cfg_if! {
         mod windows;
 
         pub use windows::{Client, Server};
+    } else if #[cfg(target_os = "macos")] {
+        mod mac;
+
+        pub use mac::{Client, Server};
     }
 }
 

@@ -1,3 +1,4 @@
+pub mod jmp;
 mod state;
 
 use crate::Error;
@@ -26,36 +27,16 @@ pub struct ExceptionHandler {
     inner: std::sync::Arc<state::HandlerInner>,
 }
 
-#[derive(Copy, Clone, PartialEq)]
-pub enum HandleDebugExceptions {
-    Yes,
-    No,
-}
-
-impl From<HandleDebugExceptions> for bool {
-    fn from(hde: HandleDebugExceptions) -> bool {
-        hde == HandleDebugExceptions::Yes
-    }
-}
-
 impl ExceptionHandler {
     /// Attaches an exception handler.
     ///
     /// The provided callback will be invoked if an exception is caught,
     /// providing a [`CrashContext`] with the details of the thread where the
     /// exception was thrown.
-    ///
-    /// The callback runs in a compromised context, so it is highly recommended
-    /// to not perform actions that may fail due to corrupted state that caused
-    /// or is a symptom of the original exception. This includes doing heap
-    /// allocations from the same allocator as the crashing code.
     pub fn attach(on_crash: Box<dyn crate::CrashEvent>) -> Result<Self, Error> {
         let inner = {
             let mut handlers = state::HANDLER_STACK.lock();
-            let inner = std::sync::Arc::new(state::HandlerInner::new(
-                HandleDebugExceptions::Yes,
-                on_crash,
-            ));
+            let inner = std::sync::Arc::new(state::HandlerInner::new(on_crash));
             handlers.push(std::sync::Arc::downgrade(&inner));
             inner
         };

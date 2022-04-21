@@ -54,8 +54,8 @@ skip = [
     # range-map uses an old version, and is unfortunately unmaintained and has
     # not seen a release in 5 years
     { name = "num-traits", version = "=0.1.43" },
-    # parking_lot unfortunatley uses an outdated version
-    { name = "windows-sys", version = "=0.32.0" },
+    # debugid uses the pre-1.0 version
+    { name = "uuid", version = "=0.8.2" },
 ]
 
 [sources]

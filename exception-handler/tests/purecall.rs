@@ -5,7 +5,7 @@ mod shared;
 #[test]
 fn handles_purecall() {
     shared::handles_exception(
-        shared::ExceptionCode::Purecall,
+        shared::ExceptionKind::Purecall,
         sadness_generator::raise_purecall,
     );
 }

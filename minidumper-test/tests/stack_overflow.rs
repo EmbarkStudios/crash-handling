@@ -7,17 +7,17 @@ fn stack_overflow_simple() {
 
 #[test]
 fn stack_overflow_threaded() {
-    run_threaded_test(Signal::StackOverflow, 32);
+    run_threaded_test(Signal::StackOverflow);
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "macos")))]
 #[test]
 fn stack_overflow_c_thread() {
     run_test(Signal::StackOverflowCThread, 0, false);
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "macos")))]
 #[test]
 fn stack_overflow_c_thread_threaded() {
-    run_threaded_test(Signal::StackOverflowCThread, 32);
+    run_threaded_test(Signal::StackOverflowCThread);
 }

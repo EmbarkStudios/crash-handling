@@ -13,5 +13,5 @@ mod shared;
 
 #[test]
 fn handles_abort() {
-    shared::handles_signal(shared::Signal::Abort, sadness_generator::raise_abort);
+    shared::handles_exception(shared::ExceptionKind::Abort, sadness_generator::raise_abort);
 }
