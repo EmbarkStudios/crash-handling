@@ -1,9 +1,6 @@
 #![allow(non_camel_case_types, clippy::exit)]
 
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc, Weak,
-};
+use crate::Error;
 pub(super) use windows_sys::Win32::{
     Foundation::{STATUS_INVALID_PARAMETER, STATUS_NONCONTINUABLE_EXCEPTION},
     System::{
@@ -52,14 +49,11 @@ type _invalid_parameter_handler = unsafe extern "C" fn(
 );
 type _purecall_handler = unsafe extern "C" fn();
 
-/// Tracks which handler to use when handling an exception since none of the
-/// error handler functions take user data
-static HANDLER_STACK_INDEX: AtomicUsize = AtomicUsize::new(1);
-pub(crate) static HANDLER_STACK: parking_lot::Mutex<Vec<Weak<HandlerInner>>> =
-    parking_lot::const_mutex(Vec::new());
+pub(super) static HANDLER: parking_lot::Mutex<Option<HandlerInner>> =
+    parking_lot::const_mutex(None);
 
-pub(crate) struct HandlerInner {
-    user_handler: Box<dyn crate::CrashEvent>,
+pub(super) struct HandlerInner {
+    pub(super) user_handler: Box<dyn crate::CrashEvent>,
     /// The previously installed filter before this handler installed its own
     previous_filter: LPTOP_LEVEL_EXCEPTION_FILTER,
     /// The previously installed invalid parameter handler
@@ -72,6 +66,8 @@ impl HandlerInner {
     pub(crate) fn new(user_handler: Box<dyn crate::CrashEvent>) -> Self {
         // Note that breakpad has flags so the user can choose which error handlers
         // to install, but for now we just install all of them
+
+        // SAFETY: syscalls
         unsafe {
             let previous_filter = SetUnhandledExceptionFilter(Some(handle_exception));
             let previous_iph = _set_invalid_parameter_handler(Some(handle_invalid_parameter));
@@ -85,40 +81,67 @@ impl HandlerInner {
             }
         }
     }
+
+    /// Sets the handlers to the previous handlers that were registered when the
+    /// specified handler was attached
+    pub(crate) fn restore_previous_handlers(&self) {
+        // SAFETY: syscalls
+        unsafe {
+            SetUnhandledExceptionFilter(self.previous_filter);
+            _set_invalid_parameter_handler(self.previous_iph);
+            _set_purecall_handler(self.previous_pch);
+        }
+    }
 }
 
-/// `handle_exception` and `handle_invalid_parameter` are stateless functions
-/// without any user provided context, so we need to lookup which handler in
-/// our stack to use in case there are multiple of them registered, then
-/// restores the state once the handler is finished
-///
-/// Note this keeps the `HANDLER_STACK` lock for the duration of the scope
+impl Drop for HandlerInner {
+    fn drop(&mut self) {
+        self.restore_previous_handlers();
+    }
+}
+
+pub(super) fn attach(on_crash: Box<dyn crate::CrashEvent>) -> Result<(), Error> {
+    let mut lock = HANDLER.lock();
+
+    if lock.is_some() {
+        return Err(Error::HandlerAlreadyInstalled);
+    }
+
+    *lock = Some(HandlerInner::new(on_crash));
+    Ok(())
+}
+
+pub(super) fn detach() {
+    let mut lock = HANDLER.lock();
+    // The previous handlers are restored on drop
+    lock.take();
+}
+
+/// While handling any exceptions, especially when calling user code, we restore
+/// and previously registered handlers
+/// Note this keeps the `HANDLER` lock for the duration of the scope
 struct AutoHandler<'scope> {
-    #[allow(dead_code)]
-    lock: parking_lot::MutexGuard<'scope, Vec<Weak<HandlerInner>>>,
-    inner: Arc<HandlerInner>,
+    lock: parking_lot::MutexGuard<'scope, Option<HandlerInner>>,
 }
 
 impl<'scope> AutoHandler<'scope> {
-    fn new(lock: parking_lot::MutexGuard<'scope, Vec<Weak<HandlerInner>>>) -> Self {
-        let reverse_index = HANDLER_STACK_INDEX.fetch_add(1, Ordering::Relaxed);
-        let handler = lock[lock.len() - reverse_index]
-            .upgrade()
-            .expect("impossible, this can't have dropped");
+    fn new(lock: parking_lot::MutexGuard<'scope, Option<HandlerInner>>) -> Option<Self> {
+        if let Some(hi) = &*lock {
+            // In case another exception occurs while this handler is doing its thing,
+            // it should be delivered to the previous filter.
+            hi.restore_previous_handlers();
+        }
 
-        // In case another exception occurs while this handler is doing its thing,
-        // it should be delivered to the previous filter.
-        set_previous_handlers(handler.clone());
-
-        Self {
-            lock,
-            inner: handler,
+        if lock.is_some() {
+            Some(Self { lock })
+        } else {
+            None
         }
     }
 }
 
 /// Sets the handlers back to our internal ones
-pub(crate) fn set_handlers() {
+fn set_handlers() {
     unsafe {
         SetUnhandledExceptionFilter(Some(handle_exception));
         _set_invalid_parameter_handler(Some(handle_invalid_parameter));
@@ -126,29 +149,18 @@ pub(crate) fn set_handlers() {
     }
 }
 
-/// Sets the handlers to the previous handlers that were registered when the
-/// specified handler was attached
-pub(crate) fn set_previous_handlers(handler_inner: Arc<HandlerInner>) {
-    unsafe {
-        SetUnhandledExceptionFilter(handler_inner.previous_filter);
-        _set_invalid_parameter_handler(handler_inner.previous_iph);
-        _set_purecall_handler(handler_inner.previous_pch);
-    }
-}
-
 impl<'scope> std::ops::Deref for AutoHandler<'scope> {
     type Target = HandlerInner;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        self.lock.as_ref().unwrap()
     }
 }
 
 impl<'scope> Drop for AutoHandler<'scope> {
     fn drop(&mut self) {
+        // Restore our handlers
         set_handlers();
-
-        HANDLER_STACK_INDEX.fetch_sub(1, Ordering::Relaxed);
     }
 }
 
@@ -165,40 +177,42 @@ pub(super) unsafe extern "system" fn handle_exception(
     except_info: *const EXCEPTION_POINTERS,
 ) -> i32 {
     let jump = {
-        let lock = HANDLER_STACK.lock();
-        let current_handler = AutoHandler::new(lock);
+        let lock = HANDLER.lock();
+        if let Some(current_handler) = AutoHandler::new(lock) {
+            let code = (*(*except_info).ExceptionRecord).ExceptionCode;
 
-        let code = (*(*except_info).ExceptionRecord).ExceptionCode;
-
-        match current_handler.user_handler.on_crash(&crate::CrashContext {
-            exception_pointers: except_info.cast(),
-            thread_id: GetCurrentThreadId(),
-            exception_code: code,
-        }) {
-            CrashEventResult::Handled(true) => {
-                // The handler fully handled the exception.  Returning
-                // EXCEPTION_EXECUTE_HANDLER indicates this to the system, and usually
-                // results in the application being terminated.
-                //
-                // Note: If the application was launched from within the Cygwin
-                // environment, returning EXCEPTION_EXECUTE_HANDLER seems to cause the
-                // application to be restarted.
-                return EXCEPTION_EXECUTE_HANDLER;
+            match current_handler.user_handler.on_crash(&crate::CrashContext {
+                exception_pointers: except_info.cast(),
+                thread_id: GetCurrentThreadId(),
+                exception_code: code,
+            }) {
+                CrashEventResult::Handled(true) => {
+                    // The handler fully handled the exception.  Returning
+                    // EXCEPTION_EXECUTE_HANDLER indicates this to the system, and usually
+                    // results in the application being terminated.
+                    //
+                    // Note: If the application was launched from within the Cygwin
+                    // environment, returning EXCEPTION_EXECUTE_HANDLER seems to cause the
+                    // application to be restarted.
+                    return EXCEPTION_EXECUTE_HANDLER;
+                }
+                CrashEventResult::Handled(false) => {
+                    // There was an exception, it was a breakpoint or something else ignored
+                    // above, or it was passed to the handler, which decided not to handle it.
+                    // Give the previous handler a chance to do something with the exception.
+                    // If there is no previous handler, return EXCEPTION_CONTINUE_SEARCH,
+                    // which will allow a debugger or native "crashed" dialog to handle the
+                    // exception.
+                    return if let Some(previous) = current_handler.previous_filter {
+                        previous(except_info)
+                    } else {
+                        EXCEPTION_CONTINUE_SEARCH
+                    };
+                }
+                CrashEventResult::Jump { jmp_buf, value } => (jmp_buf, value),
             }
-            CrashEventResult::Handled(false) => {
-                // There was an exception, it was a breakpoint or something else ignored
-                // above, or it was passed to the handler, which decided not to handle it.
-                // Give the previous handler a chance to do something with the exception.
-                // If there is no previous handler, return EXCEPTION_CONTINUE_SEARCH,
-                // which will allow a debugger or native "crashed" dialog to handle the
-                // exception.
-                return if let Some(previous) = current_handler.previous_filter {
-                    previous(except_info)
-                } else {
-                    EXCEPTION_CONTINUE_SEARCH
-                };
-            }
-            CrashEventResult::Jump { jmp_buf, value } => (jmp_buf, value),
+        } else {
+            return EXCEPTION_CONTINUE_SEARCH;
         }
     };
 
@@ -223,62 +237,64 @@ unsafe extern "C" fn handle_invalid_parameter(
     reserved: usize,
 ) {
     let jump = {
-        let lock = HANDLER_STACK.lock();
-        let current_handler = AutoHandler::new(lock);
+        let lock = HANDLER.lock();
+        if let Some(current_handler) = AutoHandler::new(lock) {
+            // Make up an exception record for the current thread and CPU context
+            // to make it possible for the crash processor to classify these
+            // as do regular crashes, and to make it humane for developers to
+            // analyze them.
+            let mut exception_record: EXCEPTION_RECORD = std::mem::zeroed();
+            let mut exception_context = std::mem::MaybeUninit::uninit();
 
-        // Make up an exception record for the current thread and CPU context
-        // to make it possible for the crash processor to classify these
-        // as do regular crashes, and to make it humane for developers to
-        // analyze them.
-        let mut exception_record: EXCEPTION_RECORD = std::mem::zeroed();
-        let mut exception_context = std::mem::MaybeUninit::uninit();
+            RtlCaptureContext(exception_context.as_mut_ptr());
 
-        RtlCaptureContext(exception_context.as_mut_ptr());
+            let mut exception_context = exception_context.assume_init();
 
-        let mut exception_context = exception_context.assume_init();
+            let exception_ptrs = EXCEPTION_POINTERS {
+                ExceptionRecord: &mut exception_record,
+                ContextRecord: &mut exception_context,
+            };
 
-        let exception_ptrs = EXCEPTION_POINTERS {
-            ExceptionRecord: &mut exception_record,
-            ContextRecord: &mut exception_context,
-        };
+            exception_record.ExceptionCode = STATUS_INVALID_PARAMETER;
 
-        exception_record.ExceptionCode = STATUS_INVALID_PARAMETER;
+            match current_handler.user_handler.on_crash(&crate::CrashContext {
+                exception_pointers: (&exception_ptrs as *const EXCEPTION_POINTERS).cast(),
+                thread_id: GetCurrentThreadId(),
+                exception_code: STATUS_INVALID_PARAMETER,
+            }) {
+                CrashEventResult::Handled(true) => return,
+                CrashEventResult::Handled(false) => {
+                    if let Some(prev_iph) = current_handler.previous_iph {
+                        prev_iph(expression, function, file, line, reserved);
+                    } else {
+                        // If there's no previous handler, pass the exception back in to the
+                        // invalid parameter handler's core.  That's the routine that called this
+                        // function, but now, since this function is no longer registered (and in
+                        // fact, no function at all is registered), this will result in the
+                        // default code path being taken: _CRT_DEBUGGER_HOOK and _invoke_watson.
+                        // Use _invalid_parameter where it exists (in _DEBUG builds) as it passes
+                        // more information through.  In non-debug builds, it is not available,
+                        // so fall back to using _invalid_parameter_noinfo.  See invarg.c in the
+                        // CRT source.
 
-        match current_handler.user_handler.on_crash(&crate::CrashContext {
-            exception_pointers: (&exception_ptrs as *const EXCEPTION_POINTERS).cast(),
-            thread_id: GetCurrentThreadId(),
-            exception_code: STATUS_INVALID_PARAMETER,
-        }) {
-            CrashEventResult::Handled(true) => return,
-            CrashEventResult::Handled(false) => {
-                if let Some(prev_iph) = current_handler.previous_iph {
-                    prev_iph(expression, function, file, line, reserved);
-                } else {
-                    // If there's no previous handler, pass the exception back in to the
-                    // invalid parameter handler's core.  That's the routine that called this
-                    // function, but now, since this function is no longer registered (and in
-                    // fact, no function at all is registered), this will result in the
-                    // default code path being taken: _CRT_DEBUGGER_HOOK and _invoke_watson.
-                    // Use _invalid_parameter where it exists (in _DEBUG builds) as it passes
-                    // more information through.  In non-debug builds, it is not available,
-                    // so fall back to using _invalid_parameter_noinfo.  See invarg.c in the
-                    // CRT source.
+                        // _invalid_parameter is only available in the debug CRT
+                        _invoke_watson();
+                        // if expression.is_null() && function.is_null() && file.is_null() {
+                        //     _invalid_parameter_noinfo();
+                        // } else {
+                        //     _invalid_parameter(expression, function, file, line, reserved);
+                        // }
+                    }
 
-                    // _invalid_parameter is only available in the debug CRT
-                    _invoke_watson();
-                    // if expression.is_null() && function.is_null() && file.is_null() {
-                    //     _invalid_parameter_noinfo();
-                    // } else {
-                    //     _invalid_parameter(expression, function, file, line, reserved);
-                    // }
+                    // The handler either took care of the invalid parameter problem itself,
+                    // or passed it on to another handler.  "Swallow" it by exiting, paralleling
+                    // the behavior of "swallowing" exceptions.
+                    std::process::exit(0);
                 }
-
-                // The handler either took care of the invalid parameter problem itself,
-                // or passed it on to another handler.  "Swallow" it by exiting, paralleling
-                // the behavior of "swallowing" exceptions.
-                std::process::exit(0);
+                CrashEventResult::Jump { jmp_buf, value } => (jmp_buf, value),
             }
-            CrashEventResult::Jump { jmp_buf, value } => (jmp_buf, value),
+        } else {
+            _invoke_watson();
         }
     };
 
@@ -290,50 +306,52 @@ unsafe extern "C" fn handle_invalid_parameter(
 #[no_mangle]
 unsafe extern "C" fn handle_pure_virtual_call() {
     let jump = {
-        let lock = HANDLER_STACK.lock();
-        let current_handler = AutoHandler::new(lock);
+        let lock = HANDLER.lock();
+        if let Some(current_handler) = AutoHandler::new(lock) {
+            // Make up an exception record for the current thread and CPU context
+            // to make it possible for the crash processor to classify these
+            // as do regular crashes, and to make it humane for developers to
+            // analyze them.
+            let mut exception_record: EXCEPTION_RECORD = std::mem::zeroed();
+            let mut exception_context = std::mem::MaybeUninit::uninit();
 
-        // Make up an exception record for the current thread and CPU context
-        // to make it possible for the crash processor to classify these
-        // as do regular crashes, and to make it humane for developers to
-        // analyze them.
-        let mut exception_record: EXCEPTION_RECORD = std::mem::zeroed();
-        let mut exception_context = std::mem::MaybeUninit::uninit();
+            RtlCaptureContext(exception_context.as_mut_ptr());
 
-        RtlCaptureContext(exception_context.as_mut_ptr());
+            let mut exception_context = exception_context.assume_init();
 
-        let mut exception_context = exception_context.assume_init();
+            let exception_ptrs = EXCEPTION_POINTERS {
+                ExceptionRecord: &mut exception_record,
+                ContextRecord: &mut exception_context,
+            };
 
-        let exception_ptrs = EXCEPTION_POINTERS {
-            ExceptionRecord: &mut exception_record,
-            ContextRecord: &mut exception_context,
-        };
+            exception_record.ExceptionCode = STATUS_NONCONTINUABLE_EXCEPTION;
 
-        exception_record.ExceptionCode = STATUS_NONCONTINUABLE_EXCEPTION;
-
-        match current_handler.user_handler.on_crash(&crate::CrashContext {
-            exception_pointers: (&exception_ptrs as *const EXCEPTION_POINTERS).cast(),
-            thread_id: GetCurrentThreadId(),
-            exception_code: STATUS_NONCONTINUABLE_EXCEPTION,
-        }) {
-            CrashEventResult::Handled(true) => {
-                // The handler either took care of the invalid parameter problem itself,
-                // or passed it on to another handler. "Swallow" it by exiting, paralleling
-                // the behavior of "swallowing" exceptions.
-                std::process::exit(0);
-            }
-            CrashEventResult::Handled(false) => {
-                if let Some(pch) = current_handler.previous_pch {
-                    // The handler didn't fully handle the exception.  Give it to the
-                    // previous purecall handler.
-                    pch();
+            match current_handler.user_handler.on_crash(&crate::CrashContext {
+                exception_pointers: (&exception_ptrs as *const EXCEPTION_POINTERS).cast(),
+                thread_id: GetCurrentThreadId(),
+                exception_code: STATUS_NONCONTINUABLE_EXCEPTION,
+            }) {
+                CrashEventResult::Handled(true) => {
+                    // The handler either took care of the invalid parameter problem itself,
+                    // or passed it on to another handler. "Swallow" it by exiting, paralleling
+                    // the behavior of "swallowing" exceptions.
+                    std::process::exit(0);
                 }
+                CrashEventResult::Handled(false) => {
+                    if let Some(pch) = current_handler.previous_pch {
+                        // The handler didn't fully handle the exception.  Give it to the
+                        // previous purecall handler.
+                        pch();
+                    }
 
-                // If there's no previous handler, return and let _purecall handle it.
-                // This will just throw up an assertion dialog.
-                return;
+                    // If there's no previous handler, return and let _purecall handle it.
+                    // This will just throw up an assertion dialog.
+                    return;
+                }
+                CrashEventResult::Jump { jmp_buf, value } => (jmp_buf, value),
             }
-            CrashEventResult::Jump { jmp_buf, value } => (jmp_buf, value),
+        } else {
+            return;
         }
     };
 

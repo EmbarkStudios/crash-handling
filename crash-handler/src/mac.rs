@@ -55,6 +55,7 @@ pub enum ExceptionType {
 
 pub struct CrashHandler;
 
+#[allow(clippy::unused_self)]
 impl CrashHandler {
     /// Attaches the exception handler.
     ///
@@ -68,15 +69,13 @@ impl CrashHandler {
 
     /// Detaches the handler.
     ///
-    /// This is done automatically when [`ExceptionHandler`] is dropped.
-    #[allow(clippy::unused_self)]
+    /// This is done automatically when [`CrashHandler`] is dropped.
     #[inline]
     pub fn detach(self) {
         state::detach(false);
     }
 
     // Raises the specified user exception
-    #[allow(clippy::unused_self)]
     #[inline]
     pub fn simulate_exception(&self, exception_info: Option<crash_context::ExceptionInfo>) -> bool {
         state::simulate_exception(exception_info)
