@@ -17,8 +17,6 @@ cfg_if::cfg_if! {
     }
 }
 
-use scroll::{Pread, Pwrite, SizeWith};
-
 #[derive(scroll::Pwrite, scroll::Pread, scroll::SizeWith)]
 struct DumpRequest {
     /// The address of an `EXCEPTION_POINTERS` in the client's memory

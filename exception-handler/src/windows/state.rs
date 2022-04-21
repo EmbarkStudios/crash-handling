@@ -171,7 +171,7 @@ pub(super) unsafe extern "system" fn handle_exception(
         let code = (*(*except_info).ExceptionRecord).ExceptionCode;
 
         match current_handler.user_handler.on_crash(&crate::CrashContext {
-            exception_pointers: except_info,
+            exception_pointers: except_info.cast(),
             thread_id: GetCurrentThreadId(),
             exception_code: code,
         }) {
@@ -245,7 +245,7 @@ unsafe extern "C" fn handle_invalid_parameter(
         exception_record.ExceptionCode = STATUS_INVALID_PARAMETER;
 
         match current_handler.user_handler.on_crash(&crate::CrashContext {
-            exception_pointers: &exception_ptrs,
+            exception_pointers: (&exception_ptrs as *const EXCEPTION_POINTERS).cast(),
             thread_id: GetCurrentThreadId(),
             exception_code: STATUS_INVALID_PARAMETER,
         }) {
@@ -312,7 +312,7 @@ unsafe extern "C" fn handle_pure_virtual_call() {
         exception_record.ExceptionCode = STATUS_NONCONTINUABLE_EXCEPTION;
 
         match current_handler.user_handler.on_crash(&crate::CrashContext {
-            exception_pointers: &exception_ptrs,
+            exception_pointers: (&exception_ptrs as *const EXCEPTION_POINTERS).cast(),
             thread_id: GetCurrentThreadId(),
             exception_code: STATUS_NONCONTINUABLE_EXCEPTION,
         }) {

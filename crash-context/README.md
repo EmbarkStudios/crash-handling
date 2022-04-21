@@ -8,7 +8,7 @@
 
 # `🔥 crash-context`
 
-**Provides portable types containing target specific contextual information at the time of an exception**
+**Provides portable types containing target specific contextual information at the time of a crash**
 
 [![Embark](https://img.shields.io/badge/embark-open%20source-blueviolet.svg)](https://embark.dev)
 [![Embark](https://img.shields.io/badge/discord-ark-%237289da.svg?logo=discord)](https://discord.gg/dAuKfZS)
@@ -32,6 +32,8 @@
 - `arm-unknown-linux-gnueabi`
 - `arm-unknown-linux-musleabi`
 - `x86_64-pc-windows-msvc`
+- `x86_64-apple-darwin`
+- `aarch64-apple-darwin`
 
 ## Contribution
 

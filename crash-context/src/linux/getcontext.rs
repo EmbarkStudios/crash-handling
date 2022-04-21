@@ -1,5 +1,6 @@
-//! Inline implementation of [] since it is not supported on all targets, namely
-//! musl, as it has been deprecated from POSIX for over a decade
+//! Inline implementation of [getcontext](https://man7.org/linux/man-pages/man3/getcontext.3.html)
+//! since it is not supported on all targets, namely `musl`, as it has been
+//! deprecated from POSIX for over a decade
 //!
 //! The implementation is ported from Breakpad
 
