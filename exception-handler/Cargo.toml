@@ -21,7 +21,7 @@ debug-print = []
 cfg-if = "1.0"
 # Definition of a portable crash-context that can be shared between various
 # crates
-crash-context = { version = "0.0.3", path = "../crash-context" }
+crash-context = { version = "0.1.0", path = "../crash-context" }
 # Wrapper around libc
 libc = "0.2"
 # Nicer sync primitives
