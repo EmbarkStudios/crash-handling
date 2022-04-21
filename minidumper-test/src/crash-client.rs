@@ -68,10 +68,14 @@ fn real_main() -> anyhow::Result<()> {
         Signal::Trap => {
             sadness_generator::raise_trap();
 
-            // For some reason on linux the default SIGTRAP action is not core
-            // dumping as it is supposed to, and thus we exit normally, so..
-            // cheat?
-            if cfg!(any(target_os = "linux", target_os = "android")) {
+            // For some reason on linux (and macos) the default SIGTRAP action
+            // is not core dumping as it is supposed to, and thus we exit
+            // normally, so..cheat?
+            if cfg!(any(
+                target_os = "linux",
+                target_os = "android",
+                target_os = "macos"
+            )) {
                 sadness_generator::raise_abort();
             }
         }
