@@ -61,63 +61,69 @@ fn real_main() -> anyhow::Result<()> {
 
     let signal = cmd.signal;
 
-    let raise_signal = move || match signal {
-        Signal::Illegal => {
-            sadness_generator::raise_illegal_instruction();
-        }
-        Signal::Trap => {
-            sadness_generator::raise_trap();
+    let raise_signal = move || {
+        // SAFETY: we're about to intentionally crash ourselves via shenanigans,
+        // none of this is safe
+        unsafe {
+            match signal {
+                Signal::Illegal => {
+                    sadness_generator::raise_illegal_instruction();
+                }
+                Signal::Trap => {
+                    sadness_generator::raise_trap();
 
-            // For some reason on linux (and macos) the default SIGTRAP action
-            // is not core dumping as it is supposed to, and thus we exit
-            // normally, so..cheat?
-            if cfg!(any(
-                target_os = "linux",
-                target_os = "android",
-                target_os = "macos"
-            )) {
-                sadness_generator::raise_abort();
-            }
-        }
-        #[cfg(unix)]
-        Signal::Abort => {
-            sadness_generator::raise_abort();
-        }
-        #[cfg(unix)]
-        Signal::Bus => {
-            sadness_generator::raise_bus();
+                    // For some reason on linux (and macos) the default SIGTRAP action
+                    // is not core dumping as it is supposed to, and thus we exit
+                    // normally, so..cheat?
+                    if cfg!(any(
+                        target_os = "linux",
+                        target_os = "android",
+                        target_os = "macos"
+                    )) {
+                        sadness_generator::raise_abort();
+                    }
+                }
+                #[cfg(unix)]
+                Signal::Abort => {
+                    sadness_generator::raise_abort();
+                }
+                #[cfg(unix)]
+                Signal::Bus => {
+                    sadness_generator::raise_bus();
 
-            // MacOS will happily continue on after a SIGBUS, but...no
-            if cfg!(target_os = "macos") {
-                sadness_generator::raise_abort();
+                    // MacOS will happily continue on after a SIGBUS, but...no
+                    if cfg!(target_os = "macos") {
+                        sadness_generator::raise_abort();
+                    }
+                }
+                Signal::Fpe => {
+                    sadness_generator::raise_floating_point_exception();
+                }
+                Signal::Segv => {
+                    sadness_generator::raise_segfault();
+                }
+                Signal::StackOverflow => {
+                    sadness_generator::raise_stack_overflow();
+                }
+                Signal::StackOverflowCThread => {
+                    #[cfg(unix)]
+                    {
+                        sadness_generator::raise_stack_overflow_in_non_rust_thread_normal();
+                    }
+                    #[cfg(windows)]
+                    {
+                        unimplemented!();
+                    }
+                }
+                #[cfg(windows)]
+                Signal::Purecall => {
+                    sadness_generator::raise_purecall();
+                }
+                #[cfg(windows)]
+                Signal::InvalidParameter => {
+                    sadness_generator::raise_invalid_parameter();
+                }
             }
-        }
-        Signal::Fpe => {
-            sadness_generator::raise_floating_point_exception();
-        }
-        Signal::Segv => {
-            sadness_generator::raise_segfault();
-        }
-        Signal::StackOverflow => {
-            sadness_generator::raise_stack_overflow();
-        }
-        Signal::StackOverflowCThread => {
-            #[cfg(unix)]
-            {
-                sadness_generator::raise_stack_overflow_in_non_rust_thread_normal();
-            }
-            #[cfg(windows)]
-            {
-                unimplemented!();
-            }
-        }
-        #[cfg(windows)]
-        Signal::Purecall => {
-            sadness_generator::raise_purecall();
-        }
-        #[cfg(windows)]
-        Signal::InvalidParameter => {
-            sadness_generator::raise_invalid_parameter();
         }
     };
 

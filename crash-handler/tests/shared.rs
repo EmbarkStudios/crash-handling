@@ -3,20 +3,9 @@ use crash_handler as ch;
 use parking_lot::{Condvar, Mutex};
 use std::sync::Arc;
 
-#[allow(dead_code)]
-pub enum ExceptionKind {
-    Abort,
-    Bus,
-    Fpe,
-    Illegal,
-    InvalidParam,
-    Purecall,
-    SigSegv,
-    StackOverflow,
-    Trap,
-}
+pub use sadness_generator::SadnessFlavor;
 
-pub fn handles_exception(signal: ExceptionKind, raiser: impl Fn()) {
+pub fn handles_crash(flavor: SadnessFlavor) {
     let _got_it = Arc::new((Mutex::new(false), Condvar::new()));
     let mut _handler = None;
 
@@ -47,16 +36,14 @@ pub fn handles_exception(signal: ExceptionKind, raiser: impl Fn()) {
 
                             assert_eq!(
                                 cc.siginfo.ssi_signo,
-                                match signal {
-                                    ExceptionKind::Abort => Signal::Abort,
-                                    ExceptionKind::Bus => Signal::Bus,
-                                    ExceptionKind::Fpe => Signal::Fpe,
-                                    ExceptionKind::Illegal => Signal::Ill,
-                                    ExceptionKind::SigSegv | ExceptionKind::StackOverflow =>
+                                match flavor {
+                                    SadnessFlavor::Abort => Signal::Abort,
+                                    SadnessFlavor::Bus => Signal::Bus,
+                                    SadnessFlavor::DivideByZero => Signal::Fpe,
+                                    SadnessFlavor::Illegal => Signal::Ill,
+                                    SadnessFlavor::Segfault | SadnessFlavor::StackOverflow { .. } =>
                                         Signal::Segv,
-                                    ExceptionKind::Trap => Signal::Trap,
-                                    ExceptionKind::InvalidParam | ExceptionKind::Purecall =>
-                                        unreachable!(),
+                                        SadnessFlavor::Trap => Signal::Trap,
                                 } as u32
                             );
                             //assert_eq!(cc.tid, tid);
@@ -69,22 +56,19 @@ pub fn handles_exception(signal: ExceptionKind, raiser: impl Fn()) {
 
                             let exc = cc.exception.expect("we should have an exception");
 
-                            let expected = match signal {
-                                ExceptionKind::Abort => {
+                            let expected = match flavor {
+                                SadnessFlavor::Abort => {
                                     assert_eq!(exc.code, 0x10003); // EXC_SOFT_SIGNAL
                                     assert_eq!(exc.subcode.unwrap(), libc::SIGABRT as i64);
 
                                     ExceptionType::Software
                                 }
-                                ExceptionKind::Bus
-                                | ExceptionKind::SigSegv
-                                | ExceptionKind::StackOverflow => ExceptionType::BadAccess,
-                                ExceptionKind::Fpe => ExceptionType::Arithmetic,
-                                ExceptionKind::Illegal => ExceptionType::BadInstruction,
-                                ExceptionKind::Trap => ExceptionType::Breakpoint,
-                                ExceptionKind::InvalidParam | ExceptionKind::Purecall => {
-                                    unreachable!()
-                                }
+                                SadnessFlavor::Bus
+                                | SadnessFlavor::Segfault
+                                | SadnessFlavor::StackOverflow { .. } => ExceptionType::BadAccess,
+                                SadnessFlavor::DivideByZero => ExceptionType::Arithmetic,
+                                SadnessFlavor::Illegal => ExceptionType::BadInstruction,
+                                SadnessFlavor::Trap => ExceptionType::Breakpoint,
                             };
 
                             assert_eq!(exc.kind, expected as i32);
@@ -100,15 +84,14 @@ pub fn handles_exception(signal: ExceptionKind, raiser: impl Fn()) {
                         } else if #[cfg(target_os = "windows")] {
                             use ch::ExceptionCode;
 
-                            let ec = match signal {
-                                ExceptionKind::Abort | ExceptionKind::Bus => unimplemented!(),
-                                ExceptionKind::Fpe => ExceptionCode::Fpe,
-                                ExceptionKind::Illegal => ExceptionCode::Illegal,
-                                ExceptionKind::InvalidParam => ExceptionCode::InvalidParam,
-                                ExceptionKind::Purecall => ExceptionCode::Purecall,
-                                ExceptionKind::SigSegv => ExceptionCode::Segv,
-                                ExceptionKind::StackOverflow => ExceptionCode::StackOverflow,
-                                ExceptionKind::Trap => ExceptionCode::Trap,
+                            let ec = match flavor {
+                                SadnessFlavor::DivideByZero => ExceptionCode::Fpe,
+                                SadnessFlavor::Illegal => ExceptionCode::Illegal,
+                                SadnessFlavor::InvalidParam => ExceptionCode::InvalidParam,
+                                SadnessFlavor::Purecall => ExceptionCode::Purecall,
+                                SadnessFlavor::Segfault => ExceptionCode::Segv,
+                                SadnessFlavor::StackOverflow { .. }=> ExceptionCode::StackOverflow,
+                                SadnessFlavor::Trap => ExceptionCode::Trap,
                             };
 
                             assert_eq!(
@@ -139,7 +122,7 @@ pub fn handles_exception(signal: ExceptionKind, raiser: impl Fn()) {
                 .unwrap(),
             );
 
-            raiser();
+            flavor.make_sad()
         } else {
             loop {
                 std::thread::yield_now();

@@ -9,8 +9,8 @@ mod shared;
 
 #[test]
 fn handles_stack_overflow_in_c_thread() {
-    shared::handles_exception(
-        shared::ExceptionKind::StackOverflow,
-        sadness_generator::raise_stack_overflow_in_non_rust_thread_longjmp,
-    );
+    shared::handles_crash(shared::SadnessFlavor::StackOverflow {
+        non_rust_thread: true,
+        long_jumps: true,
+    });
 }
