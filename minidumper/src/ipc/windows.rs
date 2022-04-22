@@ -2,7 +2,7 @@
 //! be a part of an external crate such as `uds`, but currently no Rust crates
 //! support them, or if they do, use outdated dependencies such as winapi
 
-#![allow(clippy::mem_forget)]
+#![allow(clippy::mem_forget, unsafe_code)]
 
 use std::{
     io,
@@ -275,7 +275,7 @@ impl UnixListener {
         }
     }
 
-    pub(crate) fn accept(&self) -> io::Result<(UnixStream, UnixSocketAddr)> {
+    pub(crate) fn accept_unix_addr(&self) -> io::Result<(UnixStream, UnixSocketAddr)> {
         let mut sock_addr = std::mem::MaybeUninit::<ws::sockaddr_un>::uninit();
         let mut len = std::mem::size_of::<ws::sockaddr_un>() as i32;
 
@@ -333,9 +333,6 @@ impl UnixStream {
         {
             Err(last_socket_error())
         } else {
-            // We can immediately remove the file if the connect succeeds, windows
-            // will only remove it once all references are closed
-            //let _res = std::fs::remove_file(path);
             Ok(Self(inner))
         }
     }
@@ -363,11 +360,6 @@ impl UnixStream {
     #[inline]
     pub(crate) fn send_vectored(&self, bufs: &[io::IoSlice<'_>]) -> io::Result<usize> {
         self.0.send_vectored(bufs)
-    }
-
-    #[inline]
-    pub(crate) fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        self.0.set_nonblocking(nonblocking)
     }
 }
 

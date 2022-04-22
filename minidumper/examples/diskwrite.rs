@@ -87,9 +87,7 @@ fn main() {
             // Before we request the crash, send a message to the server
             client.send_message(2, "mistakes were made").unwrap();
 
-            crash_handler::CrashEventResult::Handled(
-                client.request_dump(crash_context, true).is_ok(),
-            )
+            crash_handler::CrashEventResult::Handled(client.request_dump(crash_context).is_ok())
         })
     })
     .expect("failed to attach signal handler");

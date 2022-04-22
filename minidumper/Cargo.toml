@@ -1,7 +1,20 @@
 [package]
 name = "minidumper"
 version = "0.1.0"
+description = "Provides a client and server"
+repository = "https://github.com/EmbarkStudios/crash-handling"
+authors = [
+    "Embark <opensource@embark-studios.com>",
+    "Jake Shadle <jake.shadle@embark-studios.com>",
+]
 edition = "2021"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+documentation = "https://docs.rs/minidumper"
+homepage = "https://github.com/EmbarkStudios/crash-handling/tree/main/minidumper"
+# Unfortunately there is no good category for this on crates.io atm
+categories = ["os"]
+keywords = ["crash", "minidump", "ipc", "out-of-process"]
 
 [dependencies]
 # Nicer cfg handling
@@ -10,8 +23,8 @@ crash-context = { version = "0.1.0", path = "../crash-context" }
 libc = "0.2"
 # Basic log emitting
 log = "0.4"
-# Minidump writing (currently linux/android only)
-minidump-writer = { git = "https://github.com/EmbarkStudios/minidump_writer_linux", branch = "macos" } # branch = "main"
+# Minidump writing
+minidump-writer = { git = "https://github.com/EmbarkStudios/minidump_writer_linux", branch = "macos" }
 #minidump-writer = { path = "../../mdw" }
 # Event loop
 polling = "2.2"

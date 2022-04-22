@@ -83,21 +83,8 @@ mod errors;
 pub use errors::Error;
 use std::{fs::File, path::PathBuf};
 
-cfg_if::cfg_if! {
-    if #[cfg(any(target_os = "linux", target_os = "android"))] {
-        mod linux;
-
-        pub use linux::{Client, Server};
-    } else if #[cfg(target_os = "windows")] {
-        mod windows;
-
-        pub use windows::{Client, Server};
-    } else if #[cfg(target_os = "macos")] {
-        mod mac;
-
-        pub use mac::{Client, Server};
-    }
-}
+mod ipc;
+pub use ipc::{Client, Server};
 
 pub struct MinidumpBinary {
     /// The file the minidump was written to, as provided by [`ServerHandler::create_minidump_file`]
@@ -127,61 +114,5 @@ pub trait ServerHandler: Send + Sync {
     /// Defaults to creating a new vec.
     fn message_alloc(&self) -> Vec<u8> {
         Vec::new()
-    }
-}
-
-#[derive(Copy, Clone)]
-#[cfg_attr(test, derive(PartialEq, Debug))]
-#[repr(C)]
-pub(crate) struct Header {
-    kind: u32,
-    size: u32,
-}
-
-impl Header {
-    fn as_bytes(&self) -> &[u8] {
-        #[allow(unsafe_code)]
-        unsafe {
-            let size = std::mem::size_of::<Self>();
-            let ptr = (self as *const Self).cast();
-            std::slice::from_raw_parts(ptr, size)
-        }
-    }
-
-    fn from_bytes(buf: &[u8]) -> Option<Self> {
-        if buf.len() != std::mem::size_of::<Self>() {
-            return None;
-        }
-
-        #[allow(unsafe_code)]
-        unsafe {
-            Some(*buf.as_ptr().cast::<Self>())
-        }
-    }
-}
-
-#[inline]
-#[allow(unsafe_code, dead_code)]
-pub(crate) fn write_stderr(s: &'static str) {
-    unsafe {
-        libc::write(2, s.as_ptr().cast(), s.len() as _);
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::Header;
-
-    #[test]
-    fn header_bytes() {
-        let expected = Header {
-            kind: 20,
-            size: 8 * 1024,
-        };
-        let exp_bytes = expected.as_bytes();
-
-        let actual = Header::from_bytes(exp_bytes).unwrap();
-
-        assert_eq!(expected, actual);
     }
 }
