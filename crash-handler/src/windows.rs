@@ -19,7 +19,7 @@ pub enum ExceptionCode {
     Segv = found::EXCEPTION_ACCESS_VIOLATION,
     StackOverflow = found::EXCEPTION_STACK_OVERFLOW,
     Trap = found::EXCEPTION_BREAKPOINT,
-    InvalidParam = found::STATUS_INVALID_PARAMETER,
+    InvalidParameter = found::STATUS_INVALID_PARAMETER,
     Purecall = found::STATUS_NONCONTINUABLE_EXCEPTION,
 }
 
