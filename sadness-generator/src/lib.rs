@@ -1,23 +1,40 @@
 use std::arch::asm;
 
-pub enum SadnessFlavors {
-    /// Raises `SIGABRT` on unix and who knows what on windows
+#[derive(Copy, Clone, Debug)]
+pub enum SadnessFlavor {
+    /// `SIGABRT` on Unix. Not implemented on Windows as [`std::process::abort`],
+    /// the canonical way to abort processes in Rust, uses the [fastfail](
+    /// https://docs.microsoft.com/en-us/cpp/intrinsics/fastfail?view=msvc-170)
+    /// intrinsic, which neither raises a `SIGABRT` signal, nor issue a Windows
+    /// exception.
+    #[cfg(unix)]
     Abort,
-    /// Raises `SIGSEGV` on unix and a `EXCEPTION_ACCESS_VIOLATION` exception on windows
+    /// * `SIGSEGV` on Linux
+    /// * `EXCEPTION_ACCESS_VIOLATION` on Windows
+    /// * `EXC_BAD_ACCESS` on Macos
     Segfault,
-    /// Raises `SIGFPE` on unix and a `EXCEPTION_INT_DIVIDE_BY_ZERO` exception on windows
+    /// * `SIGFPE` on Linux
+    /// * `EXCEPTION_INT_DIVIDE_BY_ZERO` on Windows
+    /// * `EXC_ARITHMETIC` on Macos
     DivideByZero,
-    /// Raises `SIGILL` on unix and a `EXCEPTION_ILLEGAL_INSTRUCTION` exception on windows
+    /// * `SIGILL` on Linux
+    /// * `EXCEPTION_ILLEGAL_INSTRUCTION` on Windows
+    /// * `EXC_BAD_INSTRUCTION` on Macos
     Illegal,
-    /// Raises `SIGBUS` on unix
+    /// * `SIGBUS` on Linux
+    /// * `EXC_BAD_ACCESS` on Macos
     #[cfg(unix)]
     Bus,
-    /// Raises `SIGTRAP` on unix and a `EXCEPTION_BREAKPOINT` exception on windows
+    /// * `SIGTRAP` on Linux
+    /// * `EXCEPTION_BREAKPOINT` on Windows
+    /// * `EXC_BREAKPOINT` on Macos
     Trap,
-    /// Raises `SIGSEGV` on unix and a `EXCEPTION_STACK_OVERFLOW` exception on windows
+    /// * `SIGSEGV` on Linux
+    /// * `EXCEPTION_STACK_OVERFLOW` on Windows
+    /// * `EXC_BAD_ACCESS` on Macos
     StackOverflow {
         /// Raises the signal/exception from a non-[`std::thread::Thread`]
-        native_thread: bool,
+        non_rust_thread: bool,
         /// If using a native thread and there is a signal handler that longjumps,
         /// we can't wait on the thread as we would normally as it would deadlock
         long_jumps: bool,
@@ -32,10 +49,15 @@ pub enum SadnessFlavors {
     InvalidParameter,
 }
 
-impl SadnessFlavors {
+impl SadnessFlavor {
     /// This only ends one way. Sadness.
-    pub fn make_sad(self) {
+    ///
+    /// # Safety
+    ///
+    /// This is not safe. It intentionally crashes.
+    pub unsafe fn make_sad(self) {
         match self {
+            #[cfg(unix)]
             Self::Abort => raise_abort(),
             Self::Segfault => raise_segfault(),
             Self::DivideByZero => raise_floating_point_exception(),
@@ -45,10 +67,10 @@ impl SadnessFlavors {
             Self::Trap => raise_trap(),
             #[allow(unused_variables)]
             Self::StackOverflow {
-                native_thread,
+                non_rust_thread,
                 long_jumps,
             } => {
-                if !native_thread {
+                if !non_rust_thread {
                     raise_stack_overflow()
                 } else {
                     #[cfg(unix)]
@@ -69,12 +91,16 @@ impl SadnessFlavors {
     }
 }
 
-/// [`SadnessFlavors::Abort`]
+/// [`SadnessFlavor::Abort`]
 pub fn raise_abort() {
     std::process::abort();
 }
 
-/// [`SadnessFlavors::Segfault`]
+/// [`SadnessFlavor::Segfault`]
+///
+/// # Safety
+///
+/// This is not safe. It intentionally crashes.
 pub fn raise_segfault() {
     let s: &u32 = unsafe {
         // avoid deref_nullptr lint
@@ -87,7 +113,11 @@ pub fn raise_segfault() {
     println!("we are crashing by accessing a null reference: {s}");
 }
 
-/// [`SadnessFlavors::DivideByZero`]
+/// [`SadnessFlavor::DivideByZero`]
+///
+/// # Safety
+///
+/// This is not safe. It intentionally crashes.
 pub fn raise_floating_point_exception() {
     let ohno = unsafe {
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -114,70 +144,78 @@ pub fn raise_floating_point_exception() {
     println!("we won't get here because we've raised a floating point exception: {ohno}");
 }
 
-/// [`SadnessFlavors::Illegal`]
-pub fn raise_illegal_instruction() {
-    unsafe {
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-        asm!("ud2");
-        #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-        asm!("udf #0");
-    }
+/// [`SadnessFlavor::Illegal`]
+///
+/// # Safety
+///
+/// This is not safe. It intentionally crashes.
+pub unsafe fn raise_illegal_instruction() {
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    asm!("ud2");
+    #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+    asm!("udf #0");
 }
 
-/// [`SadnessFlavors::Bus`]
+/// [`SadnessFlavor::Bus`]
+///
+/// # Safety
+///
+/// This is not safe. It intentionally crashes.
 #[cfg(unix)]
-pub fn raise_bus() {
-    unsafe {
-        {
-            let mut temp_name = [0; 14];
-            temp_name.copy_from_slice(b"sigbus.XXXXXX\0");
+pub unsafe fn raise_bus() {
+    let mut temp_name = [0; 14];
+    temp_name.copy_from_slice(b"sigbus.XXXXXX\0");
 
-            let bus_fd = libc::mkstemp(temp_name.as_mut_ptr().cast());
-            assert!(bus_fd != -1);
+    let bus_fd = libc::mkstemp(temp_name.as_mut_ptr().cast());
+    assert!(bus_fd != -1);
 
-            let page_size = libc::sysconf(libc::_SC_PAGESIZE) as usize;
+    let page_size = libc::sysconf(libc::_SC_PAGESIZE) as usize;
 
-            let mapping = std::slice::from_raw_parts_mut(
-                libc::mmap(
-                    std::ptr::null_mut(),
-                    128,
-                    libc::PROT_READ | libc::PROT_WRITE,
-                    libc::MAP_SHARED,
-                    bus_fd,
-                    0,
-                )
-                .cast::<u8>(),
-                page_size + page_size / 2,
-            );
+    let mapping = std::slice::from_raw_parts_mut(
+        libc::mmap(
+            std::ptr::null_mut(),
+            128,
+            libc::PROT_READ | libc::PROT_WRITE,
+            libc::MAP_SHARED,
+            bus_fd,
+            0,
+        )
+        .cast::<u8>(),
+        page_size + page_size / 2,
+    );
 
-            libc::unlink(temp_name.as_ptr().cast());
+    libc::unlink(temp_name.as_ptr().cast());
 
-            // https://pubs.opengroup.org/onlinepubs/9699919799/functions/mmap.html
-            // The system shall always zero-fill any partial page at the end of
-            // an object. Further, the system shall never write out any modified
-            // portions of the last page of an object which are beyond its end.
-            // References within the address range starting at pa and continuing
-            // for len bytes to whole pages following the end of an object shall
-            // result in delivery of a SIGBUS signal.
-            mapping[20] = 20;
-            println!("{}", mapping[20]);
-        }
-    }
+    // https://pubs.opengroup.org/onlinepubs/9699919799/functions/mmap.html
+    // The system shall always zero-fill any partial page at the end of
+    // an object. Further, the system shall never write out any modified
+    // portions of the last page of an object which are beyond its end.
+    // References within the address range starting at pa and continuing
+    // for len bytes to whole pages following the end of an object shall
+    // result in delivery of a SIGBUS signal.
+    mapping[20] = 20;
+    println!("{}", mapping[20]);
 }
 
-/// [`SadnessFlavors::Trap`]
-pub fn raise_trap() {
-    unsafe {
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-        asm!("int3");
-        #[cfg(target_arch = "arm")]
-        asm!(".inst 0xe7f001f0");
-        #[cfg(target_arch = "aarch64")]
-        asm!(".inst 0xd4200000");
-    }
+/// [`SadnessFlavor::Trap`]
+///
+/// # Safety
+///
+/// This is not safe. It intentionally crashes.
+pub unsafe fn raise_trap() {
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    asm!("int3");
+    #[cfg(target_arch = "arm")]
+    asm!(".inst 0xe7f001f0");
+    #[cfg(target_arch = "aarch64")]
+    asm!(".inst 0xd4200000");
 }
 
-/// [`SadnessFlavors::StackOverflow`]
+/// [`SadnessFlavor::StackOverflow`]
+///
+/// # Safety
+///
+/// This is not safe. It intentionally crashes.
 pub fn raise_stack_overflow() {
     let mut big_boi = [0u8; 999 * 1024 * 1024];
     big_boi[big_boi.len() - 1] = 1;
@@ -185,77 +223,93 @@ pub fn raise_stack_overflow() {
     println!("{:?}", &big_boi[big_boi.len() - 20..]);
 }
 
-/// [`SadnessFlavors::StackOverflow`]
+/// [`SadnessFlavor::StackOverflow`]
 ///
 /// This is raised inside of a non-Rust `std::thread::Thread` to ensure that
 /// alternate stacks apply to all threads, even ones not created from Rust
+///
+/// # Safety
+///
+/// This is not safe. It intentionally crashes.
 #[cfg(unix)]
-pub fn raise_stack_overflow_in_non_rust_thread(uses_longjmp: bool) {
-    unsafe {
-        let mut native: libc::pthread_t = std::mem::zeroed();
-        let mut attr: libc::pthread_attr_t = std::mem::zeroed();
+pub unsafe fn raise_stack_overflow_in_non_rust_thread(uses_longjmp: bool) {
+    let mut native: libc::pthread_t = std::mem::zeroed();
+    let mut attr: libc::pthread_attr_t = std::mem::zeroed();
 
+    assert_eq!(
+        libc::pthread_attr_setstacksize(&mut attr, 2 * 1024 * 1024),
+        0,
+        "failed to set thread stack size",
+    );
+
+    extern "C" fn thread_start(_arg: *mut libc::c_void) -> *mut libc::c_void {
+        raise_stack_overflow();
+        std::ptr::null_mut()
+    }
+
+    let ret = libc::pthread_create(&mut native, &attr, thread_start, std::ptr::null_mut());
+
+    // We might not get here, but that's ok
+    assert_eq!(
+        libc::pthread_attr_destroy(&mut attr),
+        0,
+        "failed to destroy thread attributes"
+    );
+    assert_eq!(ret, 0, "pthread_create failed");
+
+    // Note if we're doing longjmp shenanigans, we can't do thread join, that
+    // has to be handled by the calling code
+    if !uses_longjmp {
         assert_eq!(
-            libc::pthread_attr_setstacksize(&mut attr, 2 * 1024 * 1024),
+            libc::pthread_join(native, std::ptr::null_mut()),
             0,
-            "failed to set thread stack size",
+            "failed to join"
         );
-
-        extern "C" fn thread_start(_arg: *mut libc::c_void) -> *mut libc::c_void {
-            raise_stack_overflow();
-            std::ptr::null_mut()
-        }
-
-        let ret = libc::pthread_create(&mut native, &attr, thread_start, std::ptr::null_mut());
-
-        // We might not get here, but that's ok
-        assert_eq!(
-            libc::pthread_attr_destroy(&mut attr),
-            0,
-            "failed to destroy thread attributes"
-        );
-        assert_eq!(ret, 0, "pthread_create failed");
-
-        // Note if we're doing longjmp shenanigans, we can't do thread join, that
-        // has to be handled by the calling code
-        if !uses_longjmp {
-            assert_eq!(
-                libc::pthread_join(native, std::ptr::null_mut()),
-                0,
-                "failed to join"
-            );
-        }
     }
 }
 
-/// [`SadnessFlavors::StackOverflow`]
+/// [`SadnessFlavor::StackOverflow`]
+///
+/// # Safety
+///
+/// This is not safe. It intentionally crashes.
 #[inline]
 #[cfg(unix)]
-pub fn raise_stack_overflow_in_non_rust_thread_normal() {
+pub unsafe fn raise_stack_overflow_in_non_rust_thread_normal() {
     raise_stack_overflow_in_non_rust_thread(false);
 }
 
-/// [`SadnessFlavors::StackOverflow`]
+/// [`SadnessFlavor::StackOverflow`]
+///
+/// # Safety
+///
+/// This is not safe. It intentionally crashes.
 #[inline]
 #[cfg(unix)]
-pub fn raise_stack_overflow_in_non_rust_thread_longjmp() {
+pub unsafe fn raise_stack_overflow_in_non_rust_thread_longjmp() {
     raise_stack_overflow_in_non_rust_thread(true);
 }
 
-/// [`SadnessFlavors::Purecall`]
+/// [`SadnessFlavor::Purecall`]
+///
+/// # Safety
+///
+/// This is not safe. It intentionally crashes.
 #[cfg(target_os = "windows")]
-pub fn raise_purecall() {
-    unsafe {
-        asm!("call _purecall");
-    }
+pub unsafe fn raise_purecall() {
+    asm!("call _purecall");
 }
 
-/// [`SadnessFlavors::InvalidParameter`]
+/// [`SadnessFlavor::InvalidParameter`]
+///
+/// # Safety
+///
+/// This is not safe. It intentionally crashes.
 #[cfg(target_os = "windows")]
-pub fn raise_invalid_parameter() {
+pub unsafe fn raise_invalid_parameter() {
     extern "C" {
         fn _mbscmp(s1: *const u8, s2: *const u8) -> i32;
     }
 
-    unsafe { _mbscmp(std::ptr::null(), std::ptr::null()) };
+    _mbscmp(std::ptr::null(), std::ptr::null());
 }

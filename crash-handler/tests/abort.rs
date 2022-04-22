@@ -1,4 +1,4 @@
-//! Abort is not catchable by a SEH, at least when done via the __fastfail
+//! Abort is not catchable by a SEH, at least when done via the `__fastfail`
 //! instrinsic which is used by eg. `std::process::abort()`
 //!
 //! > Critical failures that may have corrupted program state and stack beyond
@@ -13,5 +13,5 @@ mod shared;
 
 #[test]
 fn handles_abort() {
-    shared::handles_exception(shared::ExceptionKind::Abort, sadness_generator::raise_abort);
+    shared::handles_crash(shared::SadnessFlavor::Abort);
 }

@@ -11,7 +11,7 @@ pub struct ExceptionInfo {
     pub subcode: Option<et::mach_exception_data_type_t>,
 }
 
-/// Full MacOS crash context
+/// Full Macos crash context
 pub struct CrashContext {
     /// The process which crashed
     pub task: mt::task_t,

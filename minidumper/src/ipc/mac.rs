@@ -1,6 +1,8 @@
-//! Implements support for Unix domain sockets for Windows. This should probably
-//! be a part of an external crate such as `uds`, but currently no Rust crates
-//! support them, or if they do, use outdated dependencies such as winapi
+//! Implements support for Unix domain sockets for Macos. We don't use std since
+//! it `peek` is nightly only and it only implements the [`std::io::Read`] and
+//! [`std::io::Write`] traits, which doesn't fit with the model we started with
+//! with `uds`, which is that the sockets only do vectored reads/writes so
+//! exclusive access is not desired
 
 #![allow(clippy::mem_forget, unsafe_code)]
 
@@ -217,7 +219,7 @@ impl UnixListener {
         Ok(Self(Uds(listener.into_raw_fd())))
     }
 
-    pub(crate) fn accept(&self) -> io::Result<(UnixStream, UnixSocketAddr)> {
+    pub(crate) fn accept_unix_addr(&self) -> io::Result<(UnixStream, UnixSocketAddr)> {
         let mut sock_addr = std::mem::MaybeUninit::<libc::sockaddr_un>::uninit();
         let mut len = std::mem::size_of::<libc::sockaddr_un>() as _;
 
@@ -287,11 +289,6 @@ impl UnixStream {
     pub(crate) fn send_vectored(&self, bufs: &[io::IoSlice<'_>]) -> io::Result<usize> {
         self.0.send_vectored(bufs)
     }
-
-    #[inline]
-    pub(crate) fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        self.0.set_nonblocking(nonblocking)
-    }
 }
 
 impl AsRawFd for UnixStream {
@@ -299,17 +296,3 @@ impl AsRawFd for UnixStream {
         self.0.as_raw_fd()
     }
 }
-
-// impl FromRawSocket for UnixStream {
-//     unsafe fn from_raw_socket(sock: RawSocket) -> Self {
-//         Self(Socket::from_raw_socket(sock))
-//     }
-// }
-
-// impl IntoRawSocket for UnixStream {
-//     fn into_raw_socket(self) -> RawSocket {
-//         let ret = self.0.as_raw_socket();
-//         std::mem::forget(self);
-//         ret
-//     }
-// }
