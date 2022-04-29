@@ -76,13 +76,8 @@ fn real_main() -> anyhow::Result<()> {
                     // For some reason on linux (and macos) the default SIGTRAP action
                     // is not core dumping as it is supposed to, and thus we exit
                     // normally, so..cheat?
-                    if cfg!(any(
-                        target_os = "linux",
-                        target_os = "android",
-                        target_os = "macos"
-                    )) {
-                        sadness_generator::raise_abort();
-                    }
+                    #[cfg(not(target_os = "windows"))]
+                    sadness_generator::raise_abort();
                 }
                 #[cfg(unix)]
                 Signal::Abort => {
