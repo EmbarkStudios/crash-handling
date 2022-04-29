@@ -73,6 +73,7 @@ impl CrashHandler {
                 let cc = crash_context::CrashContext {
                     exception_pointers: (&exception_ptrs as *const state::EXCEPTION_POINTERS)
                         .cast(),
+                    process_id: std::process::id(),
                     thread_id: state::GetCurrentThreadId(),
                     exception_code,
                 };
