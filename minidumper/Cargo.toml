@@ -19,12 +19,12 @@ keywords = ["crash", "minidump", "ipc", "out-of-process"]
 [dependencies]
 # Nicer cfg handling
 cfg-if = "1.0"
-crash-context = { version = "0.2.0", path = "../crash-context" }
+crash-context = "0.2"
 libc = "0.2"
 # Basic log emitting
 log = "0.4"
 # Minidump writing
-minidump-writer = { git = "https://github.com/EmbarkStudios/minidump_writer_linux", branch = "macos" }
+minidump-writer = { git = "https://github.com/EmbarkStudios/minidump-writer", branch = "macos" }
 #minidump-writer = { path = "../../mdw" }
 # Event loop
 polling = "2.2"
