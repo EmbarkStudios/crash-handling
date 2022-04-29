@@ -31,7 +31,7 @@ Name | Description | crates.io | docs.rs
 
 ## Supported targets
 
-| Arch | unknown-linux-gnu | unknown-linux-musl | linux-android | Windows | MacOS
+| Arch | unknown-linux-gnu | unknown-linux-musl | linux-android | pc-windows-msvc | apple-darwin
 --- | --- | --- | --- | ---
 `x86_64` | ✅ | ✅ | ❌ | ✅ | ✅
 `i686` | ✅ | ✅ | ❌ | ❌ | ❌ |
