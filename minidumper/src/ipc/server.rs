@@ -1,10 +1,14 @@
 use super::{Connection, Header, Listener, SocketName};
 use crate::Error;
+use polling::{Event, Poller};
+use std::time::Duration;
 
 /// Server side of the connection, which runs in the watchdog process that is
 /// meant to monitor the process where the [`super::Client`] resides
 pub struct Server {
     listener: Listener,
+    #[cfg(target_os = "macos")]
+    port: crash_context::ipc::Server,
 }
 
 struct ClientConn {
@@ -12,14 +16,13 @@ struct ClientConn {
     socket: Connection,
     /// The key we associated with the socket
     key: usize,
+    /// We pair the pid of the client process so that we know which connection
+    /// to drop when a crash is received on the mach port
+    #[cfg(target_os = "macos")]
+    pid: Option<u32>,
 }
 
 impl ClientConn {
-    #[inline]
-    fn new(socket: Connection, key: usize) -> Self {
-        Self { socket, key }
-    }
-
     fn recv(&mut self, handler: &dyn crate::ServerHandler) -> Option<(u32, Vec<u8>)> {
         use std::io::IoSliceMut;
 
@@ -85,14 +88,30 @@ impl Server {
                 };
 
                 let listener = Listener::bind_unix_addr(&socket_addr)?;
-            } else {
+            } else if #[cfg(target_os = "windows")] {
                 let SocketName::Path(path) = sn;
                 let listener = Listener::bind(path)?;
                 listener.set_nonblocking(true)?;
+            } else if #[cfg(target_os = "macos")] {
+                let SocketName::Path(path) = sn;
+                let listener = Listener::bind(path)?;
+                listener.set_nonblocking(true)?;
+
+                // Note that sun_path is limited to 108 characters including null,
+                // while a mach port name is limited to 128 including null, so
+                // the length is already effectively checked here
+                let port_name = std::ffi::CString::new(path.to_str().ok_or(Error::InvalidPortName)?).map_err(|_err| Error::InvalidPortName)?;
+                let port = crash_context::ipc::Server::create(&port_name)?;
+            } else {
+                compile_error!("unimplemented target platform");
             }
         }
 
-        Ok(Self { listener })
+        Ok(Self {
+            listener,
+            #[cfg(target_os = "macos")]
+            port,
+        })
     }
 
     /// Runs the server loop, accepting client connections and receiving IPC
@@ -103,12 +122,10 @@ impl Server {
     /// This method uses basic I/O event notification via [`polling`] which
     /// can fail for a number of different reasons
     pub fn run(
-        &self,
+        &mut self,
         handler: Box<dyn crate::ServerHandler>,
         shutdown: &std::sync::atomic::AtomicBool,
     ) -> Result<(), Error> {
-        use polling::{Event, Poller};
-
         let poll = Poller::new()?;
         let mut events = Vec::new();
 
@@ -123,7 +140,12 @@ impl Server {
             }
 
             events.clear();
-            poll.wait(&mut events, Some(std::time::Duration::from_millis(10)))?;
+            poll.wait(&mut events, Some(Duration::from_millis(10)))?;
+
+            #[cfg(target_os = "macos")]
+            if self.check_mach_port(&poll, &mut clients, handler.as_ref())? {
+                return Ok(());
+            }
 
             for event in events.iter() {
                 if event.key == 0 {
@@ -135,7 +157,12 @@ impl Server {
                             poll.add(&accepted, Event::readable(key))?;
 
                             log::debug!("accepted connection {}", key);
-                            clients.push(ClientConn::new(accepted, key));
+                            clients.push(ClientConn {
+                                socket: accepted,
+                                key,
+                                #[cfg(target_os = "macos")]
+                                pid: None,
+                            });
                         }
                         Err(err) => {
                             log::error!("failed to accept socket connection: {}", err);
@@ -146,33 +173,83 @@ impl Server {
                     poll.modify(&self.listener, Event::readable(0))?;
                 } else if let Some(pos) = clients.iter().position(|cc| cc.key == event.key) {
                     let deregister = match clients[pos].recv(handler.as_ref()) {
-                        Some((0, crash_context)) => {
-                            let cc = clients.swap_remove(pos);
+                        Some((0, buffer)) => {
+                            cfg_if::cfg_if! {
+                                if #[cfg(target_os = "macos")] {
+                                    use scroll::Pread;
+                                    let pid: u32 = buffer.pread(0)?;
+                                    clients[pos].pid = Some(pid);
 
-                            let exit = match Self::handle_crash_request(
-                                &cc.socket,
-                                &crash_context,
-                                handler.as_ref(),
-                            ) {
-                                Err(err) => {
-                                    log::error!("failed to capture minidump: {}", err);
-                                    false
+                                    if let Err(e) = clients[pos].socket.send(&[1]) {
+                                        log::error!("failed to send ack: {}", e);
+                                    }
+
+                                    None
+                                } else {
+                                    let cc = clients.swap_remove(pos);
+
+                                    cfg_if::cfg_if! {
+                                        if #[cfg(any(target_os = "linux", target_os = "android"))] {
+                                            let peer_creds = cc.socket.initial_peer_credentials()?;
+
+                                            let pid = peer_creds.pid().ok_or(Error::UnknownClientPid)?;
+
+                                            let crash_ctx = crash_context::CrashContext::from_bytes(&buffer).ok_or_else(|| {
+                                                Error::from(std::io::Error::new(
+                                                    std::io::ErrorKind::InvalidData,
+                                                    "client sent an incorrectly sized buffer",
+                                                ))
+                                            })?;
+
+                                            // Validate that the crash info and the socket agree on the pid
+                                            if pid.get() != crash_ctx.pid as u32 {
+                                                return Err(Error::UnknownClientPid);
+                                            }
+                                        } else if #[cfg(target_os = "windows")] {
+                                            use scroll::Pread;
+                                            let dump_request: super::DumpRequest = buffer.pread(0)?;
+
+                                            // MiniDumpWriteDump primarily uses `EXCEPTION_POINTERS` for its crash
+                                            // context information, but inside that is an `EXCEPTION_RECORD`, which
+                                            // is an internally linked list, so rather than recurse and allocate until
+                                            // the end of that linked list, we just retrieve the actual pointer from
+                                            // the client process, and inform the dump writer that they are pointers
+                                            // to a different process, as MiniDumpWriteDump will internally read
+                                            // the processes memory as needed
+                                            let exception_pointers = dump_request.exception_pointers as *const std::ffi::c_void;
+
+                                            let crash_ctx = crash_context::CrashContext {
+                                                exception_pointers,
+                                                process_id: dump_request.process_id,
+                                                thread_id: dump_request.thread_id,
+                                                exception_code: dump_request.exception_code,
+                                            };
+                                        }
+                                    }
+
+                                    let exit =
+                                        match Self::handle_crash_request(crash_ctx, handler.as_ref()) {
+                                            Err(err) => {
+                                                log::error!("failed to capture minidump: {}", err);
+                                                false
+                                            }
+                                            Ok(exit) => {
+                                                log::info!("captured minidump");
+                                                exit
+                                            }
+                                        };
+
+                                    if let Err(e) = cc.socket.send(&[1]) {
+                                        log::error!("failed to send ack: {}", e);
+                                    }
+
+                                    if exit {
+                                        return Ok(());
+                                    }
+
+                                    Some(cc.socket)
                                 }
-                                Ok(exit) => {
-                                    log::info!("captured minidump");
-                                    exit
-                                }
-                            };
-
-                            if let Err(e) = cc.socket.send(&[1]) {
-                                log::error!("failed to send ack: {}", e);
                             }
-
-                            if exit {
-                                return Ok(());
-                            }
-
-                            Some(cc.socket)
                         }
                         Some((kind, buffer)) => {
                             handler.on_message(
@@ -207,71 +284,18 @@ impl Server {
     }
 
     fn handle_crash_request(
-        _socket: &Connection,
-        buffer: &[u8],
+        crash_context: crash_context::CrashContext,
         handler: &dyn crate::ServerHandler,
     ) -> Result<bool, Error> {
         cfg_if::cfg_if! {
             if #[cfg(any(target_os = "linux", target_os = "android"))] {
-                let peer_creds = _socket.initial_peer_credentials()?;
-
-                let pid = peer_creds.pid().ok_or(Error::UnknownClientPid)?;
-
-                let cc = crash_context::CrashContext::from_bytes(buffer).ok_or_else(|| {
-                    Error::from(std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        "client sent an incorrectly sized buffer",
-                    ))
-                })?;
-
                 let mut writer =
-                    minidump_writer::minidump_writer::MinidumpWriter::new(pid.get() as i32, cc.tid);
-                writer.set_crash_context(minidump_writer::crash_context::CrashContext { inner: cc });
+                    minidump_writer::minidump_writer::MinidumpWriter::new(crash_context.pid, crash_context.tid);
+                writer.set_crash_context(minidump_writer::crash_context::CrashContext { inner: crash_context });
             } else if #[cfg(target_os = "windows")] {
-                use scroll::Pread;
-                let dump_request: super::DumpRequest = buffer.pread(0)?;
-
-                // MiniDumpWriteDump primarily uses `EXCEPTION_POINTERS` for its crash
-                // context information, but inside that is an `EXCEPTION_RECORD`, which
-                // is an internally linked list, so rather than recurse and allocate until
-                // the end of that linked list, we just retrieve the actual pointer from
-                // the client process, and inform the dump writer that they are pointers
-                // to a different process, as MiniDumpWriteDump will internally read
-                // the processes memory as needed
-                let exception_pointers = dump_request.exception_pointers as *const std::ffi::c_void;
-
-                let cc = crash_context::CrashContext {
-                    exception_pointers,
-                    thread_id: dump_request.thread_id,
-                    exception_code: dump_request.exception_code,
-                };
-
-                let writer = minidump_writer::minidump_writer::MinidumpWriter::external_process(
-                    cc,
-                    dump_request.process_id,
-                )?;
+                let writer = minidump_writer::minidump_writer::MinidumpWriter::new(crash_context)?;
             } else if #[cfg(target_os = "macos")] {
-                use scroll::Pread;
-                let dump_request: super::DumpRequest = buffer.pread(0)?;
-
-                let exception = if dump_request.has_exception != 0 {
-                    Some(crash_context::ExceptionInfo {
-                        kind: dump_request.kind,
-                        code: dump_request.code,
-                        subcode: (dump_request.has_subcode != 0).then(|| dump_request.subcode),
-                    })
-                } else {
-                    None
-                };
-
-                let cc = crash_context::CrashContext {
-                    task: dump_request.task,
-                    thread: dump_request.thread,
-                    handler_thread: dump_request.handler_thread,
-                    exception,
-                };
-
-                let mut writer = minidump_writer::minidump_writer::MinidumpWriter::new(cc);
+                let mut writer = minidump_writer::minidump_writer::MinidumpWriter::new(crash_context);
             }
         }
 
@@ -291,5 +315,50 @@ impl Server {
                 })
                 .map_err(crate::Error::from),
         ))
+    }
+
+    #[cfg(target_os = "macos")]
+    fn check_mach_port(
+        &mut self,
+        poll: &Poller,
+        clients: &mut Vec<ClientConn>,
+        handler: &dyn crate::ServerHandler,
+    ) -> Result<bool, Error> {
+        // We use a really short timeout for receiving on the mach port since we check it
+        // frequently rather than spawning a separate thread and blocking
+        if let Some(mut rcc) = self
+            .port
+            .try_recv_crash_context(Some(Duration::from_millis(1)))?
+        {
+            // Try to find a client connection that matches the port sender
+            let pos = clients
+                .iter()
+                .position(|cc| cc.pid == Some(rcc.pid))
+                .ok_or(Error::UnknownClientPid)?;
+            let cc = clients.swap_remove(pos);
+
+            let exit = match Self::handle_crash_request(rcc.crash_context, handler) {
+                Err(err) => {
+                    log::error!("failed to capture minidump: {}", err);
+                    false
+                }
+                Ok(exit) => {
+                    log::info!("captured minidump");
+                    exit
+                }
+            };
+
+            if let Err(e) = rcc.acker.send_ack(1, Some(Duration::from_secs(2))) {
+                log::error!("failed to send ack: {}", e);
+            }
+
+            if let Err(e) = poll.delete(&cc.socket) {
+                log::error!("failed to deregister socket: {}", e);
+            }
+
+            Ok(exit)
+        } else {
+            Ok(false)
+        }
     }
 }

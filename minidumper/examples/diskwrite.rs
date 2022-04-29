@@ -4,7 +4,7 @@ use minidumper::{Client, Server};
 
 fn main() {
     if std::env::args().any(|a| a == "--server") {
-        let server = Server::with_name(SOCKET_NAME).expect("failed to create server");
+        let mut server = Server::with_name(SOCKET_NAME).expect("failed to create server");
 
         let ab = std::sync::atomic::AtomicBool::new(false);
 

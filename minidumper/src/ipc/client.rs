@@ -6,6 +6,12 @@ use std::io::IoSlice;
 /// crashed to communicate with an external watchdog process.
 pub struct Client {
     socket: Stream,
+    /// On Macos we need this additional mach port based client to send crash
+    /// contexts, as, unfortunately, it's the best (though hopefully not only?)
+    /// way to get the real info needed by the minidump writer to write the
+    /// minidump
+    #[cfg(target_os = "macos")]
+    port: crash_context::ipc::Client,
 }
 
 impl Client {
@@ -30,13 +36,41 @@ impl Client {
                 };
 
                 let socket = Stream::connect_unix_addr(&socket_addr)?;
-            } else {
+            } else if #[cfg(target_os = "windows")] {
                 let SocketName::Path(path) = sn;
                 let socket = Stream::connect(path)?;
+            } else if #[cfg(target_os = "macos")] {
+                let SocketName::Path(path) = sn;
+                let socket = Stream::connect(path)?;
+
+                // Note that sun_path is limited to 108 characters including null,
+                // while a mach port name is limited to 128 including null, so
+                // the length is already effectively checked here
+                let port_name = std::ffi::CString::new(path.to_str().ok_or(Error::InvalidPortName)?).map_err(|_err| Error::InvalidPortName)?;
+                let port = crash_context::ipc::Client::create(&port_name)?;
+            } else {
+                compile_error!("unimplemented target platform");
             }
         }
 
-        Ok(Self { socket })
+        let s = Self {
+            socket,
+            #[cfg(target_os = "macos")]
+            port,
+        };
+
+        #[cfg(target_os = "macos")]
+        {
+            // Since we aren't sending crash requests as id 0 like for other
+            // platforms, we instead abuse it to send the pid of this process
+            // so that the server can pair the port and the socket together
+            let id_buf = std::process::id().to_ne_bytes();
+            s.send_message_impl(0, &id_buf)?;
+            let mut ack = [0u8; 1];
+            s.socket.recv(&mut ack)?;
+        }
+
+        Ok(s)
     }
 
     /// Requests that the server generate a minidump for the specified crash
@@ -73,63 +107,26 @@ impl Client {
                 let written = buf.pwrite(
                     super::DumpRequest {
                         exception_pointers: crash_context.exception_pointers as _,
+                        process_id: crash_context.process_id,
                         thread_id: crash_context.thread_id,
                         exception_code: crash_context.exception_code,
-                        process_id: std::process::id(),
                     },
                     0,
                 )?;
 
                 let crash_ctx_buffer = &buf[..written];
             } else if #[cfg(target_os = "macos")] {
-                let mut buf = [0u8; 48];
-
-                let (has_exception, kind, code, has_subcode, subcode) =
-                    if let Some(exc) = crash_context.exception {
-                        (
-                            1,
-                            exc.kind,
-                            exc.code,
-                            if exc.subcode.is_some() { 1 } else { 0 },
-                            exc.subcode.unwrap_or_default(),
-                        )
-                    } else {
-                        (0, 0, 0, 0, 0)
-                    };
-
-                use scroll::Pwrite;
-                let written = buf.pwrite(
-                    super::DumpRequest {
-                        task: crash_context.task,
-                        thread: crash_context.thread,
-                        handler_thread: crash_context.handler_thread,
-                        has_exception,
-                        kind,
-                        code,
-                        has_subcode,
-                        subcode,
-                    },
-                    0,
+                self.port.send_crash_context(
+                    crash_context,
+                    Some(std::time::Duration::from_secs(2)),
+                    Some(std::time::Duration::from_secs(5))
                 )?;
-
-                let crash_ctx_buffer = &buf[..written];
+                Ok(())
             }
         }
 
-        let header = Header {
-            kind: 0,
-            size: crash_ctx_buffer.len() as u32,
-        };
-
-        let header_buf = header.as_bytes();
-
-        let io_bufs = [IoSlice::new(header_buf), IoSlice::new(crash_ctx_buffer)];
-        self.socket.send_vectored(&io_bufs)?;
-
-        let mut ack = [0u8; 1];
-        self.socket.recv(&mut ack)?;
-
-        Ok(())
+        #[cfg(not(target_os = "macos"))]
+        self.send_message_impl(0, crash_ctx_buffer)
     }
 
     /// Sends a message to the server.
@@ -145,17 +142,9 @@ impl Client {
     /// # Errors
     ///
     /// The write to the server fails
+    #[inline]
     pub fn send_message(&self, kind: u32, buf: impl AsRef<[u8]>) -> Result<(), Error> {
-        let buffer = buf.as_ref();
-
-        let header = Header {
-            kind: kind + 1, // 0 is reserved for requesting a dump
-            size: buffer.len() as u32,
-        };
-
-        let io_bufs = [IoSlice::new(header.as_bytes()), IoSlice::new(buffer)];
-
-        self.socket.send_vectored(&io_bufs)?;
+        self.send_message_impl(kind + 1, buf.as_ref())
 
         // TODO: should we have an ACK? IPC is a (relatively) reliable communication
         // method, and reserving receives from the server for the exclusive
@@ -163,7 +152,17 @@ impl Client {
         // we reduce complication
         // let mut ack = [0u8; 1];
         // self.socket.recv(&mut ack)?;
+    }
 
+    fn send_message_impl(&self, kind: u32, buf: &[u8]) -> Result<(), Error> {
+        let header = Header {
+            kind,
+            size: buf.len() as u32,
+        };
+
+        let io_bufs = [IoSlice::new(header.as_bytes()), IoSlice::new(buf)];
+
+        self.socket.send_vectored(&io_bufs)?;
         Ok(())
     }
 }
