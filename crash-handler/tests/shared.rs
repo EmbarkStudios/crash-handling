@@ -1,3 +1,5 @@
+#![allow(unsafe_code)]
+
 pub use ch::debug_print;
 use crash_handler as ch;
 use parking_lot::{Condvar, Mutex};
@@ -40,7 +42,7 @@ pub fn handles_crash(flavor: SadnessFlavor) {
                                     SadnessFlavor::Abort => Signal::Abort,
                                     SadnessFlavor::Bus => Signal::Bus,
                                     SadnessFlavor::DivideByZero => Signal::Fpe,
-                                    SadnessFlavor::Illegal => Signal::Ill,
+                                    SadnessFlavor::Illegal => Signal::Illegal,
                                     SadnessFlavor::Segfault | SadnessFlavor::StackOverflow { .. } =>
                                         Signal::Segv,
                                         SadnessFlavor::Trap => Signal::Trap,
@@ -80,6 +82,7 @@ pub fn handles_crash(flavor: SadnessFlavor) {
                             // of the fact that we only run a single test per executable
                             // in these integration tests and just exit the entire
                             // process
+                            #[allow(clippy::exit)]
                             std::process::exit(0);
                         } else if #[cfg(target_os = "windows")] {
                             use ch::ExceptionCode;
@@ -122,7 +125,7 @@ pub fn handles_crash(flavor: SadnessFlavor) {
                 .unwrap(),
             );
 
-            flavor.make_sad()
+            flavor.make_sad();
         } else {
             loop {
                 std::thread::yield_now();

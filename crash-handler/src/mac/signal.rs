@@ -4,7 +4,9 @@ use std::mem;
 /// Installs our `SIGABRT` handler, returning any previously registered handler,
 /// which should be restored later
 ///
-/// SAFETY: syscall
+/// # Safety
+///
+/// Performs syscalls
 pub(crate) unsafe fn install_abort_handler() -> Result<libc::sigaction, std::io::Error> {
     let mut sa: libc::sigaction = mem::zeroed();
     libc::sigemptyset(&mut sa.sa_mask);
@@ -23,13 +25,16 @@ pub(crate) unsafe fn install_abort_handler() -> Result<libc::sigaction, std::io:
 
 /// Restores the action for `SIGABRT` to the specified handler
 ///
-/// SAFETY: syscall
+/// # Safety
+///
+/// Performs syscalls
 #[inline]
 pub(crate) unsafe fn restore_abort_handler(handler: libc::sigaction) {
     libc::sigaction(libc::SIGABRT, &handler, std::ptr::null_mut());
 }
 
-/// Our signal handler
+/// Our signal handler, transforms the signal into a [`crash_context::ExceptionInfo`]
+/// and sends it to the thread that handles all exceptions
 unsafe extern "C" fn signal_handler(
     signal: i32,
     _info: *mut libc::siginfo_t,

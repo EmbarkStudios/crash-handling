@@ -23,6 +23,7 @@ pub enum ExceptionCode {
     Purecall = found::STATUS_NONCONTINUABLE_EXCEPTION,
 }
 
+/// A Windows exception handler
 pub struct CrashHandler;
 
 #[allow(clippy::unused_self)]
@@ -30,15 +31,16 @@ impl CrashHandler {
     /// Attaches the crash handler.
     ///
     /// The provided callback will be invoked if an exception is caught,
-    /// providing a [`CrashContext`] with the details of the thread where the
-    /// exception was thrown.
+    /// providing a [`crate::CrashContext`] with the details of the thread where
+    /// the exception was thrown.
     pub fn attach(on_crash: Box<dyn crate::CrashEvent>) -> Result<Self, Error> {
         state::attach(on_crash)?;
         Ok(Self)
     }
 
-    /// Detaches this handler, removing it from the handler stack. This is done
-    /// automatically when this [`ExceptionHandler`] is dropped.
+    /// Detaches this handler, removing it from the handler stack.
+    ///
+    /// This is done automatically when this [`CrashHandler`] is dropped.
     #[inline]
     pub fn detach(self) {
         state::detach();

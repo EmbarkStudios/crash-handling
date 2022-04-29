@@ -1,82 +1,80 @@
-// BEGIN - Embark standard lints v6 for Rust 1.55+
-// do not change or add/remove here, but one can add exceptions after this section
-// for more info see: <https://github.com/EmbarkStudios/rust-ecosystem/issues/59>
-#![deny(unsafe_code)]
-#![warn(
-    clippy::all,
-    clippy::await_holding_lock,
-    clippy::char_lit_as_u8,
-    clippy::checked_conversions,
-    clippy::dbg_macro,
-    clippy::debug_assert_with_mut_call,
-    clippy::doc_markdown,
-    clippy::empty_enum,
-    clippy::enum_glob_use,
-    clippy::exit,
-    clippy::expl_impl_clone_on_copy,
-    clippy::explicit_deref_methods,
-    clippy::explicit_into_iter_loop,
-    clippy::fallible_impl_from,
-    clippy::filter_map_next,
-    clippy::flat_map_option,
-    clippy::float_cmp_const,
-    clippy::fn_params_excessive_bools,
-    clippy::from_iter_instead_of_collect,
-    clippy::if_let_mutex,
-    clippy::implicit_clone,
-    clippy::imprecise_flops,
-    clippy::inefficient_to_string,
-    clippy::invalid_upcast_comparisons,
-    clippy::large_digit_groups,
-    clippy::large_stack_arrays,
-    clippy::large_types_passed_by_value,
-    clippy::let_unit_value,
-    clippy::linkedlist,
-    clippy::lossy_float_literal,
-    clippy::macro_use_imports,
-    clippy::manual_ok_or,
-    clippy::map_err_ignore,
-    clippy::map_flatten,
-    clippy::map_unwrap_or,
-    clippy::match_on_vec_items,
-    clippy::match_same_arms,
-    clippy::match_wild_err_arm,
-    clippy::match_wildcard_for_single_variants,
-    clippy::mem_forget,
-    clippy::mismatched_target_os,
-    clippy::missing_enforced_import_renames,
-    clippy::mut_mut,
-    clippy::mutex_integer,
-    clippy::needless_borrow,
-    clippy::needless_continue,
-    clippy::needless_for_each,
-    clippy::option_option,
-    clippy::path_buf_push_overwrite,
-    clippy::ptr_as_ptr,
-    clippy::rc_mutex,
-    clippy::ref_option_ref,
-    clippy::rest_pat_in_fully_bound_structs,
-    clippy::same_functions_in_if_condition,
-    clippy::semicolon_if_nothing_returned,
-    clippy::single_match_else,
-    clippy::string_add_assign,
-    clippy::string_add,
-    clippy::string_lit_as_bytes,
-    clippy::string_to_string,
-    clippy::todo,
-    clippy::trait_duplication_in_bounds,
-    clippy::unimplemented,
-    clippy::unnested_or_patterns,
-    clippy::unused_self,
-    clippy::useless_transmute,
-    clippy::verbose_file_reads,
-    clippy::zero_sized_map_values,
-    future_incompatible,
-    nonstandard_style,
-    rust_2018_idioms
-)]
-// END - Embark standard lints v6 for Rust 1.55+
-// crate-specific exceptions:
+//! [`CrashHandler`] provides a cross-platform way to handle crashes, executing
+//! a user-specified function with the details of the crash when they occur.
+//!
+//! # Linux
+//!
+//! On Linux this is done by handling [signals](https://man7.org/linux/man-pages/man7/signal.7.html),
+//! namely the following
+//!
+//! ## `SIGABRT`
+//!
+//! Signal sent to a process to tell it to abort, i.e. to terminate. The signal
+//! is usually initiated by the process itself when it calls `std::process::abort`
+//! or `libc::abort`, but it can be sent to the process from outside like any
+//! other signal.
+//!
+//! ## `SIGBUS`
+//!
+//! Signal sent to a process when it causes a [bus error](https://en.wikipedia.org/wiki/Bus_error).
+//!
+//! ## `SIGFPE`
+//!
+//! Signal sent to a process when it executes an erroneous arithmetic operation.
+//! Though it stands for **f**loating **p**oint **e**xception this signal covers
+//! integer operations as well.
+//!
+//! ## `SIGILL`
+//!
+//! Signal sent to a process when it attempts to execute an **illegal**, malformed,
+//! unknown, or privileged, instruction.
+//!
+//! ## `SIGSEGV`
+//!
+//! Signal sent to a process when it makes an invalid virtual memory reference,
+//! a [segmentation fault](https://en.wikipedia.org/wiki/Segmentation_fault).
+//! This covers infamous `null` pointer access, out of bounds access, use after
+//! free, stack overflows, etc.
+//!
+//! ## `SIGTRAP`
+//!
+//! Signal sent to a process when a trap is raised, eg. a breakpoint or debug
+//! assertion.
+//!
+//! One important detail of the Linux signal handling is that this crate hooks
+//! [`pthread_create`](https://man7.org/linux/man-pages/man3/pthread_create.3.html)
+//! so that an [alternate signal stack](https://man7.org/linux/man-pages/man2/sigaltstack.2.html)
+//! is always installed on every thread. [`std::thread::Thread`] already does
+//! this, however hooking `pthread_create` allows us to ensure this occurs for
+//! threads created from eg. C/C++ code as well. An alternate stack is necessary
+//! to reliably handle a `SIGSEGV` caused by a stack overflow as signals are
+//! otherwise handled on the same stack that raised the signal.
+//!
+//! # Windows
+//!
+//! On Windows we catch [exceptions](https://docs.microsoft.com/en-us/windows/win32/debug/structured-exception-handling)
+//! [invalid parameters](https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/set-invalid-parameter-handler-set-thread-local-invalid-parameter-handler?view=msvc-170)
+//! and [purecall](https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/get-purecall-handler-set-purecall-handler?view=msvc-170)
+//!
+//! # Macos
+//!
+//! On Macos we use [exception ports](https://flylib.com/books/en/3.126.1.109/1/).
+//! On Macos, exception ports are the first layer that exceptions are filtered,
+//! from a thread level, to a process (task) level, and finally to a host level.
+//!
+//! If no user ports have been registered, the default Macos implementation is
+//! to convert the Mach exception into an equivalent Unix signal and deliver it
+//! to any registered signal handlers before performing the default action for
+//! the exception/signal (ie process termination). This means that if you use
+//! this crate in conjunction with signal handling on Macos, **you will not get
+//! the results you expect** as the exception port used by this crate will take
+//! precedence over the signal handler. See [this issue](
+//! https://github.com/bytecodealliance/wasmtime/issues/2456) for a concrete
+//! example.
+//!
+//! Note that there is one exception to the above, which is that `SIGABRT` is
+//! handled by a signal handler, as there is no equivalent Mach exception for
+//! it.
+
 #![allow(unsafe_code)]
 
 mod error;
@@ -152,10 +150,11 @@ impl From<bool> for CrashEventResult {
 /// # Safety
 ///
 /// This trait is marked unsafe as care needs to be taken when implementing it
-/// due to running in a compromised context. In general, it is advised to do as
-/// _little_ as possible when handling an exception, with more complicated or
-/// dangerous (in a compromised context) code being intialized before the
-/// [`ExceptionHandler`] is installed, or hoisted out to another process entirely.
+/// due to the [`Self::on_crash`] method being run in a compromised context. In
+/// general, it is advised to do as _little_ as possible when handling a
+/// crash, with more complicated or dangerous (in a compromised context) code
+/// being intialized before the [`CrashHandler`] is installed, or hoisted out to
+/// another process entirely.
 ///
 /// ## Linux
 ///
@@ -210,15 +209,15 @@ where
 
 cfg_if::cfg_if! {
     if #[cfg(any(target_os = "linux", target_os = "android"))] {
-        pub mod linux;
+        mod linux;
 
         pub use linux::{CrashHandler, Signal, jmp};
     } else if #[cfg(target_os = "windows")] {
-        pub mod windows;
+        mod windows;
 
         pub use windows::{CrashHandler, ExceptionCode, jmp};
     } else if #[cfg(target_os = "macos")] {
-        pub mod mac;
+        mod mac;
 
         pub use mac::{CrashHandler, ExceptionType};
     }

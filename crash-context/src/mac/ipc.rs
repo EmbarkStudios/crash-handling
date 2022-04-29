@@ -145,10 +145,14 @@ impl Client {
         }
     }
 
-    /// Sends the specified [`CrateContext`] to a [`Server`].
+    /// Sends the specified [`CrashContext`] to a [`Server`].
     ///
     /// If the ack from the [`Server`] times out `Ok(None)` is returned, otherwise
     /// it is the value specified in the [`Server`] process to [`Acknowledger::send_ack`]
+    ///
+    /// # Errors
+    ///
+    /// The send of the [`CrashContext`] or the receive of the ack fails.
     pub fn send_crash_context(
         &self,
         ctx: &CrashContext,
@@ -256,6 +260,10 @@ pub struct Server {
 
 impl Server {
     /// Creates a new [`Server`] "bound" to the specified service name.
+    ///
+    /// # Errors
+    ///
+    /// We fail to acquire the bootstrap port, or fail to register the service.
     pub fn create(name: &CStr) -> Result<Self, Error> {
         // SAFETY: syscalls. Again, the caller has no invariants to uphold, so
         // the entire function is not marked as unsafe
@@ -286,6 +294,12 @@ impl Server {
     ///
     /// Note that in event of a timeout, this method will return `Ok(None)` to
     /// indicate that a crash context was unavailable rather than an error.
+    ///
+    /// # Errors
+    ///
+    /// We fail to receive the [`CrashContext`] message for a reason other than
+    /// one not being in the queue, or we fail to translate the task identifier
+    /// into a pid
     pub fn try_recv_crash_context(
         &mut self,
         timeout: Option<Duration>,
@@ -387,6 +401,10 @@ pub struct Acknowledger {
 
 impl Acknowledger {
     /// Sends an ack back to the client that sent a [`CrashContext`]
+    ///
+    /// # Errors
+    ///
+    /// We fail to send the ack to the port created in the [`Client`] process
     pub fn send_ack(&mut self, ack: u32, timeout: Option<Duration>) -> Result<(), Error> {
         if let Some(port) = self.port {
             // SAFETY: syscalls. The caller has no invariants to uphold, so the
@@ -432,7 +450,13 @@ struct AckReceiver {
 impl AckReceiver {
     /// Allocates a new port to receive an ack from a [`Server`]
     ///
-    /// SAFETY: syscalls. Only used internally hence the entire function being
+    /// # Errors
+    ///
+    /// We fail to allocate a port, or fail to add a send right to it.
+    ///
+    /// # Safety
+    ///
+    /// Performs syscalls. Only used internally hence the entire function being
     /// marked unsafe.
     unsafe fn new() -> Result<Self, Error> {
         let mut port = 0;
@@ -455,7 +479,13 @@ impl AckReceiver {
     /// Waits for the specified duration to receive a result from the [`Server`]
     /// that was sent a [`CrashContext`]
     ///
-    /// SAFETY: syscalls. Only used internally hence the entire function being
+    /// # Errors
+    ///
+    /// We fail to receive an ack for some reason
+    ///
+    /// # Safety
+    ///
+    /// Performs syscalls. Only used internally hence the entire function being
     /// marked unsafe.
     unsafe fn recv_ack(&mut self, timeout: Option<Duration>) -> Result<u32, Error> {
         let mut ack = AcknowledgementMessage {

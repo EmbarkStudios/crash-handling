@@ -1,22 +1,46 @@
+//! FFI bindings for non-local goto
+//!
+//! ```
+//! use crash_handler::jmp;
+//!
+//! unsafe {
+//!     let mut jmp_buf = std::mem::MaybeUninit::uninit();
+//!
+//!     let val = jmp::sigsetjmp(jmp_buf.as_mut_ptr(), 1);
+//!
+//!     if val == 0 {
+//!         jmp::siglongjmp(jmp_buf.as_mut_ptr(), 22);
+//!     } else {
+//!         assert_eq!(val, 22);
+//!     }
+//! }
+//! ```
+
 cfg_if::cfg_if! {
     if #[cfg(target_arch = "x86_64")] {
         #[repr(C)]
+        #[doc(hidden)]
         pub struct __jmp_buf([u64; 8]);
     } else if #[cfg(target_arch = "x86")] {
         #[repr(C)]
+        #[doc(hidden)]
         pub struct __jmp_buf([u32; 6]);
     } else if #[cfg(target_arch = "arm")] {
         #[repr(C)]
+        #[doc(hidden)]
         pub struct __jmp_buf([u64; 32]);
     } else if #[cfg(target_arch = "aarch64")] {
         #[repr(C)]
+        #[doc(hidden)]
         pub struct __jmp_buf([u64; 22]);
     }
 }
 
-/// A jump buffer, which is essentially the register state of a point in execution
-/// at the time of a [`sigestjmp`] call that can be returned to by passing this
-/// buffer to [`siglongjmp`].
+/// A jump buffer.
+///
+/// This is essentially the register state of a point in execution at the time
+/// of a [`sigsetjmp`] call that can be returned to by passing this buffer to
+/// [`siglongjmp`].
 #[repr(C)]
 pub struct JmpBuf {
     /// CPU context

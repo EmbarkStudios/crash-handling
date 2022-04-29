@@ -77,6 +77,11 @@ pub use server::Server;
 /// Additionally, Linux can use a plain string that will be used as an abstract
 /// name. See [here](https://man7.org/linux/man-pages/man7/unix.7.html) for
 /// more details on abstract namespace sockets.
+///
+/// Note that on Macos, this name is _also_ used as the name for a mach port.
+/// Apple doesn't have good/any documentation for mach port service names, but
+/// they are allowed to be longer than the path for a socket name. We also
+/// require that the path be utf-8.
 pub enum SocketName<'scope> {
     Path(&'scope std::path::Path),
     #[cfg(any(target_os = "linux", target_os = "android"))]

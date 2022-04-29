@@ -139,12 +139,17 @@ impl Client {
     /// Sends a message to the server.
     ///
     /// This method is provided so that users can send their own application
-    /// specific message to the watchdog process.
+    /// specific messages to the watchdog process.
     ///
     /// There are no limits imposed by this method itself, but it is recommended
     /// to keep the message reasonably sized, eg. below 64KiB, as different
     /// targets will have different limits for the maximum payload that can be
     /// delivered.
+    ///
+    /// It is also important to note that this method can be called from multiple
+    /// threads if you so choose. Each message is sent vectored and thus won't
+    /// be split, but if you care about ordering you will need to handle that
+    /// yourself.
     ///
     /// # Errors
     ///

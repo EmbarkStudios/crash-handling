@@ -1,10 +1,12 @@
-//! Inline implementation of [getcontext](https://man7.org/linux/man-pages/man3/getcontext.3.html)
-//! since it is not supported on all targets, namely `musl`, as it has been
-//! deprecated from POSIX for over a decade
-//!
-//! The implementation is ported from Breakpad
+//! Implementation of [`getcontext`](https://man7.org/linux/man-pages/man3/getcontext.3.html)
 
 extern "C" {
+    /// A portable implementation of [`getcontext`](https://man7.org/linux/man-pages/man3/getcontext.3.html)
+    /// since it is not supported by all libc implementations, namely `musl`, as
+    /// it has been deprecated from POSIX for over a decade
+    ///
+    /// The implementation is ported from Breakpad, which is itself ported from
+    /// libunwind
     #[cfg_attr(target_arch = "aarch64", allow(improper_ctypes))]
     pub fn crash_context_getcontext(ctx: *mut super::ucontext_t) -> i32;
 }
