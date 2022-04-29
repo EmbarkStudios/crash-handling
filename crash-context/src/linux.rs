@@ -2,8 +2,63 @@ mod getcontext;
 
 pub use getcontext::crash_context_getcontext;
 
+/// The full context for a Linux/Android crash
 #[repr(C)]
 #[derive(Clone)]
+pub struct CrashContext {
+    /// Crashing thread context.
+    ///
+    /// Note that we use [`crate::ucontext_t`] instead of [`libc::ucontext_t`]
+    /// as libc's differs between glibc and musl <https://github.com/rust-lang/libc/pull/1646>
+    /// even though the ucontext_t received from a signal will be the same
+    /// regardless of the libc implementation used as it is only arch specific
+    /// and not libc specific
+    ///
+    /// Note that we hide [`ucontext_t::uc_link`] as it is a pointer and thus can't
+    /// be accessed in a process other than the one the `CrashContext` was created
+    /// in. This is a just a self-reference so is not useful in practice.
+    ///
+    /// Note that the same applies to [`mcontext_t::fpregs`], but since that points
+    /// to floating point registers and _is_ interesting to read in another process,
+    /// those registers available as [`Self::float_state`], except on the `arm`
+    /// architecture since they aren't part of `mcontext_t` at all.
+    pub context: ucontext_t,
+    /// State of floating point registers.
+    ///
+    /// This isn't part of the user ABI for Linux arm
+    #[cfg(not(target_arch = "arm"))]
+    pub float_state: fpregset_t,
+    /// The signal info for the crash
+    pub siginfo: libc::signalfd_siginfo,
+    /// The id of the crashing process
+    pub pid: libc::pid_t,
+    /// The id of the crashing thread
+    pub tid: libc::pid_t,
+}
+
+unsafe impl Send for CrashContext {}
+
+impl CrashContext {
+    pub fn as_bytes(&self) -> &[u8] {
+        unsafe {
+            let size = std::mem::size_of_val(self);
+            let ptr = (self as *const Self).cast();
+            std::slice::from_raw_parts(ptr, size)
+        }
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
+        if bytes.len() != std::mem::size_of::<Self>() {
+            return None;
+        }
+
+        unsafe { Some((*bytes.as_ptr().cast::<Self>()).clone()) }
+    }
+}
+
+#[repr(C)]
+#[derive(Clone)]
+#[doc(hidden)]
 pub struct sigset_t {
     #[cfg(target_pointer_width = "32")]
     __val: [u32; 32],
@@ -13,6 +68,7 @@ pub struct sigset_t {
 
 #[repr(C)]
 #[derive(Clone)]
+#[doc(hidden)]
 pub struct stack_t {
     pub ss_sp: *mut std::ffi::c_void,
     pub ss_flags: i32,
@@ -23,6 +79,7 @@ cfg_if::cfg_if! {
     if #[cfg(target_arch = "x86_64")] {
         #[repr(C)]
         #[derive(Clone)]
+        #[doc(hidden)]
         pub struct ucontext_t {
             pub uc_flags: u64,
             pub uc_link: *mut ucontext_t,
@@ -34,6 +91,7 @@ cfg_if::cfg_if! {
 
         #[repr(C)]
         #[derive(Clone)]
+        #[doc(hidden)]
         pub struct mcontext_t {
             pub gregs: [i64; 23],
             pub fpregs: *mut fpregset_t,
@@ -42,6 +100,7 @@ cfg_if::cfg_if! {
 
         #[repr(C)]
         #[derive(Clone)]
+        #[doc(hidden)]
         pub struct fpregset_t {
             pub cwd: u16,
             pub swd: u16,
@@ -58,6 +117,7 @@ cfg_if::cfg_if! {
     } else if #[cfg(target_arch = "x86")] {
         #[repr(C)]
         #[derive(Clone)]
+        #[doc(hidden)]
         pub struct ucontext_t {
             pub uc_flags: u32,
             pub uc_link: *mut ucontext_t,
@@ -69,6 +129,7 @@ cfg_if::cfg_if! {
 
         #[repr(C)]
         #[derive(Clone)]
+        #[doc(hidden)]
         pub struct mcontext_t {
             pub gregs: [i64; 23],
             pub fpregs: *mut fpregset_t,
@@ -78,6 +139,7 @@ cfg_if::cfg_if! {
 
         #[repr(C)]
         #[derive(Clone)]
+        #[doc(hidden)]
         pub struct fpreg_t {
             pub significand: [u16; 4],
             pub exponent: u16,
@@ -85,6 +147,7 @@ cfg_if::cfg_if! {
 
         #[repr(C)]
         #[derive(Clone)]
+        #[doc(hidden)]
         pub struct fpregset_t {
             pub cw: u32,
             pub sw: u32,
@@ -99,6 +162,7 @@ cfg_if::cfg_if! {
     } else if #[cfg(target_arch = "aarch64")] {
         #[repr(C)]
         #[derive(Clone)]
+        #[doc(hidden)]
         pub struct ucontext_t {
             pub uc_flags: u64,
             pub uc_link: *mut ucontext_t,
@@ -114,6 +178,7 @@ cfg_if::cfg_if! {
         // 64-bit. I had forgotten what a trash type long was.
         #[repr(C)]
         #[derive(Clone)]
+        #[doc(hidden)]
         pub struct mcontext_t {
             // Note in the kernel this is just part of regs which is length 32
             pub fault_address: u64,
@@ -127,10 +192,12 @@ cfg_if::cfg_if! {
         }
 
         /// Magic value written by the kernel and our custom getcontext
+        #[doc(hidden)]
         pub const FPSIMD_MAGIC: u32 = 0x46508001;
 
         #[repr(C)]
         #[derive(Clone)]
+        #[doc(hidden)]
         pub struct _aarch64_ctx {
             pub magic: u32,
             pub size: u32,
@@ -138,6 +205,7 @@ cfg_if::cfg_if! {
 
         #[repr(C)]
         #[derive(Clone)]
+        #[doc(hidden)]
         pub struct fpsimd_context {
             pub head: _aarch64_ctx,
             pub fpsr: u32,
@@ -145,10 +213,12 @@ cfg_if::cfg_if! {
             pub vregs: [u128; 32],
         }
 
+        #[doc(hidden)]
         pub type fpregset_t = fpsimd_context;
     } else if #[cfg(target_arch = "arm")] {
         #[repr(C)]
         #[derive(Clone)]
+        #[doc(hidden)]
         pub struct ucontext_t {
             pub uc_flags: u32,
             pub uc_link: *mut ucontext_t,
@@ -162,6 +232,7 @@ cfg_if::cfg_if! {
 
         #[repr(C)]
         #[derive(Clone)]
+        #[doc(hidden)]
         pub struct mcontext_t {
             pub trap_no: u32,
             pub error_code: u32,
@@ -185,49 +256,6 @@ cfg_if::cfg_if! {
             pub arm_cpsr: u32,
             pub fault_address: u32,
         }
-    }
-}
-
-/// The full context for a linux/android crash
-#[repr(C)]
-#[derive(Clone)]
-pub struct CrashContext {
-    /// Crashing thread context.
-    ///
-    /// Note that we use [`crate::ucontext_t`] instead of [`libc::ucontext_t`]
-    /// as libc's differs between glibc and musl <https://github.com/rust-lang/libc/pull/1646>
-    /// even though the ucontext_t received from a signal will be the same
-    /// regardless of the libc implementation used as it is only arch specific
-    /// and not libc specific
-    pub context: ucontext_t,
-    /// State of floating point registers.
-    ///
-    /// This isn't part of the user ABI for Linux arm
-    #[cfg(not(target_arch = "arm"))]
-    pub float_state: fpregset_t,
-    /// The signal info for the crash
-    pub siginfo: libc::signalfd_siginfo,
-    /// The id of the crashing thread
-    pub tid: libc::pid_t,
-}
-
-unsafe impl Send for CrashContext {}
-
-impl CrashContext {
-    pub fn as_bytes(&self) -> &[u8] {
-        unsafe {
-            let size = std::mem::size_of_val(self);
-            let ptr = (self as *const Self).cast();
-            std::slice::from_raw_parts(ptr, size)
-        }
-    }
-
-    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != std::mem::size_of::<Self>() {
-            return None;
-        }
-
-        unsafe { Some((*bytes.as_ptr().cast::<Self>()).clone()) }
     }
 }
 
