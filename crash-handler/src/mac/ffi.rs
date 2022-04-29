@@ -36,9 +36,6 @@ cfg_if::cfg_if! {
     }
 }
 
-/// Synonomous with `MACH_MSG_TYPE_MOVE_SEND`
-pub const MACH_MSG_TYPE_PORT_SEND: u8 = msg::MACH_MSG_TYPE_MOVE_SEND as u8; // 17
-
 // /// Machine-independent exception behaviors. Possible values for [`et::exception_behavior_t`].
 // ///
 // /// `exception_types.h`

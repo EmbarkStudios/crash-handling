@@ -40,23 +40,9 @@ unsafe extern "C" fn signal_handler(
     // Sanity check
     assert_eq!(signal, libc::SIGABRT);
 
-    let lock = super::state::HANDLER.lock();
-    if let Some(handler) = &*lock {
-        let exc_info = crash_context::ExceptionInfo {
-            kind: ffi::et::EXC_SOFTWARE as i32, // 5
-            code: ffi::EXC_SOFT_SIGNAL as _,    // Unix signal
-            subcode: Some(signal as _),
-        };
-
-        let cc = crash_context::CrashContext {
-            task: ffi::mach_task_self(),
-            thread: ffi::mach_thread_self(),
-            handler_thread: super::state::HANDLER_THREAD
-                .lock()
-                .unwrap_or(ffi::MACH_PORT_NULL),
-            exception: Some(exc_info),
-        };
-
-        handler.crash_event.on_crash(&cc);
-    }
+    super::state::simulate_exception(Some(crash_context::ExceptionInfo {
+        kind: ffi::et::EXC_SOFTWARE as i32, // 5
+        code: ffi::EXC_SOFT_SIGNAL as _,    // Unix signal
+        subcode: Some(signal as _),
+    }));
 }
