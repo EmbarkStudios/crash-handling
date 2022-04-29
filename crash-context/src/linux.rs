@@ -82,7 +82,7 @@ cfg_if::cfg_if! {
         #[doc(hidden)]
         pub struct ucontext_t {
             pub uc_flags: u64,
-            pub uc_link: *mut ucontext_t,
+            uc_link: *mut ucontext_t,
             pub uc_stack: stack_t,
             pub uc_mcontext: mcontext_t,
             pub uc_sigmask: sigset_t,
@@ -120,7 +120,7 @@ cfg_if::cfg_if! {
         #[doc(hidden)]
         pub struct ucontext_t {
             pub uc_flags: u32,
-            pub uc_link: *mut ucontext_t,
+            uc_link: *mut ucontext_t,
             pub uc_stack: stack_t,
             pub uc_mcontext: mcontext_t,
             pub uc_sigmask: sigset_t,
@@ -165,7 +165,7 @@ cfg_if::cfg_if! {
         #[doc(hidden)]
         pub struct ucontext_t {
             pub uc_flags: u64,
-            pub uc_link: *mut ucontext_t,
+            uc_link: *mut ucontext_t,
             pub uc_stack: stack_t,
             pub uc_sigmask: sigset_t,
             pub uc_mcontext: mcontext_t,
@@ -221,7 +221,7 @@ cfg_if::cfg_if! {
         #[doc(hidden)]
         pub struct ucontext_t {
             pub uc_flags: u32,
-            pub uc_link: *mut ucontext_t,
+            uc_link: *mut ucontext_t,
             pub uc_stack: stack_t,
             // Note that the mcontext_t and sigset_t are swapped compared to
             // all of the other arches currently supported :p
