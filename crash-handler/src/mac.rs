@@ -53,6 +53,7 @@ pub enum ExceptionType {
     CorpseNotify = 13,
 }
 
+/// A Macos exception handler
 pub struct CrashHandler;
 
 #[allow(clippy::unused_self)]
@@ -60,8 +61,8 @@ impl CrashHandler {
     /// Attaches the exception handler.
     ///
     /// The provided callback will be invoked if an exception is caught,
-    /// providing a [`CrashContext`] with the details of the thread where the
-    /// exception was thrown.
+    /// providing a [`crate::CrashContext`] with the details of the thread where
+    /// the exception was thrown.
     pub fn attach(on_crash: Box<dyn crate::CrashEvent>) -> Result<Self, crate::Error> {
         state::attach(on_crash)?;
         Ok(Self)

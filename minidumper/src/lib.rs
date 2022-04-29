@@ -8,6 +8,7 @@ use std::{fs::File, path::PathBuf};
 mod ipc;
 pub use ipc::{Client, Server};
 
+/// The result of a successful minidump generation.
 pub struct MinidumpBinary {
     /// The file the minidump was written to, as provided by [`ServerHandler::create_minidump_file`]
     pub file: File,

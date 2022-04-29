@@ -1,3 +1,6 @@
+//! Provides an implementation of [`setjmp`] and [`longjmp`], as unfortunately the
+//! implementation in MSVCRT actually unwinds the stack
+
 #![cfg(target_arch = "x86_64")]
 
 // Original code from: https://github.com/Snaipe/BoxFort/blob/master/src/asm/setjmp-x86_64.asm
@@ -54,8 +57,6 @@ pub struct JmpBuf {
     __jmp_buf: [u128; 16],
 }
 
-// Note that we use our own set/longjmp functions here because the
-// MSVCRT versions actually unwind the stack :p
 #[allow(improper_ctypes)] // u128 is actually ok on x86_64 :)
 extern "C" {
     #[link_name = "ehsetjmp"]

@@ -42,7 +42,7 @@ pub fn handles_crash(flavor: SadnessFlavor) {
                                     SadnessFlavor::Abort => Signal::Abort,
                                     SadnessFlavor::Bus => Signal::Bus,
                                     SadnessFlavor::DivideByZero => Signal::Fpe,
-                                    SadnessFlavor::Illegal => Signal::Ill,
+                                    SadnessFlavor::Illegal => Signal::Illegal,
                                     SadnessFlavor::Segfault | SadnessFlavor::StackOverflow { .. } =>
                                         Signal::Segv,
                                         SadnessFlavor::Trap => Signal::Trap,

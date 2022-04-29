@@ -172,11 +172,11 @@ unsafe fn set_handler(sig: Signal, action: usize) {
 
 /// The various signals we attempt to handle
 const EXCEPTION_SIGNALS: [Signal; 6] = [
-    Signal::Segv,
     Signal::Abort,
-    Signal::Fpe,
-    Signal::Ill,
     Signal::Bus,
+    Signal::Fpe,
+    Signal::Illegal,
+    Signal::Segv,
     Signal::Trap,
 ];
 

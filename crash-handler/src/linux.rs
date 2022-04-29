@@ -3,22 +3,16 @@ mod state;
 
 use crate::Error;
 
+/// The signals that we support catching and raising
 #[derive(Copy, Clone, PartialEq)]
 #[repr(i32)]
 pub enum Signal {
-    Hup = libc::SIGHUP,
-    Int = libc::SIGINT,
-    Quit = libc::SIGQUIT,
-    Ill = libc::SIGILL,
-    Trap = libc::SIGTRAP,
     Abort = libc::SIGABRT,
     Bus = libc::SIGBUS,
     Fpe = libc::SIGFPE,
-    Kill = libc::SIGKILL,
+    Illegal = libc::SIGILL,
     Segv = libc::SIGSEGV,
-    Pipe = libc::SIGPIPE,
-    Alarm = libc::SIGALRM,
-    Term = libc::SIGTERM,
+    Trap = libc::SIGTRAP,
 }
 
 impl Signal {
@@ -30,6 +24,7 @@ impl Signal {
     }
 }
 
+/// A Linux/Android signal handler
 pub struct CrashHandler;
 
 #[allow(clippy::unused_self)]
@@ -37,7 +32,8 @@ impl CrashHandler {
     /// Attaches the signal handler.
     ///
     /// The provided callback will be invoked if a signal is caught, providing a
-    /// [`CrashContext`] with the details of the thread where the signal was raised.
+    /// [`crate::CrashContext`] with the details of the thread where the
+    /// signal was raised.
     ///
     /// The callback runs in a compromised context, so it is highly recommended
     /// to not perform actions that may fail due to corrupted state that caused
