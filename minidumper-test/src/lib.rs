@@ -93,7 +93,7 @@ pub fn spinup_server(id: &str) -> Server {
         }
     }
 
-    let server = minidumper::Server::with_name(id).expect("failed to start server");
+    let mut server = minidumper::Server::with_name(id).expect("failed to start server");
 
     struct Inner {
         id: String,

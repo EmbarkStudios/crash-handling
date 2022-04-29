@@ -32,8 +32,7 @@ const EXCEPTION_MASK: et::exception_mask_t = et::EXC_MASK_BAD_ACCESS // SIGSEGV/
     | et::EXC_MASK_ARITHMETIC // SIGFPE
     | et::EXC_MASK_BREAKPOINT; // SIGTRAP
 
-pub(super) static HANDLER: parking_lot::Mutex<Option<HandlerInner>> =
-    parking_lot::const_mutex(None);
+static HANDLER: parking_lot::RwLock<Option<HandlerInner>> = parking_lot::const_rwlock(None);
 
 #[inline]
 pub(crate) fn kern_ret(func: impl FnOnce() -> kern_return_t) -> Result<(), Error> {
@@ -62,9 +61,24 @@ struct PreviousPorts {
     ports: [PreviousPort; EXC_TYPES_COUNT],
 }
 
+type UserSignal = std::sync::Arc<(parking_lot::Mutex<Option<bool>>, parking_lot::Condvar)>;
+
+struct AllocatedPort {
+    port: mach_port_t,
+}
+
+impl Drop for AllocatedPort {
+    fn drop(&mut self) {
+        unsafe {
+            mp::mach_port_deallocate(mach_task_self(), self.port);
+        }
+    }
+}
+
 pub(super) struct HandlerInner {
     pub(super) crash_event: Box<dyn crate::CrashEvent>,
-    handler_port: mach_port_t,
+    handler_port: AllocatedPort,
+    user_signal: UserSignal,
     handler_thread: std::thread::JoinHandle<()>,
     previous_abort_action: libc::sigaction,
     previous: PreviousPorts,
@@ -93,12 +107,10 @@ impl HandlerInner {
     unsafe fn shutdown(self, is_handler_thread: bool) -> Result<(), Error> {
         self.uninstall()?;
 
-        let mut exc_msg: ExceptionMessage = mem::zeroed();
+        let mut exc_msg: UserException = mem::zeroed();
         exc_msg.header.msgh_id = MessageIds::Shutdown as i32;
 
         if self.send_message(exc_msg) {
-            mp::mach_port_deallocate(mach_task_self(), self.handler_port);
-
             // We don't really care if there was some error in the thread, note
             // that we check the thread in case we're being uninstalled from
             // the handler thread itself
@@ -111,28 +123,47 @@ impl HandlerInner {
     }
 
     /// SAFETY: syscalls
-    unsafe fn send_message(&self, mut msg: ExceptionMessage) -> bool {
-        msg.header.msgh_size = (mem::size_of_val(&msg) - mem::size_of_val(&msg.padding)) as u32;
-        msg.header.msgh_remote_port = self.handler_port;
-        msg.header.msgh_bits = msg::MACH_MSGH_BITS(
-            msg::MACH_MSG_TYPE_COPY_SEND,
-            msg::MACH_MSG_TYPE_MAKE_SEND_ONCE,
-        );
-        msg::mach_msg(
+    unsafe fn send_message(&self, mut msg: UserException) -> bool {
+        msg.header.msgh_size = mem::size_of_val(&msg) as u32;
+        msg.header.msgh_remote_port = self.handler_port.port;
+
+        // Reset the condition variable in case a user signal was already raised
+        {
+            let &(ref lock, ref _cvar) = &*self.user_signal;
+            *lock.lock() = None;
+        }
+
+        if msg::mach_msg(
             &mut msg.header,
-            msg::MACH_SEND_MSG | msg::MACH_SEND_TIMEOUT,
+            msg::MACH_SEND_MSG,
             msg.header.msgh_size,
             0,
             0,
             msg::MACH_MSG_TIMEOUT_NONE,
             MACH_PORT_NULL,
-        ) == KERN_SUCCESS
+        ) != KERN_SUCCESS
+        {
+            return false;
+        }
+
+        if msg.header.msgh_id != MessageIds::SignalCrash as i32 {
+            true
+        } else {
+            // Wait on the handler thread to signal the user callback has finished
+            // with the exception
+            let &(ref lock, ref cvar) = &*self.user_signal;
+            let mut processed = lock.lock();
+            if processed.is_none() {
+                cvar.wait(&mut processed);
+            }
+
+            processed.unwrap_or(false)
+        }
     }
 }
 
 /// The thread that is actually handling the exception port.
-pub(super) static HANDLER_THREAD: parking_lot::Mutex<Option<mach_port_t>> =
-    parking_lot::const_mutex(None);
+static HANDLER_THREAD: parking_lot::Mutex<Option<mach_port_t>> = parking_lot::const_mutex(None);
 
 /// Creates a new `mach_port` and installs it as the new task (process) exception
 /// port so that any exceptions not handled by a thread specific exception port
@@ -146,7 +177,7 @@ pub(super) static HANDLER_THREAD: parking_lot::Mutex<Option<mach_port_t>> =
 /// - A handler has already been installed, we only allow one
 /// - Any of the various syscalls that are made fail
 pub(super) fn attach(crash_event: Box<dyn crate::CrashEvent>) -> Result<(), Error> {
-    let mut lock = HANDLER.lock();
+    let mut lock = HANDLER.write();
 
     if lock.is_some() {
         return Err(Error::HandlerAlreadyInstalled);
@@ -156,7 +187,6 @@ pub(super) fn attach(crash_event: Box<dyn crate::CrashEvent>) -> Result<(), Erro
     unsafe {
         let current_task = mach_task_self();
 
-        // TODO: deallocate port if anything else fails
         let mut handler_port = MACH_PORT_NULL;
 
         // Create a receive right so that we can actually receive exception messages on the port
@@ -167,12 +197,15 @@ pub(super) fn attach(crash_event: Box<dyn crate::CrashEvent>) -> Result<(), Erro
                 &mut handler_port,
             )
         })?;
+
+        let handler_port = AllocatedPort { port: handler_port };
+
         // Add send right
         kern_ret(|| {
             mp::mach_port_insert_right(
                 current_task,
-                handler_port,
-                handler_port,
+                handler_port.port,
+                handler_port.port,
                 msg::MACH_MSG_TYPE_MAKE_SEND,
             )
         })?;
@@ -190,7 +223,7 @@ pub(super) fn attach(crash_event: Box<dyn crate::CrashEvent>) -> Result<(), Erro
             task_swap_exception_ports(
                 current_task,
                 EXCEPTION_MASK,
-                handler_port,
+                handler_port.port,
                 et::EXCEPTION_DEFAULT as i32, // 1
                 THREAD_STATE_NONE,
                 masks.as_mut_ptr(),
@@ -212,12 +245,18 @@ pub(super) fn attach(crash_event: Box<dyn crate::CrashEvent>) -> Result<(), Erro
             };
         }
 
+        let user_signal =
+            std::sync::Arc::new((parking_lot::Mutex::new(None), parking_lot::Condvar::new()));
+        let us = user_signal.clone();
+
+        let port = handler_port.port;
+
         // Spawn a thread that will handle the actual exception/user messages sent
         // to the exception port we've just created
         let handler_thread = std::thread::spawn(move || {
             *HANDLER_THREAD.lock() = Some(mach_thread_self());
 
-            exception_handler(handler_port);
+            exception_handler(port, us);
 
             *HANDLER_THREAD.lock() = None;
         });
@@ -225,6 +264,7 @@ pub(super) fn attach(crash_event: Box<dyn crate::CrashEvent>) -> Result<(), Erro
         *lock = Some(HandlerInner {
             crash_event,
             handler_port,
+            user_signal,
             handler_thread,
             previous_abort_action,
             previous,
@@ -235,7 +275,7 @@ pub(super) fn attach(crash_event: Box<dyn crate::CrashEvent>) -> Result<(), Erro
 }
 
 pub(super) fn detach(is_handler_thread: bool) {
-    let mut lock = HANDLER.lock();
+    let mut lock = HANDLER.write();
     if let Some(handler) = lock.take() {
         // user can't really do anything if something fails at this point, but
         // should have a clean way of surfacing the error happened
@@ -244,27 +284,63 @@ pub(super) fn detach(is_handler_thread: bool) {
     }
 }
 
+#[repr(C)]
+struct UserException {
+    header: msg::mach_msg_header_t,
+    body: msg::mach_msg_body_t,
+    crash_thread: msg::mach_msg_port_descriptor_t,
+    flags: u32,
+    exception_kind: i32,
+    exception_code: i64,
+    exception_subcode: i64,
+}
+
+const FLAG_HAS_EXCEPTION: u32 = 0x1;
+const FLAG_HAS_SUBCODE: u32 = 0x2;
+
 pub(super) fn simulate_exception(info: Option<crash_context::ExceptionInfo>) -> bool {
-    let lock = HANDLER.lock();
+    let lock = HANDLER.read();
     if let Some(handler) = &*lock {
         // SAFETY: ExceptionMessage is POD and send_message is syscalls
         unsafe {
-            let mut exc_msg: ExceptionMessage = mem::zeroed();
-            exc_msg.header.msgh_id = MessageIds::SignalCrash as i32;
-            exc_msg.thread.name = mach_thread_self();
-            exc_msg.thread.disposition = MACH_MSG_TYPE_PORT_SEND;
-            exc_msg.thread.type_ = msg::MACH_MSG_PORT_DESCRIPTOR as u8; // 0
+            let (flags, exception_kind, exception_code, exception_subcode) = if let Some(exc) = info
+            {
+                (
+                    FLAG_HAS_EXCEPTION
+                        | if exc.subcode.is_some() {
+                            FLAG_HAS_SUBCODE
+                        } else {
+                            0
+                        },
+                    exc.kind,
+                    exc.code,
+                    exc.subcode.unwrap_or_default(),
+                )
+            } else {
+                (0, 0, 0, 0)
+            };
 
-            if let Some(exc_info) = info {
-                exc_msg.exception = exc_info.kind;
-                exc_msg.code[0] = exc_info.code;
-                exc_msg.code_count = if let Some(subcode) = exc_info.subcode {
-                    exc_msg.code[1] = subcode;
-                    2
-                } else {
-                    1
-                };
-            }
+            let exc_msg = UserException {
+                header: msg::mach_msg_header_t {
+                    msgh_bits: msg::MACH_MSG_TYPE_COPY_SEND | msg::MACH_MSGH_BITS_COMPLEX,
+                    msgh_size: std::mem::size_of::<UserException>() as u32,
+                    msgh_remote_port: port::MACH_PORT_NULL,
+                    msgh_local_port: port::MACH_PORT_NULL,
+                    msgh_voucher_port: port::MACH_PORT_NULL,
+                    msgh_id: 0,
+                },
+                body: msg::mach_msg_body_t {
+                    msgh_descriptor_count: 1,
+                },
+                crash_thread: msg::mach_msg_port_descriptor_t::new(
+                    mach_thread_self(),
+                    msg::MACH_MSG_TYPE_COPY_SEND,
+                ),
+                flags,
+                exception_kind,
+                exception_code,
+                exception_subcode,
+            };
 
             handler.send_message(exc_msg)
         }
@@ -275,7 +351,7 @@ pub(super) fn simulate_exception(info: Option<crash_context::ExceptionInfo>) -> 
 
 #[inline]
 fn call_user_callback(cc: &crash_context::CrashContext) -> CrashEventResult {
-    let lock = HANDLER.lock();
+    let lock = HANDLER.read();
     if let Some(handler) = &*lock {
         handler.crash_event.on_crash(cc)
     } else {
@@ -286,7 +362,7 @@ fn call_user_callback(cc: &crash_context::CrashContext) -> CrashEventResult {
 /// Message loop thread. Simply waits for messages to the port, which will either
 /// be exceptions sent by the kernel, or messages sent by the exception handler
 /// that this message loop is servicing.
-unsafe fn exception_handler(port: mach_port_t) {
+unsafe fn exception_handler(port: mach_port_t, us: UserSignal) {
     let mut request: ExceptionMessage = mem::zeroed();
 
     loop {
@@ -389,29 +465,36 @@ unsafe fn exception_handler(port: mach_port_t) {
             Ok(MessageIds::SignalCrash) => {
                 suspend_threads();
 
-                let exception = if request.code_count > 0 {
+                let user_exception: &UserException = std::mem::transmute(&request);
+
+                let exception = if user_exception.flags & FLAG_HAS_EXCEPTION != 0 {
                     Some(crash_context::ExceptionInfo {
-                        kind: request.exception,
-                        code: request.code[0],
-                        subcode: (request.code_count > 1).then(|| request.code[1]),
+                        kind: user_exception.exception_kind,
+                        code: user_exception.exception_code,
+                        subcode: (user_exception.flags & FLAG_HAS_SUBCODE != 0)
+                            .then(|| user_exception.exception_subcode),
                     })
                 } else {
                     None
                 };
 
+                // Reconstruct a crash context from the message we received
                 let cc = crash_context::CrashContext {
-                    task: request.task.name,
-                    thread: if exception.is_some() {
-                        request.thread.name
-                    } else {
-                        MACH_PORT_NULL
-                    },
+                    task: mach_task_self(),
+                    thread: user_exception.crash_thread.name,
                     handler_thread: mach_thread_self(),
                     exception,
                 };
 
-                call_user_callback(&cc);
+                let res = call_user_callback(&cc);
                 resume_threads();
+
+                {
+                    let &(ref lock, ref cvar) = &*us;
+                    let mut processed = lock.lock();
+                    *processed = Some(matches!(res, CrashEventResult::Handled(true)));
+                    cvar.notify_one();
+                }
             }
             Err(unknown) => unreachable!("received unknown message {unknown}"),
         }

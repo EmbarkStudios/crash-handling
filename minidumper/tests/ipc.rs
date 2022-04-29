@@ -5,7 +5,7 @@ use std::sync::{atomic, Arc};
 fn ipc_messages() {
     let name = "ipc_messages";
 
-    let server = minidumper::Server::with_name(name).unwrap();
+    let mut server = minidumper::Server::with_name(name).unwrap();
 
     struct Message {
         kind: u32,

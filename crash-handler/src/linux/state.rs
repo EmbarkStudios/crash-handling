@@ -439,6 +439,7 @@ impl HandlerInner {
                 }
             }
 
+            cc.pid = std::process::id() as i32;
             cc.tid = libc::syscall(libc::SYS_gettid) as i32;
         }
 

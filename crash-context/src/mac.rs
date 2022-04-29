@@ -1,7 +1,9 @@
+pub mod ipc;
+
 use mach2::{exception_types as et, mach_types as mt};
 
 /// Information on the exception that caused the crash
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct ExceptionInfo {
     /// The exception kind
     pub kind: et::exception_type_t,
@@ -12,6 +14,7 @@ pub struct ExceptionInfo {
 }
 
 /// Full Macos crash context
+#[derive(Debug)]
 pub struct CrashContext {
     /// The process which crashed
     pub task: mt::task_t,

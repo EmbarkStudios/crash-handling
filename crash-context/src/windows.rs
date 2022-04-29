@@ -9,6 +9,8 @@ pub struct CrashContext {
     /// so that external processes don't need to use `ReadProcessMemory` to inspect
     /// the exception code
     pub exception_code: i32,
+    /// The pid of the process that crashed
+    pub process_id: u32,
     /// The thread id on which the exception occurred
     pub thread_id: u32,
 }

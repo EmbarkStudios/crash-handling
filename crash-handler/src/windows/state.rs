@@ -183,6 +183,7 @@ pub(super) unsafe extern "system" fn handle_exception(
 
             match current_handler.user_handler.on_crash(&crate::CrashContext {
                 exception_pointers: except_info.cast(),
+                process_id: std::process::id(),
                 thread_id: GetCurrentThreadId(),
                 exception_code: code,
             }) {
@@ -259,6 +260,7 @@ unsafe extern "C" fn handle_invalid_parameter(
 
             match current_handler.user_handler.on_crash(&crate::CrashContext {
                 exception_pointers: (&exception_ptrs as *const EXCEPTION_POINTERS).cast(),
+                process_id: std::process::id(),
                 thread_id: GetCurrentThreadId(),
                 exception_code: STATUS_INVALID_PARAMETER,
             }) {
@@ -328,6 +330,7 @@ unsafe extern "C" fn handle_pure_virtual_call() {
 
             match current_handler.user_handler.on_crash(&crate::CrashContext {
                 exception_pointers: (&exception_ptrs as *const EXCEPTION_POINTERS).cast(),
+                process_id: std::process::id(),
                 thread_id: GetCurrentThreadId(),
                 exception_code: STATUS_NONCONTINUABLE_EXCEPTION,
             }) {
