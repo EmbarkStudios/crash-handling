@@ -22,6 +22,7 @@
 ## Crates
 
 Name | Description | crates.io | docs.rs
+--- | --- | --- | ---
 [`crash-context`](crash-context) | Provides portable types containing target specific contextual information at the time of a crash | [![Crates.io](https://img.shields.io/crates/v/crash-context.svg)](https://crates.io/crates/crash-context) | [![Docs](https://docs.rs/crash-context/badge.svg)](https://docs.rs/crash-context)
 [`sadness-generator`](sadness-generator) | Provides various ways to make your program sad | [![Crates.io](https://img.shields.io/crates/v/sadness-generator.svg)](https://crates.io/crates/sadness-generator) | [![Docs](https://docs.rs/sadness-generator/badge.svg)](https://docs.rs/sadness-generator)
 [`crash-handler`](crash-handler) | Provides a crash handler to invoke a user supplied callback with the contextual information of a crash | [![Crates.io](https://img.shields.io/crates/v/crash-handler.svg)](https://crates.io/crates/crash-handler) | [![Docs](https://docs.rs/crash-handler/badge.svg)](https://docs.rs/crash-handler)
