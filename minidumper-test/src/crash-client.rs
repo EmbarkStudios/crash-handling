@@ -19,6 +19,7 @@ struct Command {
     wait_on_debugger: bool,
 }
 
+#[allow(unsafe_code)]
 fn real_main() -> anyhow::Result<()> {
     let cmd = Command::parse();
 
@@ -131,7 +132,7 @@ fn real_main() -> anyhow::Result<()> {
 
     for _ in 0..10 {
         threads.push(std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::MAX)
+            std::thread::sleep(std::time::Duration::MAX);
         }));
     }
 
@@ -155,6 +156,7 @@ fn main() {
 
         // When exiting due to a crash, the exit code will be 128 + the integer
         // signal number, at least on unixes
+        #[allow(clippy::exit)]
         std::process::exit(222);
     }
 }

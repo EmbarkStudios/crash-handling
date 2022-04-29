@@ -1,9 +1,17 @@
+//! `sadness-generator` is a simple crate that provides multiple ways to make
+//! any program it is executed in very sad.
+
+#![allow(unsafe_code)]
+
 use std::arch::asm;
 
+/// How you would like your sadness.
 #[derive(Copy, Clone, Debug)]
 pub enum SadnessFlavor {
-    /// `SIGABRT` on Unix. Not implemented on Windows as [`std::process::abort`],
-    /// the canonical way to abort processes in Rust, uses the [fastfail](
+    /// `SIGABRT` on Unix.
+    ///
+    /// This is not implemented on Windows as [`std::process::abort`], the
+    /// canonical way to abort processes in Rust, uses the [fastfail](
     /// https://docs.microsoft.com/en-us/cpp/intrinsics/fastfail?view=msvc-170)
     /// intrinsic, which neither raises a `SIGABRT` signal, nor issue a Windows
     /// exception.
@@ -71,15 +79,15 @@ impl SadnessFlavor {
                 long_jumps,
             } => {
                 if !non_rust_thread {
-                    raise_stack_overflow()
+                    raise_stack_overflow();
                 } else {
                     #[cfg(unix)]
                     {
-                        raise_stack_overflow_in_non_rust_thread(long_jumps)
+                        raise_stack_overflow_in_non_rust_thread(long_jumps);
                     }
                     #[cfg(windows)]
                     {
-                        raise_stack_overflow()
+                        raise_stack_overflow();
                     }
                 }
             }
@@ -92,7 +100,12 @@ impl SadnessFlavor {
 }
 
 /// [`SadnessFlavor::Abort`]
-pub fn raise_abort() {
+///
+/// # Safety
+///
+/// This is not safe. It intentionally crashes.
+#[cfg(unix)]
+pub unsafe fn raise_abort() {
     std::process::abort();
 }
 
@@ -101,8 +114,8 @@ pub fn raise_abort() {
 /// # Safety
 ///
 /// This is not safe. It intentionally crashes.
-pub fn raise_segfault() {
-    let s: &u32 = unsafe {
+pub unsafe fn raise_segfault() {
+    let s: &u32 = {
         // avoid deref_nullptr lint
         fn definitely_not_null() -> *const u32 {
             std::ptr::null()
@@ -110,7 +123,8 @@ pub fn raise_segfault() {
         &*definitely_not_null()
     };
 
-    println!("we are crashing by accessing a null reference: {s}");
+    let val = 1 + *s;
+    println!("{val}");
 }
 
 /// [`SadnessFlavor::DivideByZero`]
@@ -118,8 +132,8 @@ pub fn raise_segfault() {
 /// # Safety
 ///
 /// This is not safe. It intentionally crashes.
-pub fn raise_floating_point_exception() {
-    let ohno = unsafe {
+pub unsafe fn raise_floating_point_exception() {
+    let ohno = {
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         {
             let mut divisor: u32;
@@ -216,7 +230,7 @@ pub unsafe fn raise_trap() {
 /// # Safety
 ///
 /// This is not safe. It intentionally crashes.
-pub fn raise_stack_overflow() {
+pub unsafe fn raise_stack_overflow() {
     let mut big_boi = [0u8; 999 * 1024 * 1024];
     big_boi[big_boi.len() - 1] = 1;
 
@@ -243,7 +257,7 @@ pub unsafe fn raise_stack_overflow_in_non_rust_thread(uses_longjmp: bool) {
     );
 
     extern "C" fn thread_start(_arg: *mut libc::c_void) -> *mut libc::c_void {
-        raise_stack_overflow();
+        unsafe { raise_stack_overflow() };
         std::ptr::null_mut()
     }
 

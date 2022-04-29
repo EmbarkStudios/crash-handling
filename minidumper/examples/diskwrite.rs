@@ -82,6 +82,7 @@ fn main() {
     // Register our exception handler
     client.send_message(1, "mistakes will be made").unwrap();
 
+    #[allow(unsafe_code)]
     let handler = crash_handler::CrashHandler::attach(unsafe {
         crash_handler::make_crash_event(move |crash_context: &crash_handler::CrashContext| {
             // Before we request the crash, send a message to the server

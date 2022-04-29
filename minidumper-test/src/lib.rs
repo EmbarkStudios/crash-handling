@@ -1,3 +1,6 @@
+//! This crate's sole purpose is for testing the `minidumper` crate. It is not
+//! published and never will be.
+
 #[inline]
 pub fn run_test(signal: Signal, counter: u32, use_thread: bool) -> Vec<u8> {
     let id = format!(
@@ -133,7 +136,7 @@ pub fn spinup_server(id: &str) -> Server {
         }
 
         fn on_message(&self, _kind: u32, _buffer: Vec<u8>) {
-            unimplemented!();
+            unreachable!("we only test crashes");
         }
     }
 
@@ -216,7 +219,7 @@ pub fn capture_output() {
 
     SUB.call_once(|| {
         tracing_subscriber::fmt().with_test_writer().init();
-    })
+    });
 }
 
 pub fn generate_minidump(id: &str, signal: Signal, use_thread: bool) -> Vec<u8> {
@@ -385,6 +388,7 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                 unreachable!();
             }
         },
+        #[allow(clippy::match_same_arms)]
         Os::MacOs => match signal {
             #[cfg(unix)]
             Signal::Abort => {
@@ -435,7 +439,7 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                 unreachable!("windows only");
             }
         },
-        _ => unimplemented!(),
+        _ => unreachable!("apparently we are targeting a new OS"),
     }
 }
 
