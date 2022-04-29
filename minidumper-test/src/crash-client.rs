@@ -108,7 +108,7 @@ fn real_main() -> anyhow::Result<()> {
                     }
                     #[cfg(windows)]
                     {
-                        unimplemented!();
+                        unreachable!();
                     }
                 }
                 #[cfg(windows)]
