@@ -126,7 +126,14 @@ impl Client {
         }
 
         #[cfg(not(target_os = "macos"))]
-        self.send_message_impl(0, crash_ctx_buffer)
+        {
+            self.send_message_impl(0, crash_ctx_buffer)?;
+            // Wait for the server to send back an ack that it has finished
+            // with the crash context
+            let mut ack = [0u8; 1];
+            self.socket.recv(&mut ack)?;
+            Ok(())
+        }
     }
 
     /// Sends a message to the server.
