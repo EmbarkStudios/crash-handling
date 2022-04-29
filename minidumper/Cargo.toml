@@ -19,7 +19,7 @@ keywords = ["crash", "minidump", "ipc", "out-of-process"]
 [dependencies]
 # Nicer cfg handling
 cfg-if = "1.0"
-crash-context = { version = "0.1.0", path = "../crash-context" }
+crash-context = { version = "0.2.0", path = "../crash-context" }
 libc = "0.2"
 # Basic log emitting
 log = "0.4"
