@@ -24,7 +24,7 @@ libc = "0.2"
 # Basic log emitting
 log = "0.4"
 # Minidump writing
-minidump-writer = { git = "https://github.com/EmbarkStudios/minidump-writer", branch = "macos" }
+minidump-writer = { git = "https://github.com/EmbarkStudios/minidump-writer", rev = "699f248" } # branch = "macos"
 #minidump-writer = { path = "../../mdw" }
 # Event loop
 polling = "2.2"
