@@ -14,7 +14,7 @@ pub struct CrashContext {
     /// regardless of the libc implementation used as it is only arch specific
     /// and not libc specific
     ///
-    /// Note that we hide [`ucontext_t::uc_link`] as it is a pointer and thus can't
+    /// Note that we hide `ucontext_t::uc_link` as it is a pointer and thus can't
     /// be accessed in a process other than the one the `CrashContext` was created
     /// in. This is a just a self-reference so is not useful in practice.
     ///
