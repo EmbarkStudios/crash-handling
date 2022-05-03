@@ -13,17 +13,30 @@
 [![Embark](https://img.shields.io/badge/embark-open%20source-blueviolet.svg)](https://embark.dev)
 [![Embark](https://img.shields.io/badge/discord-ark-%237289da.svg?logo=discord)](https://discord.gg/dAuKfZS)
 [![Build status](https://github.com/EmbarkStudios/crash-handling/workflows/CI/badge.svg)](https://github.com/EmbarkStudios/crash-handling/actions)
-<!-- [![Crates.io](https://img.shields.io/crates/v/rust-gpu.svg)](https://crates.io/crates/rust-gpu) -->
-<!-- [![Docs](https://docs.rs/rust-gpu/badge.svg)](https://docs.rs/rust-gpu) -->
-<!-- [![dependency status](https://deps.rs/repo/github/EmbarkStudios/rust-gpu/status.svg)](https://deps.rs/repo/github/EmbarkStudios/rust-gpu) -->
 
 </div>
 
-## WIP
+## Crates
 
-- [`crash-context`](crash-context) - Provides portable types containing target specific contextual information at the time of a crash
-- [`crash-handler`](crash-handler) - Provides signal/exception handlers that invoke a user supplied callback with the contextual information of a crash
-- [`minidumper`](minidumper) - Provides an IPC client and server, the client provides a crash context and the server creates a minidump based on that crash context and invokes a user supplied callback with the minidump
+Name | Description | crates.io | docs.rs
+--- | --- | --- | ---
+[`crash-context`](crash-context) | Provides portable types containing target specific contextual information at the time of a crash | [![Crates.io](https://img.shields.io/crates/v/crash-context.svg)](https://crates.io/crates/crash-context) | [![Docs](https://docs.rs/crash-context/badge.svg)](https://docs.rs/crash-context)
+[`sadness-generator`](sadness-generator) | Provides various ways to make your program sad | [![Crates.io](https://img.shields.io/crates/v/sadness-generator.svg)](https://crates.io/crates/sadness-generator) | [![Docs](https://docs.rs/sadness-generator/badge.svg)](https://docs.rs/sadness-generator)
+[`crash-handler`](crash-handler) | Provides a crash handler to invoke a user supplied callback with the contextual information of a crash | [![Crates.io](https://img.shields.io/crates/v/crash-handler.svg)](https://crates.io/crates/crash-handler) | [![Docs](https://docs.rs/crash-handler/badge.svg)](https://docs.rs/crash-handler)
+[`minidumper`](minidumper) | Provides an IPC client and server for creating minidumps for an external process | [![Crates.io](https://img.shields.io/crates/v/minidumper.svg)](https://crates.io/crates/minidumper) | [![Docs](https://docs.rs/minidumper/badge.svg)](https://docs.rs/minidumper)
+
+## Notable external crate
+
+[`minidump-writer`](https://github.com/rust-minidump/minidump-writer) does the heavy lifting of inspecting a crashed process and writing a [minidump](https://github.com/rust-minidump/rust-minidump) for it. This is used by the [`minidumper::Service`]() to write a minidump to the user specified location when a [`minidumper::Client`]() detects a crash and requests a dump be created.
+
+## Supported targets
+
+| Arch | unknown-linux-gnu | unknown-linux-musl | linux-android | pc-windows-msvc | apple-darwin
+--- | --- | --- | --- | --- | ---
+`x86_64` | ✅ | ✅ | ❌ | ✅ | ✅
+`i686` | ✅ | ✅ | ❌ | ❌ | ❌ |
+`arm` | ✅ | ✅ | ✅ | ❌ | ❌
+`aarch64` | ✅ | ✅ | ✅ | ❌ | ✅
 
 ## Contribution
 
