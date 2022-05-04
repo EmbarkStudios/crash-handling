@@ -154,7 +154,7 @@ impl Server {
             poll.wait(&mut events, Some(Duration::from_millis(10)))?;
 
             #[cfg(target_os = "macos")]
-            if self.check_mach_port(&poll, &mut clients, handler.as_ref())? {
+            if self.check_mach_port(&poll, &mut clients, handler.as_ref())? == LoopAction::Exit {
                 return Ok(());
             }
 
@@ -345,7 +345,7 @@ impl Server {
         poll: &Poller,
         clients: &mut Vec<ClientConn>,
         handler: &dyn crate::ServerHandler,
-    ) -> Result<bool, Error> {
+    ) -> Result<LoopAction, Error> {
         // We use a really short timeout for receiving on the mach port since we check it
         // frequently rather than spawning a separate thread and blocking
         if let Some(mut rcc) = self
@@ -359,14 +359,14 @@ impl Server {
                 .ok_or(Error::UnknownClientPid)?;
             let cc = clients.swap_remove(pos);
 
-            let exit = match Self::handle_crash_request(rcc.crash_context, handler) {
+            let action = match Self::handle_crash_request(rcc.crash_context, handler) {
                 Err(err) => {
                     log::error!("failed to capture minidump: {}", err);
-                    false
+                    LoopAction::Continue
                 }
-                Ok(exit) => {
+                Ok(action) => {
                     log::info!("captured minidump");
-                    exit
+                    action
                 }
             };
 
@@ -378,9 +378,9 @@ impl Server {
                 log::error!("failed to deregister socket: {}", e);
             }
 
-            Ok(exit)
+            Ok(action)
         } else {
-            Ok(false)
+            Ok(LoopAction::Continue)
         }
     }
 }
