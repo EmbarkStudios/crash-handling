@@ -1,5 +1,5 @@
 use super::{Connection, Header, Listener, SocketName};
-use crate::Error;
+use crate::{Error, LoopAction};
 use polling::{Event, Poller};
 use std::time::Duration;
 
@@ -174,6 +174,11 @@ impl Server {
                                 #[cfg(target_os = "macos")]
                                 pid: None,
                             });
+
+                            if handler.on_client_connected(clients.len()) == LoopAction::Exit {
+                                log::debug!("on_client_connected exited message loop");
+                                return Ok(());
+                            }
                         }
                         Err(err) => {
                             log::error!("failed to accept socket connection: {}", err);
@@ -238,15 +243,15 @@ impl Server {
                                         }
                                     }
 
-                                    let exit =
+                                    let action =
                                         match Self::handle_crash_request(crash_ctx, handler.as_ref()) {
                                             Err(err) => {
                                                 log::error!("failed to capture minidump: {}", err);
-                                                false
+                                                LoopAction::Continue
                                             }
-                                            Ok(exit) => {
+                                            Ok(action) => {
                                                 log::info!("captured minidump");
-                                                exit
+                                                action
                                             }
                                         };
 
@@ -254,7 +259,8 @@ impl Server {
                                         log::error!("failed to send ack: {}", e);
                                     }
 
-                                    if exit {
+                                    if action == LoopAction::Exit {
+                                        log::debug!("user handler requested exit after minidump creation");
                                         return Ok(());
                                     }
 
@@ -286,6 +292,11 @@ impl Server {
                         if let Err(e) = poll.delete(&socket) {
                             log::error!("failed to deregister socket: {}", e);
                         }
+
+                        if handler.on_client_disconnected(clients.len()) == LoopAction::Exit {
+                            log::debug!("on_client_disconnected exited message loop");
+                            return Ok(());
+                        }
                     } else {
                         poll.modify(&clients[pos].socket, Event::readable(clients[pos].key))?;
                     }
@@ -297,7 +308,7 @@ impl Server {
     fn handle_crash_request(
         crash_context: crash_context::CrashContext,
         handler: &dyn crate::ServerHandler,
-    ) -> Result<bool, Error> {
+    ) -> Result<LoopAction, Error> {
         cfg_if::cfg_if! {
             if #[cfg(any(target_os = "linux", target_os = "android"))] {
                 let mut writer =

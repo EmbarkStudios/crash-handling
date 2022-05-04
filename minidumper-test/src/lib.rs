@@ -119,7 +119,7 @@ pub fn spinup_server(id: &str) -> Server {
         fn on_minidump_created(
             &self,
             result: Result<minidumper::MinidumpBinary, minidumper::Error>,
-        ) -> bool {
+        ) -> minidumper::LoopAction {
             let md_bin = result.expect("failed to write minidump");
             md_bin
                 .file
@@ -132,7 +132,7 @@ pub fn spinup_server(id: &str) -> Server {
                 .send(md_bin.path)
                 .expect("couldn't send minidump path");
 
-            false
+            minidumper::LoopAction::Continue
         }
 
         fn on_message(&self, _kind: u32, _buffer: Vec<u8>) {

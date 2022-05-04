@@ -27,7 +27,7 @@ fn main() {
             fn on_minidump_created(
                 &self,
                 result: Result<minidumper::MinidumpBinary, minidumper::Error>,
-            ) -> bool {
+            ) -> minidumper::LoopAction {
                 match result {
                     Ok(mut md_bin) => {
                         use std::io::Write;
@@ -39,7 +39,8 @@ fn main() {
                     }
                 }
 
-                true
+                // Tells the server to exit, which will in turn exit the process
+                minidumper::LoopAction::Exit
             }
 
             fn on_message(&self, kind: u32, buffer: Vec<u8>) {
