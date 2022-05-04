@@ -18,6 +18,17 @@ pub struct MinidumpBinary {
     pub contents: Vec<u8>,
 }
 
+/// Actions for the [`Server`] message loop to take after a [`ServerHandler`]
+/// method is invoked
+#[derive(Copy, Clone, PartialEq)]
+pub enum LoopAction {
+    /// Exits the message loop, stops processing messages, and disconnects all
+    /// connected clients
+    Exit,
+    /// Continues running the message loop as normal
+    Continue,
+}
+
 /// Allows user code to hook into the server to avoid hardcoding too many details
 pub trait ServerHandler: Send + Sync {
     /// Called when a crash request has been received and a backing file needs
@@ -28,7 +39,7 @@ pub trait ServerHandler: Send + Sync {
     ///
     /// A return value of true indicates that the message loop should exit and
     /// stop processing messages.
-    fn on_minidump_created(&self, result: Result<MinidumpBinary, Error>) -> bool;
+    fn on_minidump_created(&self, result: Result<MinidumpBinary, Error>) -> LoopAction;
     /// Called when the client sends a user message sent from the client with
     /// `send_message`
     fn on_message(&self, kind: u32, buffer: Vec<u8>);
@@ -37,5 +48,15 @@ pub trait ServerHandler: Send + Sync {
     /// Defaults to creating a new vec.
     fn message_alloc(&self) -> Vec<u8> {
         Vec::new()
+    }
+    /// Called when a new client connection has been established with the Server,
+    /// with the number of currently active client connections.
+    fn on_client_connected(&self, _num_clients: usize) -> LoopAction {
+        LoopAction::Continue
+    }
+    /// Called when a client has disconnected from the Server, with the number
+    /// of currently active client connections.
+    fn on_client_disconnected(&self, _num_clients: usize) -> LoopAction {
+        LoopAction::Continue
     }
 }

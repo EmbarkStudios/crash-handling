@@ -1,5 +1,5 @@
 use super::{Connection, Header, Listener, SocketName};
-use crate::Error;
+use crate::{Error, LoopAction};
 use polling::{Event, Poller};
 use std::time::Duration;
 
@@ -9,6 +9,13 @@ pub struct Server {
     listener: Listener,
     #[cfg(target_os = "macos")]
     port: crash_context::ipc::Server,
+    /// For abstract sockets, we don't have to worry about cleanup as it is
+    /// handled by the OS, but on Windows and MacOS we need to clean them up
+    /// manually. We basically rely on the crash watchdog program this Server
+    /// is running in to exit cleanly, which should be mostly true, but we
+    /// may need to harden this code if people experience issues with socket
+    /// paths not being cleaned up reliably
+    socket_path: Option<std::path::PathBuf>,
 }
 
 struct ClientConn {
@@ -68,13 +75,16 @@ impl Server {
         let sn = name.into();
 
         #[allow(irrefutable_let_patterns)]
-        if let SocketName::Path(path) = &sn {
-            if path.exists() {
-                // We ignore the result, if we couldn't delete the file, it's
-                // most likely that the following bind will fail
-                let _res = std::fs::remove_file(path);
-            }
-        }
+        let socket_path = if let SocketName::Path(path) = &sn {
+            // There seems to be a bug, at least on Windows, where checking for
+            // the existence of the file path will actually fail even if the file
+            // is actually there, so we just unconditionally remove the path
+            let _res = std::fs::remove_file(path);
+
+            Some(std::path::PathBuf::from(path))
+        } else {
+            None
+        };
 
         cfg_if::cfg_if! {
             if #[cfg(any(target_os = "linux", target_os = "android"))] {
@@ -111,6 +121,7 @@ impl Server {
             listener,
             #[cfg(target_os = "macos")]
             port,
+            socket_path,
         })
     }
 
@@ -143,7 +154,7 @@ impl Server {
             poll.wait(&mut events, Some(Duration::from_millis(10)))?;
 
             #[cfg(target_os = "macos")]
-            if self.check_mach_port(&poll, &mut clients, handler.as_ref())? {
+            if self.check_mach_port(&poll, &mut clients, handler.as_ref())? == LoopAction::Exit {
                 return Ok(());
             }
 
@@ -163,6 +174,11 @@ impl Server {
                                 #[cfg(target_os = "macos")]
                                 pid: None,
                             });
+
+                            if handler.on_client_connected(clients.len()) == LoopAction::Exit {
+                                log::debug!("on_client_connected exited message loop");
+                                return Ok(());
+                            }
                         }
                         Err(err) => {
                             log::error!("failed to accept socket connection: {}", err);
@@ -227,15 +243,15 @@ impl Server {
                                         }
                                     }
 
-                                    let exit =
+                                    let action =
                                         match Self::handle_crash_request(crash_ctx, handler.as_ref()) {
                                             Err(err) => {
                                                 log::error!("failed to capture minidump: {}", err);
-                                                false
+                                                LoopAction::Continue
                                             }
-                                            Ok(exit) => {
+                                            Ok(action) => {
                                                 log::info!("captured minidump");
-                                                exit
+                                                action
                                             }
                                         };
 
@@ -243,7 +259,8 @@ impl Server {
                                         log::error!("failed to send ack: {}", e);
                                     }
 
-                                    if exit {
+                                    if action == LoopAction::Exit {
+                                        log::debug!("user handler requested exit after minidump creation");
                                         return Ok(());
                                     }
 
@@ -275,6 +292,11 @@ impl Server {
                         if let Err(e) = poll.delete(&socket) {
                             log::error!("failed to deregister socket: {}", e);
                         }
+
+                        if handler.on_client_disconnected(clients.len()) == LoopAction::Exit {
+                            log::debug!("on_client_disconnected exited message loop");
+                            return Ok(());
+                        }
                     } else {
                         poll.modify(&clients[pos].socket, Event::readable(clients[pos].key))?;
                     }
@@ -286,7 +308,7 @@ impl Server {
     fn handle_crash_request(
         crash_context: crash_context::CrashContext,
         handler: &dyn crate::ServerHandler,
-    ) -> Result<bool, Error> {
+    ) -> Result<LoopAction, Error> {
         cfg_if::cfg_if! {
             if #[cfg(any(target_os = "linux", target_os = "android"))] {
                 let mut writer =
@@ -323,7 +345,7 @@ impl Server {
         poll: &Poller,
         clients: &mut Vec<ClientConn>,
         handler: &dyn crate::ServerHandler,
-    ) -> Result<bool, Error> {
+    ) -> Result<LoopAction, Error> {
         // We use a really short timeout for receiving on the mach port since we check it
         // frequently rather than spawning a separate thread and blocking
         if let Some(mut rcc) = self
@@ -337,14 +359,14 @@ impl Server {
                 .ok_or(Error::UnknownClientPid)?;
             let cc = clients.swap_remove(pos);
 
-            let exit = match Self::handle_crash_request(rcc.crash_context, handler) {
+            let action = match Self::handle_crash_request(rcc.crash_context, handler) {
                 Err(err) => {
                     log::error!("failed to capture minidump: {}", err);
-                    false
+                    LoopAction::Continue
                 }
-                Ok(exit) => {
+                Ok(action) => {
                     log::info!("captured minidump");
-                    exit
+                    action
                 }
             };
 
@@ -356,9 +378,17 @@ impl Server {
                 log::error!("failed to deregister socket: {}", e);
             }
 
-            Ok(exit)
+            Ok(action)
         } else {
-            Ok(false)
+            Ok(LoopAction::Continue)
+        }
+    }
+}
+
+impl Drop for Server {
+    fn drop(&mut self) {
+        if let Some(path) = self.socket_path.take() {
+            let _res = std::fs::remove_file(path);
         }
     }
 }

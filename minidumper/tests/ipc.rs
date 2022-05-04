@@ -26,7 +26,7 @@ fn ipc_messages() {
         fn on_minidump_created(
             &self,
             _result: Result<minidumper::MinidumpBinary, minidumper::Error>,
-        ) -> bool {
+        ) -> minidumper::LoopAction {
             panic!("should not be called");
         }
 
