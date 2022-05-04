@@ -9,6 +9,13 @@ pub struct Server {
     listener: Listener,
     #[cfg(target_os = "macos")]
     port: crash_context::ipc::Server,
+    /// For abstract sockets, we don't have to worry about cleanup as it is
+    /// handled by the OS, but on Windows and MacOS we need to clean them up
+    /// manually. We basically rely on the crash watchdog program this Server
+    /// is running in to exit cleanly, which should be mostly true, but we
+    /// may need to harden this code if people experience issues with socket
+    /// paths not being cleaned up reliably
+    socket_path: Option<std::path::PathBuf>,
 }
 
 struct ClientConn {
@@ -68,13 +75,16 @@ impl Server {
         let sn = name.into();
 
         #[allow(irrefutable_let_patterns)]
-        if let SocketName::Path(path) = &sn {
-            if path.exists() {
-                // We ignore the result, if we couldn't delete the file, it's
-                // most likely that the following bind will fail
-                let _res = std::fs::remove_file(path);
-            }
-        }
+        let socket_path = if let SocketName::Path(path) = &sn {
+            // There seems to be a bug, at least on Windows, where checking for
+            // the existence of the file path will actually fail even if the file
+            // is actually there, so we just unconditionally remove the path
+            let _res = std::fs::remove_file(path);
+
+            Some(std::path::PathBuf::from(path))
+        } else {
+            None
+        };
 
         cfg_if::cfg_if! {
             if #[cfg(any(target_os = "linux", target_os = "android"))] {
@@ -111,6 +121,7 @@ impl Server {
             listener,
             #[cfg(target_os = "macos")]
             port,
+            socket_path,
         })
     }
 
@@ -359,6 +370,14 @@ impl Server {
             Ok(exit)
         } else {
             Ok(false)
+        }
+    }
+}
+
+impl Drop for Server {
+    fn drop(&mut self) {
+        if let Some(path) = self.socket_path.take() {
+            let _res = std::fs::remove_file(path);
         }
     }
 }
