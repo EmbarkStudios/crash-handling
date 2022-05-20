@@ -390,23 +390,10 @@ impl Drop for Server {
         let _ = self.listener.take();
 
         if let Some(path) = self.socket_path.take() {
-            // If the client process was force killed it's possible the OS will
-            // take "a while" to cleanup resources, so loop for a "bit"
-            let start = std::time::Instant::now();
-            loop {
-                // Note we don't check for the existence of the path since there
-                // appears to be a bug on MacOS and Windows, or at least an oversight
-                // in std, where checking the existence of the path always fails
-                if std::fs::remove_file(&path).is_ok() {
-                    break;
-                }
-
-                if std::time::Instant::now() - start > std::time::Duration::from_secs(10) {
-                    break;
-                }
-
-                std::thread::sleep(std::time::Duration::from_millis(100));
-            }
+            // Note we don't check for the existence of the path since there
+            // appears to be a bug on MacOS and Windows, or at least an oversight
+            // in std, where checking the existence of the path always fails
+            let _res = std::fs::remove_file(&path);
         }
     }
 }
