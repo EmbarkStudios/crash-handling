@@ -388,7 +388,20 @@ impl Server {
 impl Drop for Server {
     fn drop(&mut self) {
         if let Some(path) = self.socket_path.take() {
-            let _res = std::fs::remove_file(path);
+            // If the client process was force killed it's possible the OS will
+            // take "a while" to cleanup resources, so loop for a "bit"
+            let start = std::time::Instant::now();
+            loop {
+                if !path.exists() || std::fs::remove_file(&path).is_ok() {
+                    break;
+                }
+
+                if std::time::Instant::now() - start > std::time::Duration::from_secs(5) {
+                    break;
+                }
+
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
         }
     }
 }
