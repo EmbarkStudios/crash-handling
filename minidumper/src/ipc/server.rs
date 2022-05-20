@@ -6,7 +6,7 @@ use std::time::Duration;
 /// Server side of the connection, which runs in the watchdog process that is
 /// meant to monitor the process where the [`super::Client`] resides
 pub struct Server {
-    listener: Listener,
+    listener: Option<Listener>,
     #[cfg(target_os = "macos")]
     port: crash_context::ipc::Server,
     /// For abstract sockets, we don't have to worry about cleanup as it is
@@ -118,7 +118,7 @@ impl Server {
         }
 
         Ok(Self {
-            listener,
+            listener: Some(listener),
             #[cfg(target_os = "macos")]
             port,
             socket_path,
@@ -140,7 +140,7 @@ impl Server {
         let poll = Poller::new()?;
         let mut events = Vec::new();
 
-        poll.add(&self.listener, Event::readable(0))?;
+        poll.add(self.listener.as_ref().unwrap(), Event::readable(0))?;
 
         let mut clients = Vec::new();
         let mut id = 1;
@@ -160,7 +160,7 @@ impl Server {
 
             for event in events.iter() {
                 if event.key == 0 {
-                    match self.listener.accept_unix_addr() {
+                    match self.listener.as_ref().unwrap().accept_unix_addr() {
                         Ok((accepted, _addr)) => {
                             let key = id;
                             id += 1;
@@ -186,7 +186,7 @@ impl Server {
                     }
 
                     // We need to reregister insterest every time
-                    poll.modify(&self.listener, Event::readable(0))?;
+                    poll.modify(self.listener.as_ref().unwrap(), Event::readable(0))?;
                 } else if let Some(pos) = clients.iter().position(|cc| cc.key == event.key) {
                     let deregister = match clients[pos].recv(handler.as_ref()) {
                         Some((0, buffer)) => {
@@ -387,6 +387,8 @@ impl Server {
 
 impl Drop for Server {
     fn drop(&mut self) {
+        let _ = self.listener.take();
+
         if let Some(path) = self.socket_path.take() {
             // If the client process was force killed it's possible the OS will
             // take "a while" to cleanup resources, so loop for a "bit"
@@ -396,7 +398,7 @@ impl Drop for Server {
                     break;
                 }
 
-                if std::time::Instant::now() - start > std::time::Duration::from_secs(5) {
+                if std::time::Instant::now() - start > std::time::Duration::from_secs(10) {
                     break;
                 }
 
