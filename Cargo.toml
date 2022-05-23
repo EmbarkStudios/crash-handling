@@ -9,6 +9,3 @@ members = [
 
 [profile.dev]
 debug = 2
-
-[patch.crates-io]
-minidump-common = { git = "https://github.com/EmbarkStudios/rust-minidump", branch = "main" }
