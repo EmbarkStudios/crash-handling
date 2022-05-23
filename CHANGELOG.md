@@ -10,9 +10,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
 ## [0.3.0] - 2022-05-23
-## [0.3.0] - 2022-05-23
-## [0.3.0] - 2022-05-23
-## [0.3.0] - 2022-05-23
 ### Added
 - First usable release of `crash-context`, `crash-handler`, `sadness-generator`, and `minidumper` crates.
 
@@ -34,9 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-url -->
 [Unreleased]: https://github.com/rust-minidump/crash-handling/compare/0.3.0...HEAD
-[0.3.0]: https://github.com/rust-minidump/crash-handling/compare/0.3.0...0.3.0
-[0.3.0]: https://github.com/rust-minidump/crash-handling/compare/0.3.0...0.3.0
-[0.3.0]: https://github.com/rust-minidump/crash-handling/compare/0.3.0...0.3.0
 [0.3.0]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-v0.1.0...0.3.0
 [crash-handler-v0.1.0]: https://github.com/EmbarkStudios/crash-handling/releases/tag/crash-handler-v0.1.0
 [sadness-generator-v0.1.0]: https://github.com/EmbarkStudios/crash-handling/releases/tag/sadness-generator-v0.1.0

@@ -43,4 +43,4 @@ features = [
 mach2 = "0.4"
 
 [dev-dependencies]
-sadness-generator = { version = "0.3", path = "../sadness-generator" }
+sadness-generator = { path = "../sadness-generator" }
