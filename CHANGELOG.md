@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Added
+- First usable release of `crash-context`, `crash-handler`, `sadness-generator`, and `minidumper` crates.
 
 ## [crash-handler-v0.1.0] - 2022-04-29
 ### Added
