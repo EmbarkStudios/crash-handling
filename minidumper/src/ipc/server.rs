@@ -3,7 +3,7 @@ use crate::{Error, LoopAction};
 use polling::{Event, Poller};
 use std::time::Duration;
 
-/// Server side of the connection, which runs in the watchdog process that is
+/// Server side of the connection, which runs in the monitor process that is
 /// meant to monitor the process where the [`super::Client`] resides
 pub struct Server {
     listener: Option<Listener>,
@@ -11,7 +11,7 @@ pub struct Server {
     port: crash_context::ipc::Server,
     /// For abstract sockets, we don't have to worry about cleanup as it is
     /// handled by the OS, but on Windows and MacOS we need to clean them up
-    /// manually. We basically rely on the crash watchdog program this Server
+    /// manually. We basically rely on the crash monitor program this Server
     /// is running in to exit cleanly, which should be mostly true, but we
     /// may need to harden this code if people experience issues with socket
     /// paths not being cleaned up reliably
@@ -331,9 +331,9 @@ impl Server {
                     file: minidump_file,
                     path: minidump_path,
                     #[cfg(target_os = "windows")]
-                    contents: Vec::new(),
+                    contents: None,
                     #[cfg(not(target_os = "windows"))]
-                    contents: _contents,
+                    contents: Some(_contents),
                 })
                 .map_err(crate::Error::from),
         ))

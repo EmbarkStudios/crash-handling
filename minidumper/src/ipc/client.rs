@@ -3,7 +3,7 @@ use crate::Error;
 use std::io::IoSlice;
 
 /// Client side of the connection, which runs in the process that may (or has)
-/// crashed to communicate with an external watchdog process.
+/// crashed to communicate with an external monitor process.
 pub struct Client {
     socket: Stream,
     /// On Macos we need this additional mach port based client to send crash
@@ -139,7 +139,7 @@ impl Client {
     /// Sends a message to the server.
     ///
     /// This method is provided so that users can send their own application
-    /// specific messages to the watchdog process.
+    /// specific messages to the monitor process.
     ///
     /// There are no limits imposed by this method itself, but it is recommended
     /// to keep the message reasonably sized, eg. below 64KiB, as different
