@@ -27,7 +27,7 @@ Name | Description | crates.io | docs.rs
 
 ## Notable external crate
 
-[`minidump-writer`](https://github.com/rust-minidump/minidump-writer) does the heavy lifting of inspecting a crashed process and writing a [minidump](https://github.com/rust-minidump/rust-minidump) for it. This is used by the [`minidumper::Service`]() to write a minidump to the user specified location when a [`minidumper::Client`]() detects a crash and requests a dump be created.
+[`minidump-writer`](https://github.com/rust-minidump/minidump-writer) does the heavy lifting of inspecting a crashed process and writing a [minidump](https://github.com/rust-minidump/rust-minidump) for it. This is used by the [`minidumper::Service`](https://docs.rs/minidumper/latest/minidumper/struct.Server.html) to write a minidump to the user specified location when a [`minidumper::Client`](https://docs.rs/minidumper/latest/minidumper/struct.Client.html) detects a crash and requests a dump be created.
 
 ## Supported targets
 
