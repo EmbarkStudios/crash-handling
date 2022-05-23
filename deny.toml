@@ -54,8 +54,8 @@ skip = [
     # range-map uses an old version, and is unfortunately unmaintained and has
     # not seen a release in 5 years
     { name = "num-traits", version = "=0.1.43" },
-    # debugid uses the pre-1.0 version
-    { name = "uuid", version = "=0.8.2" },
+]
+skip-tree = [
     # parking_lot is out of date again
     { name = "windows-sys", version = "=0.34" },
 ]
@@ -64,6 +64,3 @@ skip = [
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-git = []
-
-[sources.allow-org]
-github = ["EmbarkStudios", "rust-minidump"]

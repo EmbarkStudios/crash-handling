@@ -1,4 +1,4 @@
-// crate-specific exceptions:
+#![doc = include_str!("../README.md")]
 
 mod errors;
 
@@ -14,8 +14,8 @@ pub struct MinidumpBinary {
     pub file: File,
     /// The path to the file as provided by [`ServerHandler::create_minidump_file`].
     pub path: PathBuf,
-    /// The in-memory contents of the minidump, may be empty
-    pub contents: Vec<u8>,
+    /// The in-memory contents of the minidump, if available
+    pub contents: Option<Vec<u8>>,
 }
 
 /// Actions for the [`Server`] message loop to take after a [`ServerHandler`]
