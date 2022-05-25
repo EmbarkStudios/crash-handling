@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- Updated to `minidump-writer` 0.2.1 which includes support for MacOS thread names, and aligns on crash-context 0.3.0.
+
 ## [0.3.0] - 2022-05-23
 ### Added
 - First usable release of `crash-context`, `crash-handler`, `sadness-generator`, and `minidumper` crates.

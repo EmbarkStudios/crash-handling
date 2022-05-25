@@ -22,7 +22,7 @@ debug-print = []
 cfg-if = "1.0"
 # Definition of a portable crash-context that can be shared between various
 # crates
-crash-context = "0.2"
+crash-context = "0.3"
 # Wrapper around libc
 libc = "0.2"
 # Nicer sync primitives
