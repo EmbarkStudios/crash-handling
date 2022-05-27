@@ -10,7 +10,7 @@ enum MessageIds {
     /// Message ID telling the handler thread to quit.
     Shutdown = 2,
     /// Taken from mach_exc in /usr/include/mach/exc.defs.
-    Exception = 2401,
+    Exception = 2405,
 }
 
 impl TryFrom<i32> for MessageIds {
@@ -20,7 +20,7 @@ impl TryFrom<i32> for MessageIds {
         Ok(match val {
             0 => Self::SignalCrash,
             2 => Self::Shutdown,
-            2401 => Self::Exception,
+            2405 => Self::Exception,
             unknown => return Err(unknown),
         })
     }
@@ -30,7 +30,8 @@ impl TryFrom<i32> for MessageIds {
 const EXCEPTION_MASK: et::exception_mask_t = et::EXC_MASK_BAD_ACCESS // SIGSEGV/SIGBUS
     | et::EXC_MASK_BAD_INSTRUCTION // SIGILL
     | et::EXC_MASK_ARITHMETIC // SIGFPE
-    | et::EXC_MASK_BREAKPOINT; // SIGTRAP
+    | et::EXC_MASK_BREAKPOINT // SIGTRAP
+    | et::EXC_MASK_CRASH;
 
 static HANDLER: parking_lot::RwLock<Option<HandlerInner>> = parking_lot::const_rwlock(None);
 
@@ -218,13 +219,25 @@ pub(super) fn attach(crash_event: Box<dyn crate::CrashEvent>) -> Result<(), Erro
         let mut behaviors = [0; EXC_TYPES_COUNT];
         let mut flavors = [0; EXC_TYPES_COUNT];
 
+        let behavior =
+            // The apple source doesn't really say anything useful, but this flag
+            // is basically used to say...we actually want to catch exceptions
+            et::EXCEPTION_DEFAULT |
+            // Send 64-bit code and subcode in the exception header.
+            //
+            // Without this flag the code and subcode in the exception will be
+            // 32-bits, which for exceptions such as EXC_BAD_ACCESS where, in
+            // particular, the subcode can contain addresses, they will be
+            // truncated, giving us essentially useless information
+            et::MACH_EXCEPTION_CODES;
+
         // Swap the exception ports so that we use our own
         kern_ret(|| {
             task_swap_exception_ports(
                 current_task,
                 EXCEPTION_MASK,
                 handler_port.port,
-                et::EXCEPTION_DEFAULT as i32, // 1
+                behavior as _,
                 THREAD_STATE_NONE,
                 masks.as_mut_ptr(),
                 &mut count,
