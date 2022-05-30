@@ -233,10 +233,24 @@ pub unsafe fn raise_trap() -> ! {
 ///
 /// This is not safe. It intentionally crashes.
 pub unsafe fn raise_stack_overflow() -> ! {
-    let mut big_boi = [0u8; 999 * 1024 * 1024];
-    big_boi[big_boi.len() - 1] = 1;
+    fn recurse(data: u64) -> u64 {
+        let mut buff = [0u8; 256];
+        let mut result = data;
 
-    println!("{:?}", &big_boi[big_boi.len() - 20..]);
+        buff[..9].copy_from_slice(b"junk data");
+
+        for c in buff {
+            result += c as u64;
+        }
+
+        if result == 0 {
+            result
+        } else {
+            recurse(result) + 1
+        }
+    }
+
+    recurse(42);
     std::process::abort()
 }
 
