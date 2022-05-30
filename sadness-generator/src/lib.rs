@@ -63,7 +63,7 @@ impl SadnessFlavor {
     /// # Safety
     ///
     /// This is not safe. It intentionally crashes.
-    pub unsafe fn make_sad(self) {
+    pub unsafe fn make_sad(self) -> ! {
         match self {
             #[cfg(unix)]
             Self::Abort => raise_abort(),
@@ -79,15 +79,15 @@ impl SadnessFlavor {
                 long_jumps,
             } => {
                 if !non_rust_thread {
-                    raise_stack_overflow();
+                    raise_stack_overflow()
                 } else {
                     #[cfg(unix)]
                     {
-                        raise_stack_overflow_in_non_rust_thread(long_jumps);
+                        raise_stack_overflow_in_non_rust_thread(long_jumps)
                     }
                     #[cfg(windows)]
                     {
-                        raise_stack_overflow();
+                        raise_stack_overflow()
                     }
                 }
             }
@@ -105,8 +105,8 @@ impl SadnessFlavor {
 ///
 /// This is not safe. It intentionally crashes.
 #[cfg(unix)]
-pub unsafe fn raise_abort() {
-    std::process::abort();
+pub unsafe fn raise_abort() -> ! {
+    std::process::abort()
 }
 
 /// [`SadnessFlavor::Segfault`]
@@ -114,17 +114,11 @@ pub unsafe fn raise_abort() {
 /// # Safety
 ///
 /// This is not safe. It intentionally crashes.
-pub unsafe fn raise_segfault() {
-    let s: &u32 = {
-        // avoid deref_nullptr lint
-        fn definitely_not_null() -> *const u32 {
-            std::ptr::null()
-        }
-        &*definitely_not_null()
-    };
+pub unsafe fn raise_segfault() -> ! {
+    let bad_ptr: *mut u8 = 0x42 as _;
+    std::ptr::write_volatile(bad_ptr, 1);
 
-    let val = 1 + *s;
-    println!("{val}");
+    std::process::abort()
 }
 
 /// [`SadnessFlavor::DivideByZero`]
@@ -132,7 +126,7 @@ pub unsafe fn raise_segfault() {
 /// # Safety
 ///
 /// This is not safe. It intentionally crashes.
-pub unsafe fn raise_floating_point_exception() {
+pub unsafe fn raise_floating_point_exception() -> ! {
     let ohno = {
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         {
@@ -156,6 +150,8 @@ pub unsafe fn raise_floating_point_exception() {
     };
 
     println!("we won't get here because we've raised a floating point exception: {ohno}");
+
+    std::process::abort()
 }
 
 /// [`SadnessFlavor::Illegal`]
@@ -163,11 +159,13 @@ pub unsafe fn raise_floating_point_exception() {
 /// # Safety
 ///
 /// This is not safe. It intentionally crashes.
-pub unsafe fn raise_illegal_instruction() {
+pub unsafe fn raise_illegal_instruction() -> ! {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     asm!("ud2");
     #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
     asm!("udf #0");
+
+    std::process::abort()
 }
 
 /// [`SadnessFlavor::Bus`]
@@ -176,7 +174,7 @@ pub unsafe fn raise_illegal_instruction() {
 ///
 /// This is not safe. It intentionally crashes.
 #[cfg(unix)]
-pub unsafe fn raise_bus() {
+pub unsafe fn raise_bus() -> ! {
     let mut temp_name = [0; 14];
     temp_name.copy_from_slice(b"sigbus.XXXXXX\0");
 
@@ -209,6 +207,8 @@ pub unsafe fn raise_bus() {
     // result in delivery of a SIGBUS signal.
     mapping[20] = 20;
     println!("{}", mapping[20]);
+
+    std::process::abort()
 }
 
 /// [`SadnessFlavor::Trap`]
@@ -216,13 +216,15 @@ pub unsafe fn raise_bus() {
 /// # Safety
 ///
 /// This is not safe. It intentionally crashes.
-pub unsafe fn raise_trap() {
+pub unsafe fn raise_trap() -> ! {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     asm!("int3");
     #[cfg(target_arch = "arm")]
     asm!(".inst 0xe7f001f0");
     #[cfg(target_arch = "aarch64")]
     asm!(".inst 0xd4200000");
+
+    std::process::abort()
 }
 
 /// [`SadnessFlavor::StackOverflow`]
@@ -230,11 +232,12 @@ pub unsafe fn raise_trap() {
 /// # Safety
 ///
 /// This is not safe. It intentionally crashes.
-pub unsafe fn raise_stack_overflow() {
+pub unsafe fn raise_stack_overflow() -> ! {
     let mut big_boi = [0u8; 999 * 1024 * 1024];
     big_boi[big_boi.len() - 1] = 1;
 
     println!("{:?}", &big_boi[big_boi.len() - 20..]);
+    std::process::abort()
 }
 
 /// [`SadnessFlavor::StackOverflow`]
@@ -246,7 +249,7 @@ pub unsafe fn raise_stack_overflow() {
 ///
 /// This is not safe. It intentionally crashes.
 #[cfg(unix)]
-pub unsafe fn raise_stack_overflow_in_non_rust_thread(uses_longjmp: bool) {
+pub unsafe fn raise_stack_overflow_in_non_rust_thread(uses_longjmp: bool) -> ! {
     let mut native: libc::pthread_t = std::mem::zeroed();
     let mut attr: libc::pthread_attr_t = std::mem::zeroed();
 
@@ -256,12 +259,30 @@ pub unsafe fn raise_stack_overflow_in_non_rust_thread(uses_longjmp: bool) {
         "failed to set thread stack size",
     );
 
-    extern "C" fn thread_start(_arg: *mut libc::c_void) -> *mut libc::c_void {
+    use std::sync;
+
+    let pair = sync::Arc::new((sync::Mutex::new(false), sync::Condvar::new()));
+    let tpair = pair.clone();
+
+    extern "C" fn thread_start(arg: *mut libc::c_void) -> *mut libc::c_void {
+        {
+            let tpair =
+                unsafe { sync::Arc::from_raw(arg as *const (sync::Mutex<bool>, sync::Condvar)) };
+            let (lock, cvar) = &*tpair;
+            let mut started = lock.lock().unwrap();
+            *started = true;
+            cvar.notify_one();
+        }
+
         unsafe { raise_stack_overflow() };
-        std::ptr::null_mut()
     }
 
-    let ret = libc::pthread_create(&mut native, &attr, thread_start, std::ptr::null_mut());
+    let ret = libc::pthread_create(
+        &mut native,
+        &attr,
+        thread_start,
+        sync::Arc::into_raw(tpair) as *mut _,
+    );
 
     // We might not get here, but that's ok
     assert_eq!(
@@ -280,6 +301,15 @@ pub unsafe fn raise_stack_overflow_in_non_rust_thread(uses_longjmp: bool) {
             "failed to join"
         );
     }
+
+    let (lock, cvar) = &*pair;
+    let mut started = lock.lock().unwrap();
+    while !*started {
+        started = cvar.wait(started).unwrap();
+    }
+
+    std::thread::sleep(std::time::Duration::from_millis(10));
+    loop {}
 }
 
 /// [`SadnessFlavor::StackOverflow`]
@@ -289,8 +319,8 @@ pub unsafe fn raise_stack_overflow_in_non_rust_thread(uses_longjmp: bool) {
 /// This is not safe. It intentionally crashes.
 #[inline]
 #[cfg(unix)]
-pub unsafe fn raise_stack_overflow_in_non_rust_thread_normal() {
-    raise_stack_overflow_in_non_rust_thread(false);
+pub unsafe fn raise_stack_overflow_in_non_rust_thread_normal() -> ! {
+    raise_stack_overflow_in_non_rust_thread(false)
 }
 
 /// [`SadnessFlavor::StackOverflow`]
@@ -300,8 +330,8 @@ pub unsafe fn raise_stack_overflow_in_non_rust_thread_normal() {
 /// This is not safe. It intentionally crashes.
 #[inline]
 #[cfg(unix)]
-pub unsafe fn raise_stack_overflow_in_non_rust_thread_longjmp() {
-    raise_stack_overflow_in_non_rust_thread(true);
+pub unsafe fn raise_stack_overflow_in_non_rust_thread_longjmp() -> ! {
+    raise_stack_overflow_in_non_rust_thread(true)
 }
 
 /// [`SadnessFlavor::Purecall`]
@@ -310,8 +340,9 @@ pub unsafe fn raise_stack_overflow_in_non_rust_thread_longjmp() {
 ///
 /// This is not safe. It intentionally crashes.
 #[cfg(target_os = "windows")]
-pub unsafe fn raise_purecall() {
+pub unsafe fn raise_purecall() -> ! {
     asm!("call _purecall");
+    std::process::abort()
 }
 
 /// [`SadnessFlavor::InvalidParameter`]
@@ -320,10 +351,11 @@ pub unsafe fn raise_purecall() {
 ///
 /// This is not safe. It intentionally crashes.
 #[cfg(target_os = "windows")]
-pub unsafe fn raise_invalid_parameter() {
+pub unsafe fn raise_invalid_parameter() -> ! {
     extern "C" {
         fn _mbscmp(s1: *const u8, s2: *const u8) -> i32;
     }
 
     _mbscmp(std::ptr::null(), std::ptr::null());
+    std::process::abort()
 }
