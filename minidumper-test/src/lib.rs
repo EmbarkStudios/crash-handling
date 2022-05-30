@@ -362,7 +362,7 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
             }
             Signal::Segv => {
                 verify!(CrashReason::WindowsAccessViolation(
-                    errors::ExceptionCodeWindowsAccessType::READ
+                    errors::ExceptionCodeWindowsAccessType::WRITE
                 ));
             }
             Signal::StackOverflow | Signal::StackOverflowCThread => {
