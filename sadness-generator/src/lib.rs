@@ -325,6 +325,8 @@ pub unsafe fn raise_stack_overflow_in_non_rust_thread(uses_longjmp: bool) -> ! {
     }
 
     std::thread::sleep(std::time::Duration::from_millis(10));
+
+    #[allow(clippy::empty_loop)]
     loop {}
 }
 
