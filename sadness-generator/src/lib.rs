@@ -118,6 +118,8 @@ pub unsafe fn raise_segfault() -> ! {
     let bad_ptr: *mut u8 = 0x42 as _;
     std::ptr::write_volatile(bad_ptr, 1);
 
+    // If we actually get here that means the address is mapped and writable
+    // by the current process which is...unexpected
     std::process::abort()
 }
 
