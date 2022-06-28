@@ -291,7 +291,8 @@ impl Server {
                                 size: 0,
                             };
 
-                            if let Err(_e) = clients[pos].socket.send(pong.as_bytes()) {
+                            if let Err(e) = clients[pos].socket.send(pong.as_bytes()) {
+                                dbg!(e);
                                 let cc = clients.swap_remove(pos);
                                 Some(cc.socket)
                             } else {
