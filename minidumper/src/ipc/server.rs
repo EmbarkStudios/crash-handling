@@ -292,11 +292,11 @@ impl Server {
                             };
 
                             if let Err(e) = clients[pos].socket.send(pong.as_bytes()) {
-                                dbg!(e);
+                                log::error!("failed to send PONG: {}", e);
+
                                 let cc = clients.swap_remove(pos);
                                 Some(cc.socket)
                             } else {
-                                println!("sent PONG");
                                 None
                             }
                         }
@@ -344,7 +344,7 @@ impl Server {
                     let keep = conn.last_update.elapsed() < ka;
 
                     if !keep {
-                        println!("dropping connection {:?}", conn.last_update.elapsed());
+                        log::debug!("dropping stale connection {:?}", conn.last_update.elapsed());
                         if let Err(e) = poll.delete(&conn.socket) {
                             log::error!("failed to deregister timed-out socket: {}", e);
                         }

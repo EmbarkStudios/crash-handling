@@ -120,11 +120,10 @@ fn inactive_reap() {
     };
 
     let shutdown = Arc::new(atomic::AtomicBool::new(false));
-    let is_shutdown = shutdown.clone();
     let server_loop = std::thread::spawn(move || {
         server.run(
             Box::new(server_handler),
-            &is_shutdown,
+            &shutdown,
             Some(std::time::Duration::from_millis(20)),
         )
     });
@@ -193,11 +192,10 @@ fn ping() {
     let server_handler = Server;
 
     let shutdown = Arc::new(atomic::AtomicBool::new(false));
-    let is_shutdown = shutdown.clone();
     let server_loop = std::thread::spawn(move || {
         server.run(
             Box::new(server_handler),
-            &is_shutdown,
+            &shutdown,
             Some(std::time::Duration::from_millis(20)),
         )
     });
