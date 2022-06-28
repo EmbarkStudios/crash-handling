@@ -237,9 +237,19 @@ impl IntoRawSocket for Socket {
 
 impl Drop for Socket {
     fn drop(&mut self) {
-        // SAFETY: syscall
+        // SAFETY: syscalls
         let _ = unsafe {
-            ws::shutdown(self.0);
+            // https://docs.microsoft.com/en-us/windows/win32/winsock/graceful-shutdown-linger-options-and-socket-closure-2
+            if ws::shutdown(self.0, ws::SD_SEND) == 0 {
+                // Loop until we've received all data
+                let mut chunk = [0u8; 1024];
+                while let Ok(sz) = self.recv_with_flags(&mut chunk, 0) {
+                    if sz == 0 {
+                        break;
+                    }
+                }
+            }
+
             ws::closesocket(self.0)
         };
     }
