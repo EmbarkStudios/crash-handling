@@ -36,4 +36,6 @@ pub enum Error {
     #[cfg(any(target_os = "windows", target_os = "macos"))]
     #[error(transparent)]
     Scroll(#[from] scroll::Error),
+    #[error("protocol error occurred: {0}")]
+    ProtocolError(&'static str),
 }

@@ -152,7 +152,7 @@ pub fn spinup_server(id: &str) -> Server {
 
     let run_loop = std::thread::spawn(move || {
         server
-            .run(Box::new(inner), &exit)
+            .run(Box::new(inner), &exit, None)
             .expect("failed to run server loop");
     });
 

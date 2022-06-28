@@ -70,6 +70,13 @@ mod server;
 pub use client::Client;
 pub use server::Server;
 
+const CRASH: u32 = 0;
+#[cfg_attr(target_os = "macos", allow(dead_code))]
+const CRASH_ACK: u32 = 1;
+const PING: u32 = 2;
+const PONG: u32 = 3;
+const USER: u32 = 4;
+
 /// A socket name.
 ///
 /// Linux, Windows, and Macos can all use a file path as the name for the socket.
