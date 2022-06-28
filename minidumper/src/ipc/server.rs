@@ -344,11 +344,10 @@ impl Server {
                     let keep = conn.last_update.elapsed() < ka;
 
                     if !keep {
+                        println!("dropping connection {:?}", conn.last_update.elapsed());
                         if let Err(e) = poll.delete(&conn.socket) {
                             log::error!("failed to deregister timed-out socket: {}", e);
                         }
-
-                        println!("dropping connection");
                     }
 
                     keep
