@@ -136,6 +136,17 @@ impl Server {
     /// Runs the server loop, accepting client connections and receiving IPC
     /// messages.
     ///
+    /// If `stale_timeout` is specified, client connections that have not sent
+    /// a message within that period will be shutdown and removed, to prevent
+    /// potential issues with the server process from indefinitely outlasting
+    /// the process(es) it was monitoring for crashes, in cases where the OS
+    /// (read, Windows) might take longer than one would want to properly reap
+    /// the client connections in the event of adrupt process termination.
+    /// Sending messages will prevent the connection from going stale, but if
+    /// messages are not guaranteed to be sent at a higher frequency than your
+    /// specified timeout, you can use [`crate::Client::ping`] to fill in any
+    /// message gaps to indicate the client is still alive.
+    ///
     /// # Errors
     ///
     /// This method uses basic I/O event notification via [`polling`] which
@@ -144,7 +155,7 @@ impl Server {
         &mut self,
         handler: Box<dyn crate::ServerHandler>,
         shutdown: &std::sync::atomic::AtomicBool,
-        keep_alive: Option<std::time::Duration>,
+        stale_timeout: Option<std::time::Duration>,
     ) -> Result<(), Error> {
         let poll = Poller::new()?;
         let mut events = Vec::new();
@@ -336,12 +347,13 @@ impl Server {
                 }
             }
 
-            if let Some(ka) = keep_alive {
-                // Reap any connections that haven't sent a message within the keep_alive window
+            if let Some(st) = stale_timeout {
                 let before = clients.len();
 
+                // Reap any connections that haven't sent a message in the period
+                // specified by the user
                 clients.retain(|conn| {
-                    let keep = conn.last_update.elapsed() < ka;
+                    let keep = conn.last_update.elapsed() < st;
 
                     if !keep {
                         log::debug!("dropping stale connection {:?}", conn.last_update.elapsed());
