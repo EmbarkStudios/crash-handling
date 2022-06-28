@@ -240,7 +240,7 @@ impl Drop for Socket {
         // SAFETY: syscalls
         let _ = unsafe {
             // https://docs.microsoft.com/en-us/windows/win32/winsock/graceful-shutdown-linger-options-and-socket-closure-2
-            if ws::shutdown(self.0, ws::SD_SEND) == 0 {
+            if ws::shutdown(self.0, ws::SD_SEND /* 1 */ as i32) == 0 {
                 // Loop until we've received all data
                 let mut chunk = [0u8; 1024];
                 while let Ok(sz) = self.recv_with_flags(&mut chunk, 0) {
