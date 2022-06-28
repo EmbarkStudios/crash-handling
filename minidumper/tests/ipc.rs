@@ -96,16 +96,16 @@ fn inactive_reap() {
 
         fn on_message(&self, _kind: u32, buffer: Vec<u8>) {
             self.messages.lock().push(Message {
-                msg: dbg!(String::from_utf8(buffer).unwrap()),
+                msg: String::from_utf8(buffer).unwrap(),
             });
         }
 
         fn on_client_disconnected(&self, num_clients: usize) -> minidumper::LoopAction {
             self.messages.lock().push(Message {
-                msg: dbg!(format!("num_clients = {num_clients}")),
+                msg: format!("num_clients = {num_clients}"),
             });
 
-            if dbg!(num_clients == 0) {
+            if num_clients == 0 {
                 minidumper::LoopAction::Exit
             } else {
                 minidumper::LoopAction::Continue
@@ -205,7 +205,8 @@ fn ping() {
     let start = std::time::Instant::now();
     for i in 0..3 {
         std::thread::sleep(std::time::Duration::from_millis(10));
-        assert!(client.ping().is_ok(), "ping {i}");
+        let res = client.ping();
+        assert!(res.is_ok(), "ping {i} {res:?}");
     }
 
     server_loop.join().unwrap().unwrap();
