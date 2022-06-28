@@ -211,7 +211,8 @@ fn ping() {
 
     server_loop.join().unwrap().unwrap();
 
-    let elapsed = start.elapsed();
+    #[allow(clippy::dbg_macro)]
+    let elapsed = dbg!(start.elapsed());
 
     assert!(
         elapsed < std::time::Duration::from_millis(60)
