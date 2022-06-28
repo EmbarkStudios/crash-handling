@@ -68,6 +68,12 @@ fn ipc_messages() {
 /// Tests that the server reaps inactive clients
 #[test]
 fn inactive_reap() {
+    #[cfg(target_os = "macos")]
+    if std::env::var("CI").is_ok() {
+        println!("not potato compatible");
+        return;
+    }
+
     let name = "inactive_reap";
 
     let mut server = minidumper::Server::with_name(name).unwrap();
@@ -156,6 +162,12 @@ fn inactive_reap() {
 
 #[test]
 fn ping() {
+    #[cfg(target_os = "macos")]
+    if std::env::var("CI").is_ok() {
+        println!("not potato compatible");
+        return;
+    }
+
     let name = "ping";
 
     let mut server = minidumper::Server::with_name(name).unwrap();
