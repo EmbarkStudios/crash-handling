@@ -154,3 +154,70 @@ fn inactive_reap() {
     assert_eq!(messages[3].msg, "msg #3");
     assert_eq!(messages[4].msg, "num_clients = 0");
 }
+
+#[test]
+fn ping() {
+    let name = "ping";
+
+    let mut server = minidumper::Server::with_name(name).unwrap();
+
+    struct Server;
+
+    impl minidumper::ServerHandler for Server {
+        fn create_minidump_file(
+            &self,
+        ) -> Result<(std::fs::File, std::path::PathBuf), std::io::Error> {
+            panic!("should not be called");
+        }
+
+        fn on_minidump_created(
+            &self,
+            _result: Result<minidumper::MinidumpBinary, minidumper::Error>,
+        ) -> minidumper::LoopAction {
+            panic!("should not be called");
+        }
+
+        fn on_message(&self, _kind: u32, _buffer: Vec<u8>) {
+            panic!("should not be called");
+        }
+
+        fn on_client_disconnected(&self, num_clients: usize) -> minidumper::LoopAction {
+            if num_clients == 0 {
+                minidumper::LoopAction::Exit
+            } else {
+                minidumper::LoopAction::Continue
+            }
+        }
+    }
+
+    let server_handler = Server;
+
+    let shutdown = Arc::new(atomic::AtomicBool::new(false));
+    let is_shutdown = shutdown.clone();
+    let server_loop = std::thread::spawn(move || {
+        server.run(
+            Box::new(server_handler),
+            &is_shutdown,
+            Some(std::time::Duration::from_millis(20)),
+        )
+    });
+
+    let client = minidumper::Client::with_name(name).unwrap();
+
+    let start = std::time::Instant::now();
+    for i in 0..3 {
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        assert!(client.ping().is_ok(), "ping {i}");
+    }
+
+    server_loop.join().unwrap().unwrap();
+
+    let elapsed = start.elapsed();
+
+    assert!(
+        elapsed < std::time::Duration::from_millis(60)
+            && elapsed > std::time::Duration::from_millis(45)
+    );
+
+    assert!(client.ping().is_err(), "server should be gone");
+}
