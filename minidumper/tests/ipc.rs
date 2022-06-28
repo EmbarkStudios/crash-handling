@@ -215,7 +215,7 @@ fn ping() {
     let elapsed = dbg!(start.elapsed());
 
     assert!(
-        elapsed < std::time::Duration::from_millis(60)
+        elapsed < std::time::Duration::from_millis(60 + 30 /* account for potato computers */)
             && elapsed > std::time::Duration::from_millis(45)
     );
 
