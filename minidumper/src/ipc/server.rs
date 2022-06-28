@@ -296,6 +296,7 @@ impl Server {
                                 let cc = clients.swap_remove(pos);
                                 Some(cc.socket)
                             } else {
+                                println!("sent PONG");
                                 None
                             }
                         }
@@ -346,6 +347,8 @@ impl Server {
                         if let Err(e) = poll.delete(&conn.socket) {
                             log::error!("failed to deregister timed-out socket: {}", e);
                         }
+
+                        println!("dropping connection");
                     }
 
                     keep
