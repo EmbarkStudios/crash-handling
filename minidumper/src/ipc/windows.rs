@@ -238,7 +238,10 @@ impl IntoRawSocket for Socket {
 impl Drop for Socket {
     fn drop(&mut self) {
         // SAFETY: syscall
-        let _ = unsafe { ws::closesocket(self.0) };
+        let _ = unsafe {
+            ws::shutdown(self.0);
+            ws::closesocket(self.0)
+        };
     }
 }
 

@@ -128,10 +128,18 @@ impl Client {
         #[cfg(not(target_os = "macos"))]
         {
             self.send_message_impl(0, crash_ctx_buffer)?;
+
             // Wait for the server to send back an ack that it has finished
             // with the crash context
-            let mut ack = [0u8; 1];
+            let mut ack = [0u8; std::mem::size_of::<Header>()];
             self.socket.recv(&mut ack)?;
+
+            let header = Header::from_bytes(&ack);
+
+            if header.filter(|hdr| hdr.kind == super::CRASH_ACK).is_none() {
+                return Err(Error::ProtocolError("received invalid response to crash"));
+            }
+
             Ok(())
         }
     }
@@ -153,10 +161,12 @@ impl Client {
     ///
     /// # Errors
     ///
-    /// The write to the server fails
+    /// The send to the server fails
     #[inline]
     pub fn send_message(&self, kind: u32, buf: impl AsRef<[u8]>) -> Result<(), Error> {
-        self.send_message_impl(kind + 1, buf.as_ref())
+        debug_assert!(kind < u32::MAX - super::USER);
+
+        self.send_message_impl(kind + super::USER, buf.as_ref())
 
         // TODO: should we have an ACK? IPC is a (relatively) reliable communication
         // method, and reserving receives from the server for the exclusive
@@ -164,6 +174,28 @@ impl Client {
         // we reduce complication
         // let mut ack = [0u8; 1];
         // self.socket.recv(&mut ack)?;
+    }
+
+    /// Sends a ping to the server, to keep it from reaping connections that haven't
+    /// sent a message within its keep alive window
+    ///
+    /// # Errors
+    ///
+    /// The send to the server fails
+    #[inline]
+    pub fn ping(&self) -> Result<(), Error> {
+        self.send_message_impl(super::PING, &[])?;
+
+        let mut pong = [0u8; std::mem::size_of::<Header>()];
+        self.socket.recv(&mut pong)?;
+
+        let header = Header::from_bytes(&pong);
+
+        if header.filter(|hdr| hdr.kind == super::PONG).is_none() {
+            Err(Error::ProtocolError("received invalid response to ping"))
+        } else {
+            Ok(())
+        }
     }
 
     fn send_message_impl(&self, kind: u32, buf: &[u8]) -> Result<(), Error> {

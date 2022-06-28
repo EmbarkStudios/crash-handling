@@ -53,7 +53,7 @@ fn main() {
         }
 
         server
-            .run(Box::new(Handler), &ab)
+            .run(Box::new(Handler), &ab, None)
             .expect("failed to run server");
 
         return;
