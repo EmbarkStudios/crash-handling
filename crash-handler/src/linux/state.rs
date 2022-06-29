@@ -429,7 +429,7 @@ impl HandlerInner {
                     let fp_ptr = uc_ptr.uc_mcontext.__reserved.as_ptr().cast::<crash_context::fpsimd_context>();
 
                     if (*fp_ptr).head.magic == crash_context::FPSIMD_MAGIC {
-                        ptr::copy_nonoverlapping(fp_ptr, &mut cc.float_state, mem::size_of::<crash_context::fpregset_t>());
+                        ptr::copy_nonoverlapping(fp_ptr, &mut cc.float_state, 1);
                     }
                 } else if #[cfg(not(target_arch = "arm"))] {
                     if !uc_ptr.uc_mcontext.fpregs.is_null() {
