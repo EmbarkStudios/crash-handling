@@ -387,6 +387,7 @@ impl Server {
                     minidump_writer::minidump_writer::MinidumpWriter::new(crash_context.pid, crash_context.tid);
                 writer.set_crash_context(minidump_writer::crash_context::CrashContext { inner: crash_context });
             } else if #[cfg(target_os = "windows")] {
+                #[allow(unsafe_code)]
                 // SAFETY: Unfortunately this is a bit dangerous since we are relying on the crashing process
                 // to still be alive and still have the interior pointers in the crash context still at the
                 // same location in memory, unfortunately it's a bit hard to communicate this through so
