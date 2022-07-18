@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
 ### Changed
-- Updated `minidump-writer` to 0.3 which includes improved support for MacOS
+- [PR#41](https://github.com/EmbarkStudios/crash-handling/pull/41) added support for detecting stale client connections for cases where the OS might not efficiently close the client end of the connection so that the server notices and removes the client from the event loop.
+- [PR#44](https://github.com/EmbarkStudios/crash-handling/pull/44) updated `minidump-writer` to 0.3, which includes improved support for MacOS
 
 ## [0.3.1] - 2022-05-25
 ### Changed
