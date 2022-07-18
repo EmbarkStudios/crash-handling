@@ -379,19 +379,21 @@ impl Server {
         crash_context: crash_context::CrashContext,
         handler: &dyn crate::ServerHandler,
     ) -> Result<LoopAction, Error> {
+        let (mut minidump_file, minidump_path) = handler.create_minidump_file()?;
+
         cfg_if::cfg_if! {
             if #[cfg(any(target_os = "linux", target_os = "android"))] {
                 let mut writer =
                     minidump_writer::minidump_writer::MinidumpWriter::new(crash_context.pid, crash_context.tid);
                 writer.set_crash_context(minidump_writer::crash_context::CrashContext { inner: crash_context });
             } else if #[cfg(target_os = "windows")] {
-                let writer = minidump_writer::minidump_writer::MinidumpWriter::with_crash_context(crash_context)?;
+                let result = minidump_writer::minidump_writer::MinidumpWriter::dump_crash_context(crash_context);
             } else if #[cfg(target_os = "macos")] {
                 let mut writer = minidump_writer::minidump_writer::MinidumpWriter::with_crash_context(crash_context);
             }
         }
 
-        let (mut minidump_file, minidump_path) = handler.create_minidump_file()?;
+        #[cfg(not(target_os = "windows"))]
         let result = writer.dump(&mut minidump_file);
 
         // Notify the user handler about the minidump, even if we failed to write it
