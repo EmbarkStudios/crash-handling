@@ -385,9 +385,9 @@ impl Server {
                     minidump_writer::minidump_writer::MinidumpWriter::new(crash_context.pid, crash_context.tid);
                 writer.set_crash_context(minidump_writer::crash_context::CrashContext { inner: crash_context });
             } else if #[cfg(target_os = "windows")] {
-                let writer = minidump_writer::minidump_writer::MinidumpWriter::new(crash_context)?;
+                let writer = minidump_writer::minidump_writer::MinidumpWriter::with_crash_context(crash_context)?;
             } else if #[cfg(target_os = "macos")] {
-                let mut writer = minidump_writer::minidump_writer::MinidumpWriter::new(crash_context);
+                let mut writer = minidump_writer::minidump_writer::MinidumpWriter::with_crash_context(crash_context);
             }
         }
 
