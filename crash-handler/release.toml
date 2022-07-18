@@ -1,8 +1,6 @@
 pre-release-commit-message = "Release crash-handler-{{version}}"
 tag-message = "Release crash-handler-{{version}}"
 tag-name = "crash-handler-{{version}}"
-shared-version = true
-consolidate-commits = true
 consolidate-pushes = true
 pre-release-replacements = [
     { file = "CHANGELOG.md", search = "Unreleased", replace = "{{version}}" },
