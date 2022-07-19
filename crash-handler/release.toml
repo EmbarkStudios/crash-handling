@@ -1,6 +1,6 @@
-pre-release-commit-message = "Release minidumper-{{version}}"
-tag-message = "Release minidumper-{{version}}"
-tag-name = "minidumper-{{version}}"
+pre-release-commit-message = "Release crash-handler-{{version}}"
+tag-message = "Release crash-handler-{{version}}"
+tag-name = "crash-handler-{{version}}"
 consolidate-pushes = true
 pre-release-replacements = [
     { file = "CHANGELOG.md", search = "Unreleased", replace = "{{version}}" },

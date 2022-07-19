@@ -9,9 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
-### Changed
-- [PR#41](https://github.com/EmbarkStudios/crash-handling/pull/41) added support for detecting stale client connections for cases where the OS might not efficiently close the client end of the connection so that the server notices and removes the client from the event loop.
-- [PR#44](https://github.com/EmbarkStudios/crash-handling/pull/44) updated `minidump-writer` to 0.3, which includes improved support for MacOS
+### Fixed
+- [PR#38](https://github.com/EmbarkStudios/crash-handling/pull/38) resolved [#31](https://github.com/EmbarkStudios/crash-handling/issues/31) and [#35](https://github.com/EmbarkStudios/crash-handling/issues/35) by adding support for 64-bit codes in the mach exception information, as well as now handling `EXC_CRASH` exceptions.
+- [PR#43](https://github.com/EmbarkStudios/crash-handling/pull/42) resolved [#42](https://github.com/EmbarkStudios/crash-handling/issues/42) by fixing a bug on `aarch64-linux`. Thanks [@sfackler](https://github.com/sfackler)!
 
 ## [0.3.1] - 2022-05-25
 ### Changed
@@ -39,7 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-url -->
 [Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/0.3.1...HEAD
-[0.3.1]: https://github.com/EmbarkStudios/crash-handling/compare/0.3.0...0.3.1
+[0.3.1]: https://github.com/EmbarkStudios/crash-handling/compare/0.3.1...0.3.1
 [0.3.0]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-v0.1.0...0.3.0
 [crash-handler-v0.1.0]: https://github.com/EmbarkStudios/crash-handling/releases/tag/crash-handler-v0.1.0
 [sadness-generator-v0.1.0]: https://github.com/EmbarkStudios/crash-handling/releases/tag/sadness-generator-v0.1.0
