@@ -19,26 +19,20 @@ jobs:
         os: [ubuntu-20.04, windows-2022, macos-11]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          submodules: true
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: "1.60.0"
-          override: true
+          components: "clippy, rustfmt"
 
       # make sure all code has been formatted with rustfmt
       - name: check rustfmt
-        run: |
-          rustup component add rustfmt
-          cargo fmt -- --check --color always
+        run: cargo fmt -- --check --color always
 
       # run clippy to verify we have no warnings
       - run: cargo fetch
       - name: cargo clippy
         run: |
-          rustup component add clippy
-          cargo clippy --all-targets --all-features -- -D warnings
+          cargo clippy -p crash-context -p crash-handler -p sadness-generator --all-targets --all-features -- -D warnings
 
   test:
     name: Test
@@ -47,42 +41,30 @@ jobs:
         os: [ubuntu-20.04, windows-2022, macos-11]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: true
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: "1.59.0"
-          override: true
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
       - run: cargo fetch
       - name: cargo test build
-        run: cargo build --tests
+        run: cargo build -p crash-context -p crash-handler -p sadness-generator --tests
       - name: cargo test
-        run: cargo test
+        run: cargo test -p crash-context -p crash-handler -p sadness-generator
 
   deny-check:
     name: cargo-deny
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: true
+      - uses: actions/checkout@v3
       - uses: EmbarkStudios/cargo-deny-action@v1
 
   publish-check:
     name: Publish Check
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: true
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: "1.59.0"
-          override: true
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
       - run: cargo fetch
       - name: cargo publish check
         run: |
           cargo publish --dry-run --manifest-path crash-handler/Cargo.toml
-          cargo publish --dry-run --manifest-path minidumper/Cargo.toml
+          #cargo publish --dry-run --manifest-path minidumper/Cargo.toml
           cargo publish --dry-run --manifest-path crash-context/Cargo.toml
