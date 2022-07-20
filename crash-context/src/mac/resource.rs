@@ -1,7 +1,7 @@
 //! Contains types and helpers for dealing with `EXC_RESOURCE` exceptions.
 //!
 //! `EXC_RESOURCE` exceptions embed details about the resource and the limits
-//! it exceeded within the `code` and, in some cases, `subcode` fields of the exception
+//! it exceeded within the `code` and, in some cases `subcode`, fields of the exception
 //!
 //! See <https://github.com/apple-oss-distributions/xnu/blob/e6231be02a03711ca404e5121a151b24afbff733/osfmk/kern/exc_resource.h>
 //! for the various constants and decoding of exception information wrapped in
@@ -76,7 +76,7 @@ pub fn resource_exc_flavor(code: i64) -> u8 {
 impl super::ExceptionInfo {
     /// If this is an `EXC_RESOURCE` exception, retrieves the exception metadata
     /// from the code, otherwise returns `None`
-    pub fn get_resource_info(&self) -> Option<ResourceException> {
+    pub fn resource_exception(&self) -> Option<ResourceException> {
         if self.kind as u32 != EXC_RESOURCE {
             return None;
         }

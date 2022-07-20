@@ -32,7 +32,9 @@ const EXCEPTION_MASK: et::exception_mask_t = et::EXC_MASK_BAD_ACCESS // SIGSEGV/
     | et::EXC_MASK_ARITHMETIC // SIGFPE
     | et::EXC_MASK_BREAKPOINT // SIGTRAP
     | et::EXC_MASK_CRASH // technically this is a catch all mask for the previous masks, but no reason not to spell out exactly what we handle
-    | et::EXC_MASK_RESOURCE; // exception thrown when a resource limit is exceeded
+    | et::EXC_MASK_RESOURCE // exception thrown when a resource limit is exceeded
+    | et::EXC_MASK_GUARD // exception thrown when an action that is guarded on a resource is attempted
+    ;
 
 static HANDLER: parking_lot::RwLock<Option<HandlerInner>> = parking_lot::const_rwlock(None);
 
@@ -591,7 +593,7 @@ fn is_exception_non_fatal(exc_info: crash_context::ExceptionInfo, task: mt::task
     // We want to clearly see the different variants, even if they end up with
     // the same result
     #[allow(clippy::match_same_arms)]
-    match exc_info.get_resource_info() {
+    match exc_info.resource_exception() {
         // CPU exceptions have, currently 2 flavors, fata and non-fatal
         Some(Re::Cpu(cpu_exc)) => !cpu_exc.is_fatal,
         // Wakeups exceptions
@@ -660,7 +662,7 @@ fn is_exception_non_fatal(exc_info: crash_context::ExceptionInfo, task: mt::task
         Some(Re::Memory(mem_exc)) if mem_exc.flavor == res::MemoryFlavor::HighWatermark => true,
         // I/O resource exeptions are never fatal
         Some(Re::Io(_)) => true,
-        // Thread resource exceptions are always fatal
+        // Thread resource exceptions are not possible (at least currently) in production kernels
         Some(Re::Threads(_)) => false,
         // Port resource exceptions are always fatal
         Some(Re::Ports(_)) => false,

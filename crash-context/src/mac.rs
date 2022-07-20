@@ -1,3 +1,4 @@
+pub mod guard;
 pub mod ipc;
 pub mod resource;
 
