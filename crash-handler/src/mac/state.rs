@@ -31,8 +31,8 @@ const EXCEPTION_MASK: et::exception_mask_t = et::EXC_MASK_BAD_ACCESS // SIGSEGV/
     | et::EXC_MASK_BAD_INSTRUCTION // SIGILL
     | et::EXC_MASK_ARITHMETIC // SIGFPE
     | et::EXC_MASK_BREAKPOINT // SIGTRAP
-    | et::EXC_MASK_CRASH // exception wrapper around an exception that is thrown from a "corpse" process
-    | et::EXC_RESOURCE; // exception thrown when a resource limit is exceeded
+    | et::EXC_MASK_CRASH // technically this is a catch all mask for the previous masks, but no reason not to spell out exactly what we handle
+    | et::EXC_MASK_RESOURCE; // exception thrown when a resource limit is exceeded
 
 static HANDLER: parking_lot::RwLock<Option<HandlerInner>> = parking_lot::const_rwlock(None);
 
@@ -523,24 +523,27 @@ struct ScopedSuspend;
 
 impl ScopedSuspend {
     fn new() -> Self {
-        let mut threads_for_task = std::ptr::null_mut();
-        let mut thread_count = 0;
+        // SAFETY: syscalls
+        unsafe {
+            let mut threads_for_task = std::ptr::null_mut();
+            let mut thread_count = 0;
 
-        if task::task_threads(mach_task_self(), &mut threads_for_task, &mut thread_count)
-            != KERN_SUCCESS
-        {
-            return Self;
-        }
+            if task::task_threads(mach_task_self(), &mut threads_for_task, &mut thread_count)
+                != KERN_SUCCESS
+            {
+                return Self;
+            }
 
-        let this_thread = mach_thread_self();
-        let threads = std::slice::from_raw_parts(threads_for_task, thread_count as usize);
+            let this_thread = mach_thread_self();
+            let threads = std::slice::from_raw_parts(threads_for_task, thread_count as usize);
 
-        // suspend all of the threads except for this one
-        for thread in threads {
-            if *thread != this_thread {
-                // We try to suspend all threads as a best effort, it's not fatal
-                // if we can't
-                mach2::thread_act::thread_suspend(*thread);
+            // suspend all of the threads except for this one
+            for thread in threads {
+                if *thread != this_thread {
+                    // We try to suspend all threads as a best effort, it's not fatal
+                    // if we can't
+                    mach2::thread_act::thread_suspend(*thread);
+                }
             }
         }
 
@@ -550,22 +553,25 @@ impl ScopedSuspend {
 
 impl Drop for ScopedSuspend {
     fn drop(&mut self) {
-        let mut threads_for_task = std::ptr::null_mut();
-        let mut thread_count = 0;
+        // SAFETY: syscalls
+        unsafe {
+            let mut threads_for_task = std::ptr::null_mut();
+            let mut thread_count = 0;
 
-        if task::task_threads(mach_task_self(), &mut threads_for_task, &mut thread_count)
-            != KERN_SUCCESS
-        {
-            return;
-        }
+            if task::task_threads(mach_task_self(), &mut threads_for_task, &mut thread_count)
+                != KERN_SUCCESS
+            {
+                return;
+            }
 
-        let this_thread = mach_thread_self();
-        let threads = std::slice::from_raw_parts(threads_for_task, thread_count as usize);
+            let this_thread = mach_thread_self();
+            let threads = std::slice::from_raw_parts(threads_for_task, thread_count as usize);
 
-        // resume all of the threads except for this one
-        for thread in threads {
-            if *thread != this_thread {
-                mach2::thread_act::thread_resume(*thread);
+            // resume all of the threads except for this one
+            for thread in threads {
+                if *thread != this_thread {
+                    mach2::thread_act::thread_resume(*thread);
+                }
             }
         }
     }
@@ -573,14 +579,22 @@ impl Drop for ScopedSuspend {
 
 /// Determines if the specified exception is non-fatal.
 ///
-/// On MacOS, `EXC_RESOURCE` exceptions are thrown when a resource limit (hard or soft)
-/// is hit/exceeded, and importantly for our scenario, are often non-fatal, meaning
+/// `EXC_RESOURCE` exceptions are thrown when a resource limit (hard or soft)
+/// is surpassed, and importantly for our scenario, are often non-fatal, meaning
 /// we should _not_ notify the user callback that a crash has occurred
 fn is_exception_non_fatal(exc_info: crash_context::ExceptionInfo, task: mt::task_t) -> bool {
-    use crash_context::resource::{self as res, ResourceException as Re};
+    use crash_context::{
+        ipc::pid_for_task,
+        resource::{self as res, ResourceException as Re},
+    };
 
+    // We want to clearly see the different variants, even if they end up with
+    // the same result
+    #[allow(clippy::match_same_arms)]
     match exc_info.get_resource_info() {
+        // CPU exceptions have, currently 2 flavors, fata and non-fatal
         Some(Re::Cpu(cpu_exc)) => !cpu_exc.is_fatal,
+        // Wakeups exceptions
         Some(Re::Wakeups(wu_exc)) if wu_exc.flavor == res::WakeupsFlavor::Monitor => {
             // Unlike the other resource exceptions kinds, we need to call into
             // the task to determine if this exception is actually fatal. Since
@@ -589,7 +603,7 @@ fn is_exception_non_fatal(exc_info: crash_context::ExceptionInfo, task: mt::task
             // non-fatal
             let mut pid = 0;
             // SAFETY: syscall
-            if unsafe { cc::ipc::pid_for_task(task, &mut pid) } != KERN_SUCCESS {
+            if unsafe { pid_for_task(task, &mut pid) } != KERN_SUCCESS {
                 return true;
             }
 
@@ -627,6 +641,9 @@ fn is_exception_non_fatal(exc_info: crash_context::ExceptionInfo, task: mt::task
                     return true;
                 }
 
+                let proc_get_wakemon_params: ProcGetWakemonParams =
+                    std::mem::transmute(proc_get_wakemon_params);
+
                 let mut rate = 0;
                 let mut flags = 0;
                 if proc_get_wakemon_params(pid, &mut rate, &mut flags) < 0 {
@@ -639,9 +656,13 @@ fn is_exception_non_fatal(exc_info: crash_context::ExceptionInfo, task: mt::task
                 (flags & WAKEMON_MAKE_FATAL) == 0
             }
         }
+        // Memory resource exceptions are never fatal
         Some(Re::Memory(mem_exc)) if mem_exc.flavor == res::MemoryFlavor::HighWatermark => true,
+        // I/O resource exeptions are never fatal
         Some(Re::Io(_)) => true,
+        // Thread resource exceptions are always fatal
         Some(Re::Threads(_)) => false,
+        // Port resource exceptions are always fatal
         Some(Re::Ports(_)) => false,
         // non resource exceptions are always fatal
         None => false,
@@ -658,8 +679,8 @@ mod test {
     #[inline]
     fn res_exc(kind: ResourceKind, flavor: u8) -> ExceptionInfo {
         ExceptionInfo {
-            kind: et::EXC_RESOURCE,
-            code: ((kind as u64 & 0x7) << 61) | ((flavor as u64 & 0x7) << 58),
+            kind: et::EXC_RESOURCE as _,
+            code: (((kind as u64 & 0x7) << 61) | ((flavor as u64 & 0x7) << 58)) as i64,
             subcode: None,
         }
     }
@@ -668,7 +689,8 @@ mod test {
     /// exceptions we handle are always fatal
     #[test]
     fn check_resource_non_fatal() {
-        let task = mach_task_self();
+        // SAFETY: syscall
+        let task = unsafe { mach_task_self() };
 
         assert!(is_exception_non_fatal(
             res_exc(ResourceKind::Cpu, CpuFlavor::Monitor as u8),
@@ -694,7 +716,7 @@ mod test {
 
         assert!(!is_exception_non_fatal(
             ExceptionInfo {
-                kind: et::EXC_CRASH,
+                kind: et::EXC_CRASH as _,
                 code: 0xb100001,
                 subcode: None,
             },
@@ -702,7 +724,7 @@ mod test {
         ));
         assert!(!is_exception_non_fatal(
             ExceptionInfo {
-                kind: et::EXC_CRASH,
+                kind: et::EXC_CRASH as _,
                 code: 0x0b00000,
                 subcode: None,
             },
@@ -710,7 +732,7 @@ mod test {
         ));
         assert!(!is_exception_non_fatal(
             ExceptionInfo {
-                kind: et::EXC_CRASH,
+                kind: et::EXC_CRASH as _,
                 code: 0x6000000,
                 subcode: None,
             },
@@ -718,15 +740,15 @@ mod test {
         ));
         assert!(!is_exception_non_fatal(
             ExceptionInfo {
-                kind: et::EXC_BAD_ACCESS,
-                code: KERN_INVALID_ADDRESS,
+                kind: et::EXC_BAD_ACCESS as _,
+                code: mach2::kern_return::KERN_INVALID_ADDRESS as _,
                 subcode: None,
             },
             task
         ));
         assert!(!is_exception_non_fatal(
             ExceptionInfo {
-                kind: et::EXC_BAD_INSTRUCTION,
+                kind: et::EXC_BAD_INSTRUCTION as _,
                 code: 1,
                 subcode: None,
             },
@@ -734,7 +756,7 @@ mod test {
         ));
         assert!(!is_exception_non_fatal(
             ExceptionInfo {
-                kind: et::EXC_ARITHMETIC,
+                kind: et::EXC_ARITHMETIC as _,
                 code: 1,
                 subcode: None,
             },
@@ -742,7 +764,7 @@ mod test {
         ));
         assert!(!is_exception_non_fatal(
             ExceptionInfo {
-                kind: et::EXC_BREAKPOINT,
+                kind: et::EXC_BREAKPOINT as _,
                 code: 2,
                 subcode: None,
             },

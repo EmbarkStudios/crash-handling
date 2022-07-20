@@ -15,8 +15,6 @@ pub fn handles_crash(flavor: SadnessFlavor) {
                     if #[cfg(any(target_os = "linux", target_os = "android"))] {
                         use ch::Signal;
 
-                        println!("GOT {}", cc.siginfo.ssi_signo);
-
                         assert_eq!(
                             cc.siginfo.ssi_signo,
                             match flavor {

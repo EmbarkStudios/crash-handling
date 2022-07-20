@@ -2,6 +2,13 @@
 //!
 //! `EXC_RESOURCE` exceptions embed details about the resource and the limits
 //! it exceeded within the `code` and, in some cases, `subcode` fields of the exception
+//!
+//! See <https://github.com/apple-oss-distributions/xnu/blob/e6231be02a03711ca404e5121a151b24afbff733/osfmk/kern/exc_resource.h>
+//! for the various constants and decoding of exception information wrapped in
+//! this module.
+
+use mach2::exception_types::EXC_RESOURCE;
+use std::time::Duration;
 
 /// The details for an `EXC_RESOURCE` exception as retrieved from the exception's
 /// code and subcode
@@ -21,19 +28,19 @@ pub enum ResourceException {
     Ports(PortsResourceException),
     /// An unknown resource kind due to an addition to the set of possible
     /// resource exception kinds in exc_resource.h
-    Unknown { kind: i32, flavor: i32 },
+    Unknown { kind: u8, flavor: u8 },
 }
 
 /// Each different resource exception type has 1 or more flavors that it can be,
 /// and while these most likely don't change often, we try to be forward
 /// compatible by not failing if a particular flavor is unknown
 #[derive(Copy, Clone, Debug)]
-pub enum Flavor<T: Copy + Clone + Debug> {
+pub enum Flavor<T: Copy + Clone + std::fmt::Debug> {
     Known(T),
     Unknown(u8),
 }
 
-impl<T: TryFrom<u8>> From<i64> for Flavor<T> {
+impl<T: TryFrom<u8> + Copy + Clone + std::fmt::Debug> From<i64> for Flavor<T> {
     #[inline]
     fn from(code: i64) -> Self {
         let flavor = resource_exc_flavor(code);
@@ -45,7 +52,7 @@ impl<T: TryFrom<u8>> From<i64> for Flavor<T> {
     }
 }
 
-impl<T: PartialEq> PartialEq<T> for Flavor<T> {
+impl<T: PartialEq + Copy + Clone + std::fmt::Debug> PartialEq<T> for Flavor<T> {
     fn eq(&self, o: &T) -> bool {
         match self {
             Self::Known(flavor) => flavor == o,
@@ -57,20 +64,20 @@ impl<T: PartialEq> PartialEq<T> for Flavor<T> {
 /// Retrieves the resource exception kind from an exception code
 #[inline]
 pub fn resource_exc_kind(code: i64) -> u8 {
-    (code >> 61) & 0x7
+    ((code >> 61) & 0x7) as u8
 }
 
 /// Retrieves the resource exception flavor from an exception code
 #[inline]
 pub fn resource_exc_flavor(code: i64) -> u8 {
-    (code >> 58) & 0x7
+    ((code >> 58) & 0x7) as u8
 }
 
 impl super::ExceptionInfo {
     /// If this is an `EXC_RESOURCE` exception, retrieves the exception metadata
     /// from the code, otherwise returns `None`
     pub fn get_resource_info(&self) -> Option<ResourceException> {
-        if self.kind != et::EXC_RESOURCE {
+        if self.kind as u32 != EXC_RESOURCE {
             return None;
         }
 
@@ -78,7 +85,7 @@ impl super::ExceptionInfo {
 
         let res_exc = if kind == ResourceKind::Cpu as u8 {
             ResourceException::Cpu(CpuResourceException::from_exc_info(self.code, self.subcode))
-        } else if kind == ExcResourceKind::Wakeups as u8 {
+        } else if kind == ResourceKind::Wakeups as u8 {
             ResourceException::Wakeups(WakeupsResourceException::from_exc_info(
                 self.code,
                 self.subcode,
@@ -92,14 +99,17 @@ impl super::ExceptionInfo {
         } else if kind == ResourceKind::Ports as u8 {
             ResourceException::Ports(PortsResourceException::from_exc_info(self.code))
         } else {
-            ResourceExceptionInfo::Unknown { kind, flavor }
+            ResourceException::Unknown {
+                kind,
+                flavor: resource_exc_flavor(self.code),
+            }
         };
 
         Some(res_exc)
     }
 }
 
-/// The types of `EXC_RESOURCE`, see <include/kern/exc_resource.h>
+/// The types of resources that an `EXC_RESOURCE` exception can pertain to
 #[repr(u8)]
 pub enum ResourceKind {
     Cpu = 1,
@@ -110,11 +120,14 @@ pub enum ResourceKind {
     Ports = 6,
 }
 
-/// The flavors for a `EXC_RESOURCE` `cpu` exception, see <include/kern/exc_resource.h>
+/// The flavors for a [`CpuResourceException`]
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[repr(u8)]
 pub enum CpuFlavor {
+    /// The process has surpassed its CPU limit
     Monitor = 1,
+    /// The process has surpassed its CPU limit, and the process has been configured
+    /// to make this exception fatal
     MonitorFatal = 2,
 }
 
@@ -133,18 +146,17 @@ impl TryFrom<u8> for CpuFlavor {
 /// These exceptions _may_ be fatal. They are not fatal by default at task
 /// creation but can be made fatal by calling `proc_rlimit_control` with
 /// `RLIMIT_CPU_USAGE_MONITOR` as the second argument and `CPUMON_MAKE_FATAL`
-/// set in the flags.
+/// set in the flags. The flavor extracted from the exception code determines if
+/// the exception is fatal.
 ///
-/// In OS X 10.10, the exception code indicates whether the exception is
-/// fatal. See 10.10 <xnu-2782.1.97/osfmk/kern/thread.c>
-/// `THIS_THREAD_IS_CONSUMING_TOO_MUCH_CPU__SENDING_EXC_RESOURCE`.
+/// [Kernel code](https://github.com/apple-oss-distributions/xnu/blob/e7776783b89a353188416a9a346c6cdb4928faad/osfmk/kern/thread.c#L2475-L2616)
 #[derive(Copy, Clone, Debug)]
 pub struct CpuResourceException {
     pub flavor: Flavor<CpuFlavor>,
     /// If the exception is fatal. Currently only true if the flavor is [`CpuFlavor::MonitorFatal`]
     pub is_fatal: bool,
     /// The time period in which the CPU limit was surpassed
-    pub observation_interval: std::time::Duration,
+    pub observation_interval: Duration,
     /// The CPU % limit
     pub limit: u8,
     /// The CPU % consumed by the task
@@ -170,28 +182,27 @@ impl CpuResourceException {
      */
     #[inline]
     pub fn from_exc_info(code: i64, subcode: Option<i64>) -> Self {
-        debug_assert_eq!(resource_exc_kind(code), ExcResourceKind::Cpu as u8);
+        debug_assert_eq!(resource_exc_kind(code), ResourceKind::Cpu as u8);
 
-        let flavor = Flavor::new(code);
-
-        let interval_seconds = (code >> 7) & 0x1ffffff;
-        let limit = code & 0x7f;
-        let consumed = subcode.map_or(0, |sc| sc & 0x7f);
+        let flavor = Flavor::from(code);
+        let interval_seconds = ((code >> 7) & 0x1ffffff) as u64;
+        let limit = (code & 0x7f) as u8;
+        let consumed = subcode.map_or(0, |sc| sc & 0x7f) as u8;
 
         // The default is that cpu resource exceptions are not fatal, so
         // we only check the flavor against the (currently) one known value
         // that indicates the exception is fatal
         Self {
             flavor,
-            is_fatal: flavor == CpuFlavors::MonitorFatal,
-            observation_interval: std::time::Duration::from_secs(interval_seconds),
+            is_fatal: flavor == CpuFlavor::MonitorFatal,
+            observation_interval: Duration::from_secs(interval_seconds),
             limit,
             consumed,
         }
     }
 }
 
-/// The flavors for a `EXC_RESOURCE` `wakeups` exception, see <include/kern/exc_resource.h>
+/// The flavors for a [`WakeupsResourceException`]
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[repr(u8)]
 pub enum WakeupsFlavor {
@@ -212,16 +223,14 @@ impl TryFrom<u8> for WakeupsFlavor {
 /// These exceptions may be fatal. They are not fatal by default at task
 /// creation, but can be made fatal by calling `proc_rlimit_control` with
 /// `RLIMIT_WAKEUPS_MONITOR` as the second argument and `WAKEMON_MAKE_FATAL`
-/// set in the flags.
+/// set in the flags. Calling [`proc_get_wakemon_params`](https://github.com/apple-oss-distributions/xnu/blob/e6231be02a03711ca404e5121a151b24afbff733/libsyscall/wrappers/libproc/libproc.c#L592-L608)
+/// determines whether these exceptions are fatal.
 ///
-/// `proc_get_wakemon_params` (which calls through to `proc_rlimit_control`
-/// with `RLIMIT_WAKEUPS_MONITOR`) determines whether these exceptions are
-/// fatal. See 10.10 <xnu-2782.1.97/osfmk/kern/task.c>
-/// `THIS_PROCESS_IS_CAUSING_TOO_MANY_WAKEUPS__SENDING_EXC_RESOURCE`
+/// [Kernel source](https://github.com/apple-oss-distributions/xnu/blob/e6231be02a03711ca404e5121a151b24afbff733/osfmk/kern/task.c#L7501-L7580)
 pub struct WakeupsResourceException {
     pub flavor: Flavor<WakeupsFlavor>,
     /// The time period in which the number of wakeups was surpassed
-    pub observation_interval: std::time::Duration,
+    pub observation_interval: Duration,
     /// The number of wakeups permitted per second
     pub permitted: u32,
     /// The number of wakeups observed per second
@@ -248,23 +257,25 @@ impl WakeupsResourceException {
      */
     #[inline]
     pub fn from_exc_info(code: i64, subcode: Option<i64>) -> Self {
-        debug_assert_eq!(resource_exc_kind(code), ExcResourceKind::Wakeups as u8);
+        debug_assert_eq!(resource_exc_kind(code), ResourceKind::Wakeups as u8);
 
-        let flavor = Flavor::new(code);
-        let interval_seconds = (code >> 20) & 0xfffff;
-        let permitted = code & 0xfff;
-        let observed = subcode.map_or(0, |sc| sc & 0xfffff);
+        let flavor = Flavor::from(code);
+        // Note that Apple has a bug in exc_resource.h where the masks in the
+        // decode macros for the interval and the permitted wakeups have been swapped
+        let interval_seconds = ((code >> 20) & 0xfff) as u64;
+        let permitted = (code & 0xfffff) as u32;
+        let observed = subcode.map_or(0, |sc| sc & 0xfffff) as u32;
 
         Self {
             flavor,
-            observation_interval: std::time::from_secs(interval_seconds),
+            observation_interval: Duration::from_secs(interval_seconds),
             permitted,
             observed,
         }
     }
 }
 
-/// The flavors for a `EXC_RESOURCE` `memory` exception, see <include/kern/exc_resource.h>
+/// The flavors for a [`MemoryResourceException`]
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[repr(u8)]
 pub enum MemoryFlavor {
@@ -282,25 +293,13 @@ impl TryFrom<u8> for MemoryFlavor {
     }
 }
 
-/// These exceptions were never fatal prior to 10.12. See 10.10
-/// xnu-2782.1.97/osfmk/kern/task.c
-/// `THIS_PROCESS_CROSSED_HIGH_WATERMARK__SENDING_EXC_RESOURCE`
+/// These exceptions, as of this writing, are never fatal.
 ///
-/// A superficial examination of 10.12 shows that these exceptions may be
-/// fatal, as determined by the P_MEMSTAT_FATAL_MEMLIMIT bit of the
-/// kernel-internal struct proc::p_memstat_state. See 10.12.3
-/// xnu-3789.41.3/osfmk/kern/task.c task_footprint_exceeded(). This bit is
-/// not exposed to user space, which makes it difficult to determine whether
-/// the kernel considers a given instance of this exception fatal. However, a
-/// close read reveals that it is only possible for this bit to become set
-/// when xnu-3789.41.3/bsd/kern/kern_memorystatus.c
-/// memorystatus_cmd_set_memlimit_properties() is called, which is only
-/// possible when the kernel is built with `CONFIG_JETSAM` set, or if the
-/// `kern.memorystatus_highwater_enabled` sysctl is used, which is only
-/// possible when the kernel is built with `DEVELOPMENT` or `DEBUG` set.
-/// Although `CONFIG_JETSAM` is used on iOS, it is not used on macOS.
-/// `DEVELOPMENT` and `DEBUG` are also not set for production kernels. It
-/// therefore remains impossible for these exceptions to be fatal, even on 10.12.
+/// While memory exceptions _can_ be fatal, this appears to only be possible if
+/// the kernel is built with `CONFIG_JETSAM` or in `DEVELOPMENT` or `DEBUG` modes,
+/// so as of now, they should never be considered fatal, at least on `MacOS`
+///
+/// [Kernel source](https://github.com/apple-oss-distributions/xnu/blob/e6231be02a03711ca404e5121a151b24afbff733/osfmk/kern/task.c#L6767-L6874)
 pub struct MemoryResourceException {
     pub flavor: Flavor<MemoryFlavor>,
     /// The limit in MiB of the high watermark
@@ -325,16 +324,16 @@ impl MemoryResourceException {
      */
     #[inline]
     pub fn from_exc_info(code: i64) -> Self {
-        debug_assert_eq!(resource_exc_kind(code), ExcResourceKind::Memory as u8);
+        debug_assert_eq!(resource_exc_kind(code), ResourceKind::Memory as u8);
 
-        let flavor = Flavor::new(code);
-        let limit_mib = code & 0x1fff;
+        let flavor = Flavor::from(code);
+        let limit_mib = (code & 0x1fff) as u16;
 
         Self { flavor, limit_mib }
     }
 }
 
-/// The flavors for a `EXC_RESOURCE` `io` exception, see <include/kern/exc_resource.h>
+/// The flavors for an [`IoResourceException`]
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[repr(u8)]
 pub enum IoFlavor {
@@ -354,12 +353,17 @@ impl TryFrom<u8> for IoFlavor {
     }
 }
 
-/// These exceptions are never fatal. See 10.12.3 xnu-3789.41.3/osfmk/kern/task.c
-/// `SENDING_NOTIFICATION__THIS_PROCESS_IS_CAUSING_TOO_MUCH_IO`
+/// These exceptions are never fatal.
+///
+/// [Kernel source](https://github.com/apple-oss-distributions/xnu/blob/e6231be02a03711ca404e5121a151b24afbff733/osfmk/kern/task.c#L7739-L7792)
 pub struct IoResourceException {
     pub flavor: Flavor<MemoryFlavor>,
-    /// The limit in MiB of the high watermark
+    /// The time period in which the I/O limit was surpassed
+    pub observation_interval: Duration,
+    /// The I/O limit in MiB of the high watermark
     pub limit_mib: u16,
+    /// The observed I/O in MiB
+    pub observed_mib: u16,
 }
 
 impl IoResourceException {
@@ -381,22 +385,23 @@ impl IoResourceException {
      */
     #[inline]
     pub fn from_exc_info(code: i64, subcode: Option<i64>) -> Self {
-        debug_assert_eq!(resource_exc_kind(code), ExcResourceKind::Io as u8);
-        let flavor = Flavor::new(code);
-        let interval_seconds = (code >> 15) & 0x1ffff;
-        let limit_mib = code & 0x7fff;
-        let observed_mib = subcode.map_or(0, |sc| sc & 0x7fff);
+        debug_assert_eq!(resource_exc_kind(code), ResourceKind::Io as u8);
+
+        let flavor = Flavor::from(code);
+        let interval_seconds = ((code >> 15) & 0x1ffff) as u64;
+        let limit_mib = (code & 0x7fff) as u16;
+        let observed_mib = subcode.map_or(0, |sc| sc & 0x7fff) as u16;
 
         Self {
             flavor,
-            observation_interval: std::time::Duration::from_secs(interval_seconds),
+            observation_interval: Duration::from_secs(interval_seconds),
             limit_mib,
             observed_mib,
         }
     }
 }
 
-/// The flavors for a `EXC_RESOURCE` `threads` exception, see <include/kern/exc_resource.h>
+/// The flavors for a [`ThreadsResourceException`]
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[repr(u8)]
 pub enum ThreadsFlavor {
@@ -414,7 +419,10 @@ impl TryFrom<u8> for ThreadsFlavor {
     }
 }
 
-/// This exception is always fatal
+/// This exception is provided for completeness sake, but is only possible if
+/// the kernel is built in `DEVELOPMENT` or `DEBUG` modes.
+///
+/// [Kernel source](https://github.com/apple-oss-distributions/xnu/blob/e6231be02a03711ca404e5121a151b24afbff733/osfmk/kern/thread.c#L2575-L2620)
 pub struct ThreadsResourceException {
     pub flavor: Flavor<ThreadsFlavor>,
     /// The thread limit
@@ -440,16 +448,16 @@ impl ThreadsResourceException {
      */
     #[inline]
     pub fn from_exc_info(code: i64) -> Self {
-        debug_assert_eq!(resource_exc_kind(code), ExcResourceKind::Threads as u8);
+        debug_assert_eq!(resource_exc_kind(code), ResourceKind::Threads as u8);
 
-        let flavor = Flavor::new(code);
-        let limit = code & 0x7fff;
+        let flavor = Flavor::from(code);
+        let limit = (code & 0x7fff) as u16;
 
         Self { flavor, limit }
     }
 }
 
-/// The flavors for a `EXC_RESOURCE` `ports` exception, see <include/kern/exc_resource.h>
+/// The flavors for a [`PortsResourceException`]
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[repr(u8)]
 pub enum PortsFlavor {
@@ -467,7 +475,11 @@ impl TryFrom<u8> for PortsFlavor {
     }
 }
 
-/// This exception is always fatal
+/// This exception is always fatal, and in fact I'm unsure if this exception
+/// is even observable, as the kernel will kill the offending process if
+/// the port space is full
+///
+/// [Kernel source](https://github.com/apple-oss-distributions/xnu/blob/e7776783b89a353188416a9a346c6cdb4928faad/osfmk/kern/task.c#L7907-L7969)
 pub struct PortsResourceException {
     pub flavor: Flavor<ThreadsFlavor>,
     /// The number of allocated ports
@@ -494,10 +506,10 @@ impl PortsResourceException {
      */
     #[inline]
     pub fn from_exc_info(code: i64) -> Self {
-        debug_assert_eq!(resource_exc_kind(code), ExcResourceKind::Ports as u8);
+        debug_assert_eq!(resource_exc_kind(code), ResourceKind::Ports as u8);
 
-        let flavor = Flavor::new(code);
-        let allocated = code & 0xffffff;
+        let flavor = Flavor::from(code);
+        let allocated = (code & 0xffffff) as u32;
 
         Self { flavor, allocated }
     }
