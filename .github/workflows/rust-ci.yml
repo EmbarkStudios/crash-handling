@@ -32,7 +32,7 @@ jobs:
       - run: cargo fetch
       - name: cargo clippy
         run: |
-          cargo clippy -p crash-context crash-handler sadness-generator --all-targets --all-features -- -D warnings
+          cargo clippy -p crash-context -p crash-handler -p sadness-generator --all-targets --all-features -- -D warnings
 
   test:
     name: Test
@@ -45,9 +45,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo fetch
       - name: cargo test build
-        run: cargo build -p crash-context crash-handler sadness-generator --tests
+        run: cargo build -p crash-context -p crash-handler -p sadness-generator --tests
       - name: cargo test
-        run: cargo test -p crash-context crash-handler sadness-generator
+        run: cargo test -p crash-context -p crash-handler -p sadness-generator
 
   deny-check:
     name: cargo-deny
