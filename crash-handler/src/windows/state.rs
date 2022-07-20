@@ -12,21 +12,20 @@ pub(super) use windows_sys::Win32::{
     },
 };
 
-/// MSVCRT has its own error handling function for invalid parameters to crt functions
-/// (eg printf) which instead of returning error codes from the function itself,
-/// like one would want, call a handler if specified, or, worse, throw up a dialog
-/// if in a GUI!
-///
-/// [Invalid Parameter Handler](https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/set-invalid-parameter-handler-set-thread-local-invalid-parameter-handler?view=msvc-170)
-///
-/// It also has a separate error handling function when calling pure virtuals
-/// because why not?
-///
-/// [Purecall Handler](https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/get-purecall-handler-set-purecall-handler?view=msvc-170)
 extern "C" {
+    /// MSVCRT has its own error handling function for invalid parameters to crt functions
+    /// (eg printf) which instead of returning error codes from the function itself,
+    /// like one would want, call a handler if specified, or, worse, throw up a dialog
+    /// if in a GUI!
+    ///
+    /// [Invalid Parameter Handler](https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/set-invalid-parameter-handler-set-thread-local-invalid-parameter-handler?view=msvc-170)
     fn _set_invalid_parameter_handler(
         new_handler: Option<_invalid_parameter_handler>,
     ) -> Option<_invalid_parameter_handler>;
+    /// It also has a separate error handling function when calling pure virtuals
+    /// because why not?
+    ///
+    /// [Purecall Handler](https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/get-purecall-handler-set-purecall-handler?view=msvc-170)
     fn _set_purecall_handler(new_handler: Option<_purecall_handler>) -> Option<_purecall_handler>;
     // This is only available in the debug CRT
     // fn _invalid_parameter(
