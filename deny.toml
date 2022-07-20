@@ -22,7 +22,7 @@ copyleft = "deny"
 allow-osi-fsf-free = "neither"
 default = "deny"
 confidence-threshold = 0.8
-exceptions = []
+exceptions = [{ allow = ["Unicode-DFS-2016"], name = "unicode-ident" }]
 
 # Some crates don't have (easily) machine readable licensing information,
 # adding a clarification entry for it allows you to manually specify the
@@ -55,10 +55,7 @@ skip = [
     # not seen a release in 5 years
     { name = "num-traits", version = "=0.1.43" },
 ]
-skip-tree = [
-    # parking_lot is out of date again
-    { name = "windows-sys", version = "=0.34" },
-]
+skip-tree = []
 
 [sources]
 unknown-registry = "deny"
