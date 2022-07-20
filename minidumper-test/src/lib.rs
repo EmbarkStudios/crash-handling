@@ -30,6 +30,8 @@ pub enum Signal {
     Purecall,
     #[cfg(windows)]
     InvalidParameter,
+    #[cfg(target_os = "macos")]
+    Guard,
 }
 
 use std::fmt;
@@ -50,6 +52,8 @@ impl fmt::Display for Signal {
             Self::Purecall => "purecall",
             #[cfg(windows)]
             Self::InvalidParameter => "invalid-parameter",
+            #[cfg(target_os = "macos")]
+            Self::Guard => "guard",
         })
     }
 }
