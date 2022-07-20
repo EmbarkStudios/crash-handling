@@ -1,4 +1,5 @@
 pub mod ipc;
+pub mod resource;
 
 use mach2::{exception_types as et, mach_types as mt};
 

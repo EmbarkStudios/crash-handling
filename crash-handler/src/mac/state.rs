@@ -31,7 +31,8 @@ const EXCEPTION_MASK: et::exception_mask_t = et::EXC_MASK_BAD_ACCESS // SIGSEGV/
     | et::EXC_MASK_BAD_INSTRUCTION // SIGILL
     | et::EXC_MASK_ARITHMETIC // SIGFPE
     | et::EXC_MASK_BREAKPOINT // SIGTRAP
-    | et::EXC_MASK_CRASH;
+    | et::EXC_MASK_CRASH // exception wrapper around an exception that is thrown from a "corpse" process
+    | et::EXC_RESOURCE; // exception thrown when a resource limit is exceeded
 
 static HANDLER: parking_lot::RwLock<Option<HandlerInner>> = parking_lot::const_rwlock(None);
 
@@ -408,7 +409,7 @@ unsafe fn exception_handler(port: mach_port_t, us: UserSignal) {
                 // KERN_FAILURE (see catch_exception_raise) in order for the kernel
                 // to move onto the host exception handler for the child task
                 let ret_code = if request.task.name == mach_task_self() {
-                    suspend_threads();
+                    let _ss = ScopedSuspend::new();
 
                     let subcode = (request.exception == et::EXC_BAD_ACCESS as i32 // 1
                         && request.code_count > 1)
@@ -420,30 +421,33 @@ unsafe fn exception_handler(port: mach_port_t, us: UserSignal) {
                         subcode,
                     };
 
-                    let cc = crash_context::CrashContext {
-                        thread: request.thread.name,
-                        task: request.task.name,
-                        handler_thread: mach_thread_self(),
-                        exception: Some(exc_info),
-                    };
+                    // Check if the exception is non-fatal, if it is we don't report it
+                    // and importantly _don't_ detach the exception handler like we
+                    // do for fatal exceptions
+                    if !is_exception_non_fatal(exc_info, request.task.name) {
+                        let cc = crash_context::CrashContext {
+                            thread: request.thread.name,
+                            task: request.task.name,
+                            handler_thread: mach_thread_self(),
+                            exception: Some(exc_info),
+                        };
 
-                    let ret_code = if let CrashEventResult::Handled(true) = call_user_callback(&cc)
-                    {
-                        KERN_SUCCESS
+                        let ret_code =
+                            if let CrashEventResult::Handled(true) = call_user_callback(&cc) {
+                                KERN_SUCCESS
+                            } else {
+                                mach2::kern_return::KERN_FAILURE
+                            };
+
+                        // Restores the previous exception ports, in most cases
+                        // this will be the default for the OS, which will kill this
+                        // process when we reply that we've handled the exception
+                        detach(true);
+
+                        ret_code
                     } else {
-                        mach2::kern_return::KERN_FAILURE
-                    };
-
-                    // note that breakpad doesn't do this, but this seems more
-                    // correct?
-                    resume_threads();
-
-                    // Restores the previous exception ports, in most cases
-                    // this will be the default for the OS, which will kill this
-                    // process when we reply that we've handled the exception
-                    detach(true);
-
-                    ret_code
+                        KERN_SUCCESS
+                    }
                 } else {
                     KERN_SUCCESS
                 };
@@ -476,31 +480,32 @@ unsafe fn exception_handler(port: mach_port_t, us: UserSignal) {
             }
             Ok(MessageIds::Shutdown) => return,
             Ok(MessageIds::SignalCrash) => {
-                suspend_threads();
+                let res = {
+                    let _ss = ScopedSuspend::new();
 
-                let user_exception: &UserException = std::mem::transmute(&request);
+                    let user_exception: &UserException = std::mem::transmute(&request);
 
-                let exception = if user_exception.flags & FLAG_HAS_EXCEPTION != 0 {
-                    Some(crash_context::ExceptionInfo {
-                        kind: user_exception.exception_kind,
-                        code: user_exception.exception_code,
-                        subcode: (user_exception.flags & FLAG_HAS_SUBCODE != 0)
-                            .then(|| user_exception.exception_subcode),
-                    })
-                } else {
-                    None
+                    let exception = if user_exception.flags & FLAG_HAS_EXCEPTION != 0 {
+                        Some(crash_context::ExceptionInfo {
+                            kind: user_exception.exception_kind,
+                            code: user_exception.exception_code,
+                            subcode: (user_exception.flags & FLAG_HAS_SUBCODE != 0)
+                                .then(|| user_exception.exception_subcode),
+                        })
+                    } else {
+                        None
+                    };
+
+                    // Reconstruct a crash context from the message we received
+                    let cc = crash_context::CrashContext {
+                        task: mach_task_self(),
+                        thread: user_exception.crash_thread.name,
+                        handler_thread: mach_thread_self(),
+                        exception,
+                    };
+
+                    call_user_callback(&cc)
                 };
-
-                // Reconstruct a crash context from the message we received
-                let cc = crash_context::CrashContext {
-                    task: mach_task_self(),
-                    thread: user_exception.crash_thread.name,
-                    handler_thread: mach_thread_self(),
-                    exception,
-                };
-
-                let res = call_user_callback(&cc);
-                resume_threads();
 
                 {
                     let &(ref lock, ref cvar) = &*us;
@@ -514,51 +519,242 @@ unsafe fn exception_handler(port: mach_port_t, us: UserSignal) {
     }
 }
 
-/// Suspends all threads other than the current one handling the exception
-unsafe fn suspend_threads() -> bool {
-    let mut threads_for_task = std::ptr::null_mut();
-    let mut thread_count = 0;
+struct ScopedSuspend;
 
-    if task::task_threads(mach_task_self(), &mut threads_for_task, &mut thread_count)
-        != KERN_SUCCESS
-    {
-        return false;
-    }
+impl ScopedSuspend {
+    fn new() -> Self {
+        let mut threads_for_task = std::ptr::null_mut();
+        let mut thread_count = 0;
 
-    let this_thread = mach_thread_self();
-
-    let threads = std::slice::from_raw_parts(threads_for_task, thread_count as usize);
-
-    // suspend all of the threads except for this one
-    for thread in threads {
-        if *thread != this_thread && mach2::thread_act::thread_suspend(*thread) != KERN_SUCCESS {
-            return false;
+        if task::task_threads(mach_task_self(), &mut threads_for_task, &mut thread_count)
+            != KERN_SUCCESS
+        {
+            return Self;
         }
-    }
 
-    true
+        let this_thread = mach_thread_self();
+        let threads = std::slice::from_raw_parts(threads_for_task, thread_count as usize);
+
+        // suspend all of the threads except for this one
+        for thread in threads {
+            if *thread != this_thread {
+                // We try to suspend all threads as a best effort, it's not fatal
+                // if we can't
+                mach2::thread_act::thread_suspend(*thread);
+            }
+        }
+
+        Self
+    }
 }
 
-/// Resumes all threads
-unsafe fn resume_threads() -> bool {
-    let mut threads_for_task = std::ptr::null_mut();
-    let mut thread_count = 0;
+impl Drop for ScopedSuspend {
+    fn drop(&mut self) {
+        let mut threads_for_task = std::ptr::null_mut();
+        let mut thread_count = 0;
 
-    if task::task_threads(mach_task_self(), &mut threads_for_task, &mut thread_count)
-        != KERN_SUCCESS
-    {
-        return false;
+        if task::task_threads(mach_task_self(), &mut threads_for_task, &mut thread_count)
+            != KERN_SUCCESS
+        {
+            return;
+        }
+
+        let this_thread = mach_thread_self();
+        let threads = std::slice::from_raw_parts(threads_for_task, thread_count as usize);
+
+        // resume all of the threads except for this one
+        for thread in threads {
+            if *thread != this_thread {
+                mach2::thread_act::thread_resume(*thread);
+            }
+        }
     }
+}
 
-    let this_thread = mach_thread_self();
-    let threads = std::slice::from_raw_parts(threads_for_task, thread_count as usize);
+/// Determines if the specified exception is non-fatal.
+///
+/// On MacOS, `EXC_RESOURCE` exceptions are thrown when a resource limit (hard or soft)
+/// is hit/exceeded, and importantly for our scenario, are often non-fatal, meaning
+/// we should _not_ notify the user callback that a crash has occurred
+fn is_exception_non_fatal(exc_info: crash_context::ExceptionInfo, task: mt::task_t) -> bool {
+    use crash_context::resource::{self as res, ResourceException as Re};
 
-    // resume all of the threads except for this one
-    for thread in threads {
-        if *thread != this_thread && mach2::thread_act::thread_resume(*thread) != KERN_SUCCESS {
-            return false;
+    match exc_info.get_resource_info() {
+        Some(Re::Cpu(cpu_exc)) => !cpu_exc.is_fatal,
+        Some(Re::Wakeups(wu_exc)) if wu_exc.flavor == res::WakeupsFlavor::Monitor => {
+            // Unlike the other resource exceptions kinds, we need to call into
+            // the task to determine if this exception is actually fatal. Since
+            // it is by default not fatal, failure to retrieve the task's pid
+            // or calling proc_get_wakemon_params will consider the exception
+            // non-fatal
+            let mut pid = 0;
+            // SAFETY: syscall
+            if unsafe { cc::ipc::pid_for_task(task, &mut pid) } != KERN_SUCCESS {
+                return true;
+            }
+
+            // The SDK doesn’t have `proc_get_wakemon_params` to link against,
+            // even with weak import, so we need need to look it up by name
+            // before invoking it
+            // SAFETY: syscalls
+            unsafe {
+                let mut dl_info = std::mem::MaybeUninit::uninit();
+                if libc::dladdr(libc::proc_pidinfo as *const _, dl_info.as_mut_ptr()) == 0 {
+                    // We failed to find the lib that contains proc_pidinfo, which
+                    // is the same lib that contains proc_get_wakemon_params
+                    return true;
+                }
+
+                let dl_info = dl_info.assume_init();
+
+                let dl_handle = libc::dlopen(
+                    dl_info.dli_fname,
+                    libc::RTLD_LAZY | libc::RTLD_LOCAL | libc::RTLD_NOLOAD,
+                );
+                if dl_handle.is_null() {
+                    return true;
+                }
+
+                type ProcGetWakemonParams = unsafe extern "C" fn(
+                    pid: libc::pid_t,
+                    rate_hz: *mut i32,
+                    flags: *mut i32,
+                ) -> i32;
+
+                let proc_get_wakemon_params =
+                    libc::dlsym(dl_handle, b"proc_get_wakemon_params\0".as_ptr().cast());
+                if proc_get_wakemon_params.is_null() {
+                    return true;
+                }
+
+                let mut rate = 0;
+                let mut flags = 0;
+                if proc_get_wakemon_params(pid, &mut rate, &mut flags) < 0 {
+                    return true;
+                }
+
+                // Configure the task so that violations are fatal. <include/sys/resource.h>
+                const WAKEMON_MAKE_FATAL: i32 = 0x10;
+
+                (flags & WAKEMON_MAKE_FATAL) == 0
+            }
+        }
+        Some(Re::Memory(mem_exc)) if mem_exc.flavor == res::MemoryFlavor::HighWatermark => true,
+        Some(Re::Io(_)) => true,
+        Some(Re::Threads(_)) => false,
+        Some(Re::Ports(_)) => false,
+        // non resource exceptions are always fatal
+        None => false,
+        // TODO: print out details on the unknown exception?
+        _ => false,
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crash_context::{resource::*, *};
+
+    #[inline]
+    fn res_exc(kind: ResourceKind, flavor: u8) -> ExceptionInfo {
+        ExceptionInfo {
+            kind: et::EXC_RESOURCE,
+            code: ((kind as u64 & 0x7) << 61) | ((flavor as u64 & 0x7) << 58),
+            subcode: None,
         }
     }
 
-    true
+    /// Ensures that the resource exceptions can be non-fatal and all other
+    /// exceptions we handle are always fatal
+    #[test]
+    fn check_resource_non_fatal() {
+        let task = mach_task_self();
+
+        assert!(is_exception_non_fatal(
+            res_exc(ResourceKind::Cpu, CpuFlavor::Monitor as u8),
+            task
+        ));
+        assert!(!is_exception_non_fatal(
+            res_exc(ResourceKind::Cpu, CpuFlavor::MonitorFatal as u8),
+            task
+        ));
+
+        // This assumes that WAKEMON_MAKE_FATAL is not set for this process. The
+        // default is for WAKEMON_MAKE_FATAL to not be set, there’s no public API to
+        // enable it, and nothing in this process should have enabled it.
+        assert!(is_exception_non_fatal(
+            res_exc(ResourceKind::Wakeups, WakeupsFlavor::Monitor as u8),
+            task
+        ));
+
+        assert!(is_exception_non_fatal(
+            res_exc(ResourceKind::Memory, MemoryFlavor::HighWatermark as u8),
+            task
+        ));
+
+        assert!(!is_exception_non_fatal(
+            ExceptionInfo {
+                kind: et::EXC_CRASH,
+                code: 0xb100001,
+                subcode: None,
+            },
+            task
+        ));
+        assert!(!is_exception_non_fatal(
+            ExceptionInfo {
+                kind: et::EXC_CRASH,
+                code: 0x0b00000,
+                subcode: None,
+            },
+            task
+        ));
+        assert!(!is_exception_non_fatal(
+            ExceptionInfo {
+                kind: et::EXC_CRASH,
+                code: 0x6000000,
+                subcode: None,
+            },
+            task
+        ));
+        assert!(!is_exception_non_fatal(
+            ExceptionInfo {
+                kind: et::EXC_BAD_ACCESS,
+                code: KERN_INVALID_ADDRESS,
+                subcode: None,
+            },
+            task
+        ));
+        assert!(!is_exception_non_fatal(
+            ExceptionInfo {
+                kind: et::EXC_BAD_INSTRUCTION,
+                code: 1,
+                subcode: None,
+            },
+            task
+        ));
+        assert!(!is_exception_non_fatal(
+            ExceptionInfo {
+                kind: et::EXC_ARITHMETIC,
+                code: 1,
+                subcode: None,
+            },
+            task
+        ));
+        assert!(!is_exception_non_fatal(
+            ExceptionInfo {
+                kind: et::EXC_BREAKPOINT,
+                code: 2,
+                subcode: None,
+            },
+            task
+        ));
+        assert!(!is_exception_non_fatal(
+            ExceptionInfo {
+                kind: 0,
+                code: 0,
+                subcode: None,
+            },
+            task
+        ));
+    }
 }
