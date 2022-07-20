@@ -22,7 +22,7 @@ copyleft = "deny"
 allow-osi-fsf-free = "neither"
 default = "deny"
 confidence-threshold = 0.8
-exceptions = [{ allow = ["Unicode-DFS-2016"], name = "unicode-ident" }]
+exceptions = []
 
 # Some crates don't have (easily) machine readable licensing information,
 # adding a clarification entry for it allows you to manually specify the
