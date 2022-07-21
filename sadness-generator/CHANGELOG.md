@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.4.1] - 2022-07-21
 ### Added
 - [PR#47](https://github.com/EmbarkStudios/crash-handling/pull/47) added support for raising `EXC_GUARD` exceptions on MacOS.
 
@@ -41,7 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial pass of crash-context, Linux only
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/sadness-generator-0.4.0...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/sadness-generator-0.4.1...HEAD
+[0.4.1]: https://github.com/EmbarkStudios/crash-handling/compare/sadness-generator-0.4.0...sadness-generator-0.4.1
 [0.4.0]: https://github.com/EmbarkStudios/crash-handling/compare/0.3.1...sadness-generator-0.4.0
 [0.3.1]: https://github.com/EmbarkStudios/crash-handling/compare/0.3.1...0.3.1
 [0.3.0]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-v0.1.0...0.3.0
