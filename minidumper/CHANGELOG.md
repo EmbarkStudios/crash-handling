@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.5.0] - 2022-07-21
 ### Changed
 - [PR#50](https://github.com/EmbarkStudios/crash-handling/pull/50) updated `minidump-writer` to take advantage of improvements in writing macos minidumps.
 
@@ -42,7 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial pass of crash-context, Linux only
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/minidumper-0.4.0...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/minidumper-0.5.0...HEAD
+[0.5.0]: https://github.com/EmbarkStudios/crash-handling/compare/minidumper-0.4.0...minidumper-0.5.0
 [0.4.0]: https://github.com/EmbarkStudios/crash-handling/compare/0.3.1...minidumper-0.4.0
 [0.3.1]: https://github.com/EmbarkStudios/crash-handling/compare/0.3.0...0.3.1
 [0.3.0]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-v0.1.0...0.3.0
