@@ -403,9 +403,8 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
             }
             #[cfg(unix)]
             Signal::Bus => {
-                verify!(CrashReason::MacGeneral(
-                    errors::ExceptionCodeMac::EXC_BAD_ACCESS,
-                    _ // This will be an actual address
+                verify!(CrashReason::MacBadAccessKern(
+                    errors::ExceptionCodeMacBadAccessKernType::KERN_MEMORY_ERROR,
                 ));
             }
             Signal::Fpe => {
@@ -415,28 +414,45 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                 ));
             }
             Signal::Illegal => {
-                verify!(CrashReason::MacGeneral(
-                    errors::ExceptionCodeMac::EXC_BAD_INSTRUCTION,
-                    0
-                ));
+                cfg_if::cfg_if! {
+                    if #[cfg(target_arch = "aarch64")] {
+                        verify!(CrashReason::MacBadInstructionArm(
+                            errors::ExceptionCodeMacBadInstructionArmType::EXC_ARM_UNDEFINED,
+                        ));
+                    } else if #[cfg(target_arch = "x86_64")] {
+                        verify!(CrashReason::MacBadInstructionX86(
+                            errors::ExceptionCodeMacBadInstructionX86Type::EXC_I386_INVOP,
+                        ));
+                    } else {
+                        panic!("this target architecture is not supported on mac");
+                    }
+                }
             }
             Signal::Segv => {
-                verify!(CrashReason::MacGeneral(
-                    errors::ExceptionCodeMac::EXC_BAD_ACCESS,
-                    0
+                verify!(CrashReason::MacBadAccessKern(
+                    errors::ExceptionCodeMacBadAccessKernType::KERN_INVALID_ADDRESS,
                 ));
             }
             Signal::StackOverflow | Signal::StackOverflowCThread => {
-                verify!(CrashReason::MacGeneral(
-                    errors::ExceptionCodeMac::EXC_BAD_ACCESS,
-                    _ // This will be the an actual address
+                verify!(CrashReason::MacBadAccessKern(
+                    errors::ExceptionCodeMacBadAccessKernType::KERN_PROTECTION_FAILURE
                 ));
             }
             Signal::Trap => {
-                verify!(CrashReason::MacGeneral(
-                    errors::ExceptionCodeMac::EXC_BREAKPOINT,
-                    _ // EXC_BREAKPOINT says "details in the code field" but doesn't elaborate what that means and I'm too lazy to look at more mac source code right now
-                ));
+                cfg_if::cfg_if! {
+                    if #[cfg(target_arch = "aarch64")] {
+                        verify!(CrashReason::MacBreakpointArm(
+                            errors::ExceptionCodeMacBreakpointArmType::EXC_ARM_BREAKPOINT,
+                        ));
+                    } else if #[cfg(target_arch = "x86_64")] {
+                        verify!(CrashReason::MacBreakpointX86(
+                            errors::ExceptionCodeMacBreakpointX86Type::EXC_I386_BPT,
+                        ));
+                    } else {
+                        panic!("this target architecture is not supported on mac");
+                    }
+                }
+            }
             }
             #[cfg(windows)]
             Signal::Purecall | Signal::InvalidParameter => {

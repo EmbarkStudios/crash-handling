@@ -140,7 +140,7 @@ impl HandlerInner {
         }
 
         if msg::mach_msg(
-            &mut msg.header,
+            (&mut msg.header) as *mut _,
             msg::MACH_SEND_MSG,
             msg.header.msgh_size,
             0,
@@ -384,11 +384,11 @@ unsafe fn exception_handler(port: mach_port_t, us: UserSignal) {
     let mut request: ExceptionMessage = mem::zeroed();
 
     loop {
-        request.header.msgh_local_port = port;
-        request.header.msgh_size = mem::size_of_val(&request) as _;
+        request.header.local_port = port;
+        request.header.size = mem::size_of_val(&request) as _;
 
         let kret = msg::mach_msg(
-            &mut request.header,
+            ((&mut request.header) as *mut MachMsgHeader).cast(),
             msg::MACH_RCV_MSG | msg::MACH_RCV_LARGE,
             0,
             mem::size_of_val(&request) as u32,
@@ -459,19 +459,17 @@ unsafe fn exception_handler(port: mach_port_t, us: UserSignal) {
                 // 'mig -v /usr/include/mach/mach_exc.defs', or you can look at
                 // https://github.com/doadam/xnu-4570.1.46/blob/2ad7fbf85ff567495a572cd4583961ffd8525083/BUILD/obj/RELEASE_X86_64/osfmk/RELEASE/mach/exc_server.c#L491-L520
                 let mut reply: ExceptionRaiseReply = mem::zeroed();
-                reply.header.msgh_bits = msg::MACH_MSGH_BITS(
-                    request.header.msgh_bits & msg::MACH_MSGH_BITS_REMOTE_MASK,
-                    0,
-                );
-                reply.header.msgh_size = mem::size_of_val(&reply) as u32;
-                reply.header.msgh_remote_port = request.header.msgh_remote_port;
-                reply.header.msgh_local_port = MACH_PORT_NULL;
-                reply.header.msgh_id = request.header.msgh_id + 100;
+                reply.header.bits =
+                    msg::MACH_MSGH_BITS(request.header.bits & msg::MACH_MSGH_BITS_REMOTE_MASK, 0);
+                reply.header.size = mem::size_of_val(&reply) as u32;
+                reply.header.remote_port = request.header.remote_port;
+                reply.header.local_port = MACH_PORT_NULL;
+                reply.header.id = request.header.id + 100;
                 reply.ndr = NDR_record;
                 reply.ret_code = ret_code;
 
                 msg::mach_msg(
-                    &mut reply.header,
+                    ((&mut reply.header) as *mut MachMsgHeader).cast(),
                     msg::MACH_SEND_MSG,
                     mem::size_of_val(&reply) as u32,
                     0,

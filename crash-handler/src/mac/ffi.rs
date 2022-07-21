@@ -28,10 +28,17 @@ pub const EXC_TYPES_COUNT: usize = 14;
 ///
 /// `exception_types.h`
 pub const EXC_SOFT_SIGNAL: u32 = 0x10003;
+
 cfg_if::cfg_if! {
     if #[cfg(any(target_arch = "x86", target_arch = "x86_64"))] {
+        /// <https://github.com/apple-oss-distributions/xnu/blob/e6231be02a03711ca404e5121a151b24afbff733/osfmk/mach/i386/thread_status.h#L112>
+        /// <https://github.com/apple-oss-distributions/xnu/blob/e6231be02a03711ca404e5121a151b24afbff733/osfmk/mach/i386/thread_status.h#L363>
+        pub const MACHINE_THREAD_STATE: ts::thread_state_flavor_t = 7;
         pub const THREAD_STATE_NONE: ts::thread_state_flavor_t = 13;
     } else if #[cfg(any(target_arch = "arm", target_arch = "aarch64"))] {
+        /// <https://github.com/apple-oss-distributions/xnu/blob/e6231be02a03711ca404e5121a151b24afbff733/osfmk/mach/arm/thread_status.h#L52>
+        /// <https://github.com/apple-oss-distributions/xnu/blob/e6231be02a03711ca404e5121a151b24afbff733/osfmk/mach/arm/thread_status.h#L239>
+        pub const MACHINE_THREAD_STATE: ts::thread_state_flavor_t = 1;
         pub const THREAD_STATE_NONE: ts::thread_state_flavor_t = 5;
     }
 }
@@ -53,10 +60,10 @@ cfg_if::cfg_if! {
 
 /// Network Data Representation Record
 ///
-/// ndr.h
+/// <https://github.com/apple-oss-distributions/xnu/blob/e6231be02a03711ca404e5121a151b24afbff733/osfmk/mach/ndr.h#L40-L49>
 #[repr(C)]
-#[derive(Copy, Clone)]
-pub struct NDR_record_t {
+#[derive(Copy, Clone, Debug)]
+pub struct NdrRecord {
     pub mig_vers: u8,
     pub if_vers: u8,
     pub reserved1: u8,
@@ -67,29 +74,69 @@ pub struct NDR_record_t {
     pub reserved2: u8,
 }
 
-/// These structures and techniques are illustrated in Mac OS X Internals, Amit Singh, ch 9.7
-#[repr(C)]
+/// <https://github.com/apple-oss-distributions/xnu/blob/e6231be02a03711ca404e5121a151b24afbff733/osfmk/mach/message.h#L379-L391>
+#[repr(C, packed(4))]
+#[derive(Debug)]
+pub struct MachMsgPortDescriptor {
+    pub name: u32,
+    __pad1: u32,
+    __pad2: u16,
+    __disposition: u8,
+    __type: u8,
+}
+
+#[repr(C, packed(4))]
+#[derive(Debug)]
+pub struct MachMsgBody {
+    pub descriptor_count: u32,
+}
+
+/// <https://github.com/apple-oss-distributions/xnu/blob/e6231be02a03711ca404e5121a151b24afbff733/osfmk/mach/message.h#L545-L552>
+#[repr(C, packed(4))]
+#[derive(Debug)]
+pub struct MachMsgHeader {
+    pub bits: u32,
+    pub size: u32,
+    pub remote_port: u32,
+    pub local_port: u32,
+    pub voucher_port: u32,
+    pub id: u32,
+}
+
+/// https://github.com/apple-oss-distributions/xnu/blob/e6231be02a03711ca404e5121a151b24afbff733/osfmk/mach/message.h#L585-L588
+#[repr(C, packed(4))]
+#[derive(Debug)]
+pub struct MachMsgTrailer {
+    pub kind: u32,
+    pub size: u32,
+}
+
+/// This structure can be obtained by running `mig <path to OSX SDK>/usr/include/mach_exc.defs`
+#[repr(C, packed(4))]
+#[derive(Debug)]
 pub struct ExceptionMessage {
-    pub header: msg::mach_msg_header_t,
-    pub body: msg::mach_msg_body_t,
-    pub thread: msg::mach_msg_port_descriptor_t,
-    pub task: msg::mach_msg_port_descriptor_t,
-    pub ndr: NDR_record_t,
-    pub exception: et::exception_type_t,
-    pub code_count: msg::mach_msg_type_number_t,
-    pub code: [i64; 2],
-    pub padding: [u8; 512],
+    pub header: MachMsgHeader,
+    /* start of the kernel processed data */
+    pub body: MachMsgBody,
+    pub thread: MachMsgPortDescriptor,
+    pub task: MachMsgPortDescriptor,
+    /* end of the kernel processed data */
+    _ndr: NdrRecord,
+    pub exception: u32,
+    pub code_count: u32,
+    pub code: [u64; 2],
+    _trailer: MachMsgTrailer,
 }
 
 /// Whenever MIG detects an error, it sends back a generic `mig_reply_error_t`
 /// format message.  Clients must accept these in addition to the expected reply
 /// message format.
 ///
-/// `mig_errors.h`
-#[repr(C)]
+/// This structure can be obtained by running `mig <path to OSX SDK>/usr/include/mach_exc.defs`
+#[repr(C, packed(4))]
 pub struct ExceptionRaiseReply {
-    pub header: msg::mach_msg_header_t,
-    pub ndr: NDR_record_t,
+    pub header: MachMsgHeader,
+    pub ndr: NdrRecord,
     pub ret_code: kern_return_t,
 }
 
@@ -131,5 +178,5 @@ extern "C" {
     /// The host? NDR
     ///
     /// <arch>/ndr_def.h
-    pub static NDR_record: NDR_record_t;
+    pub static NDR_record: NdrRecord;
 }
