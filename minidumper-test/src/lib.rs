@@ -475,14 +475,14 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                     // We've tried an operation on a guarded file descriptor
                     assert_eq!(kind, errors::ExceptionCodeMacGuardType::GUARD_TYPE_FD);
                     // The guard identifier used when opening the file
-                    assert_eq!(guard_id, 0x1234567890abcdef);
+                    assert_eq!(guard_id, sadness_generator::GUARD_ID);
 
                     // +-------------------+----------------+--------------+
                     // |[63:61] guard type | [60:32] flavor | [31:0] target|
                     // +-------------------+----------------+--------------+
                     assert_eq!(
                         errors::ExceptionCodeMacGuardType::GUARD_TYPE_FD as u8,
-                        ((dbg!(code) >> 61) & 0x7) as u8
+                        ((code >> 61) & 0x7) as u8
                     );
                     assert_eq!(1 /* GUARD_CLOSE */, ((code >> 32) & 0x1fffffff) as u32);
                     // The target is just the file descriptor itself which is kind of pointless
