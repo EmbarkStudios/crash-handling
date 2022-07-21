@@ -225,15 +225,18 @@ pub(super) fn attach(crash_event: Box<dyn crate::CrashEvent>) -> Result<(), Erro
         let mut flavors = [0; EXC_TYPES_COUNT];
 
         let behavior =
-            // The apple source doesn't really say anything useful, but this flag
-            // is basically used to say...we actually want to catch exceptions
+            // Send a catch_exception_raise message including the identity.
             et::EXCEPTION_DEFAULT |
             // Send 64-bit code and subcode in the exception header.
             //
             // Without this flag the code and subcode in the exception will be
-            // 32-bits, which for exceptions such as EXC_BAD_ACCESS where, in
-            // particular, the subcode can contain addresses, they will be
-            // truncated, giving us essentially useless information
+            // 32-bits, losing information for several types of exception
+            // * `EXC_BAD_ACCESS` - the address of the bad access is stored in the subcode
+            // * `EXC_RESOURCE` - the details of the resource exception are stored
+            // using the full 64-bits of the code
+            // * `EXC_GUARD` - the details of the guard exception are stored
+            // in the full 64-bits of the code, and the full 64-bits of the subcode
+            // _can_ be used depending on the guard type
             et::MACH_EXCEPTION_CODES;
 
         // Swap the exception ports so that we use our own
