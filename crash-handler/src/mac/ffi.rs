@@ -62,7 +62,7 @@ cfg_if::cfg_if! {
 ///
 /// <https://github.com/apple-oss-distributions/xnu/blob/e6231be02a03711ca404e5121a151b24afbff733/osfmk/mach/ndr.h#L40-L49>
 #[repr(C)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub struct NdrRecord {
     pub mig_vers: u8,
     pub if_vers: u8,
@@ -76,7 +76,6 @@ pub struct NdrRecord {
 
 /// <https://github.com/apple-oss-distributions/xnu/blob/e6231be02a03711ca404e5121a151b24afbff733/osfmk/mach/message.h#L379-L391>
 #[repr(C, packed(4))]
-#[derive(Debug)]
 pub struct MachMsgPortDescriptor {
     pub name: u32,
     __pad1: u32,
@@ -86,14 +85,12 @@ pub struct MachMsgPortDescriptor {
 }
 
 #[repr(C, packed(4))]
-#[derive(Debug)]
 pub struct MachMsgBody {
     pub descriptor_count: u32,
 }
 
 /// <https://github.com/apple-oss-distributions/xnu/blob/e6231be02a03711ca404e5121a151b24afbff733/osfmk/mach/message.h#L545-L552>
 #[repr(C, packed(4))]
-#[derive(Debug)]
 pub struct MachMsgHeader {
     pub bits: u32,
     pub size: u32,
@@ -105,7 +102,6 @@ pub struct MachMsgHeader {
 
 /// https://github.com/apple-oss-distributions/xnu/blob/e6231be02a03711ca404e5121a151b24afbff733/osfmk/mach/message.h#L585-L588
 #[repr(C, packed(4))]
-#[derive(Debug)]
 pub struct MachMsgTrailer {
     pub kind: u32,
     pub size: u32,
@@ -113,7 +109,6 @@ pub struct MachMsgTrailer {
 
 /// This structure can be obtained by running `mig <path to OSX SDK>/usr/include/mach_exc.defs`
 #[repr(C, packed(4))]
-#[derive(Debug)]
 pub struct ExceptionMessage {
     pub header: MachMsgHeader,
     /* start of the kernel processed data */
