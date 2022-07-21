@@ -10,11 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
 ### Added
-- [PR#47](https://github.com/EmbarkStudios/crash-handling/pull/47) added support for raising `EXC_GUARD` exceptions on MacOS.
+- [PR#46](https://github.com/EmbarkStudios/crash-handling/pull/46) added support for unpacking `EXC_RESOURCE` exceptions on MacOS.
+- [PR#47](https://github.com/EmbarkStudios/crash-handling/pull/47) added support for unpacking `EXC_GUARD` exceptions on MacOS.
 
-## [0.4.0] - 2022-07-19
 ### Changed
-- [PR#39](https://github.com/EmbarkStudios/crash-handling/pull/39) resolved [#24](https://github.com/EmbarkStudios/crash-handling/issues/24) and [#37](https://github.com/EmbarkStudios/crash-handling/issues/37) by changing stack overflow to use recursion instead of a single large stack allocated buffer, and changed all crash functions to be `-> !`.
+- [PR#47](https://github.com/EmbarkStudios/crash-handling/pull/47) changed `ExceptionInfo` to use unsigned types for all of its fields. While these are declared as signed, in practice all usage of them is as unsigned integers.
+
+### Fixed
+- [PR#47](https://github.com/EmbarkStudios/crash-handling/pull/47) fixed a potential issue with the IPC exception passing due to the structure's not being `#[repr(C, packed(4))]`, and the receiving side not (properly) accounting for the trailer that is added by the kernel to every mach msg.
 
 ## [0.3.1] - 2022-05-25
 ### Changed
@@ -41,9 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial pass of crash-context, Linux only
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/sadness-generator-0.4.0...HEAD
-[0.4.0]: https://github.com/EmbarkStudios/crash-handling/compare/0.3.1...sadness-generator-0.4.0
-[0.3.1]: https://github.com/EmbarkStudios/crash-handling/compare/0.3.1...0.3.1
+[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/0.3.1...HEAD
+[0.3.1]: https://github.com/EmbarkStudios/crash-handling/compare/0.3.0...0.3.1
 [0.3.0]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-v0.1.0...0.3.0
 [crash-handler-v0.1.0]: https://github.com/EmbarkStudios/crash-handling/releases/tag/crash-handler-v0.1.0
 [sadness-generator-v0.1.0]: https://github.com/EmbarkStudios/crash-handling/releases/tag/sadness-generator-v0.1.0
