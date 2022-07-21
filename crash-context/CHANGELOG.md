@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.4.0] - 2022-07-21
 ### Added
 - [PR#46](https://github.com/EmbarkStudios/crash-handling/pull/46) added support for unpacking `EXC_RESOURCE` exceptions on MacOS.
 - [PR#47](https://github.com/EmbarkStudios/crash-handling/pull/47) added support for unpacking `EXC_GUARD` exceptions on MacOS.
@@ -44,7 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial pass of crash-context, Linux only
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/0.3.1...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/crash-context-0.4.0...HEAD
+[0.4.0]: https://github.com/EmbarkStudios/crash-handling/compare/0.3.1...crash-context-0.4.0
 [0.3.1]: https://github.com/EmbarkStudios/crash-handling/compare/0.3.0...0.3.1
 [0.3.0]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-v0.1.0...0.3.0
 [crash-handler-v0.1.0]: https://github.com/EmbarkStudios/crash-handling/releases/tag/crash-handler-v0.1.0
