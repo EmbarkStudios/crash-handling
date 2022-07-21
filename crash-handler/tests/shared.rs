@@ -46,7 +46,15 @@ pub fn handles_crash(flavor: SadnessFlavor) {
                             }
                             SadnessFlavor::Bus
                             | SadnessFlavor::Segfault
-                            | SadnessFlavor::StackOverflow { .. } => ExceptionType::BadAccess,
+                            | SadnessFlavor::StackOverflow { .. } => {
+                                if flavor == SadnessFlavor::Segfault {
+                                    // For EXC_BAD_ACCESS exceptions, the subcode will be the
+                                    // bad address we tried to access
+                                    assert_eq!(cc.exception.unwrap().subcode.unwrap(), sadness_generator::SEGFAULT_ADDRESS as _);
+                                }
+
+                                ExceptionType::BadAccess
+                            },
                             SadnessFlavor::DivideByZero => ExceptionType::Arithmetic,
                             SadnessFlavor::Illegal => ExceptionType::BadInstruction,
                             SadnessFlavor::Trap => ExceptionType::Breakpoint,

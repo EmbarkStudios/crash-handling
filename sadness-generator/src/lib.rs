@@ -6,7 +6,7 @@
 use std::arch::asm;
 
 /// How you would like your sadness.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum SadnessFlavor {
     /// `SIGABRT` on Unix.
     ///
@@ -115,13 +115,21 @@ pub unsafe fn raise_abort() -> ! {
     std::process::abort()
 }
 
+/// This is the fixed address used to generate a segfault. It's possible that
+/// this address can be mapped and writable by the your process in which case a
+/// crash may not occur
+#[cfg(target_pointer_width = "64")]
+pub const SEGFAULT_ADDRESS: u64 = u64::MAX - ((u32::MAX >> 1) as u64) + 0x42;
+#[cfg(target_pointer_width = "32")]
+pub const SEGFAULT_ADDRESS: u32 = 0x42;
+
 /// [`SadnessFlavor::Segfault`]
 ///
 /// # Safety
 ///
 /// This is not safe. It intentionally crashes.
 pub unsafe fn raise_segfault() -> ! {
-    let bad_ptr: *mut u8 = 0x42 as _;
+    let bad_ptr: *mut u8 = SEGFAULT_ADDRESS as _;
     std::ptr::write_volatile(bad_ptr, 1);
 
     // If we actually get here that means the address is mapped and writable

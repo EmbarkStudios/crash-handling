@@ -432,6 +432,8 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                 verify!(CrashReason::MacBadAccessKern(
                     errors::ExceptionCodeMacBadAccessKernType::KERN_INVALID_ADDRESS,
                 ));
+
+                assert_eq!(crash_address, sadness_generator::SEGFAULT_ADDRESS as _);
             }
             Signal::StackOverflow | Signal::StackOverflowCThread => {
                 verify!(CrashReason::MacBadAccessKern(
