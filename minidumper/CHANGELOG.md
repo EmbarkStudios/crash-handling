@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#50](https://github.com/EmbarkStudios/crash-handling/pull/50) updated `minidump-writer` to take advantage of improvements in writing macos minidumps.
+
 ## [0.4.0] - 2022-07-19
 ### Changed
 - [PR#41](https://github.com/EmbarkStudios/crash-handling/pull/41) added support for detecting stale client connections for cases where the OS might not efficiently close the client end of the connection so that the server notices and removes the client from the event loop.

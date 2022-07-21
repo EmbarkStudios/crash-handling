@@ -419,10 +419,20 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                 ));
             }
             Signal::Fpe => {
-                verify!(CrashReason::MacGeneral(
-                    errors::ExceptionCodeMac::EXC_ARITHMETIC,
-                    0
-                ));
+                cfg_if::cfg_if! {
+                    if #[cfg(target_arch = "aarch64")] {
+                        verify!(CrashReason::MacGeneral(
+                            errors::ExceptionCodeMac::EXC_ARITHMETIC,
+                            0
+                        ));
+                    } else if #[cfg(target_arch = "x86_64")] {
+                        verify!(CrashReason::MacArithmeticX86(
+                            errors::ExceptionCodeMacArithmeticX86Type::EXC_I386_DIV,
+                        ));
+                    } else {
+                        panic!("this target architecture is not supported on mac");
+                    }
+                }
             }
             Signal::Illegal => {
                 cfg_if::cfg_if! {
