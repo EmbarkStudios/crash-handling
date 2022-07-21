@@ -41,3 +41,6 @@ skip-tree = []
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-git = []
+
+[sources.allow-org]
+github = ["rust-minidump"]
