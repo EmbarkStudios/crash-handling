@@ -3,7 +3,7 @@ use crate::CrashEventResult;
 use crate::Error;
 use std::mem;
 
-#[repr(i32)]
+#[repr(u32)]
 enum MessageIds {
     /// Message ID telling the handler thread to signal a crash w/optional exception information
     SignalCrash = 0,
@@ -11,16 +11,18 @@ enum MessageIds {
     Shutdown = 2,
     /// Taken from mach_exc in /usr/include/mach/exc.defs.
     Exception = 2405,
+    ExceptionStateIdentity = 2407,
 }
 
-impl TryFrom<i32> for MessageIds {
-    type Error = i32;
+impl TryFrom<u32> for MessageIds {
+    type Error = u32;
 
-    fn try_from(val: i32) -> Result<Self, Self::Error> {
+    fn try_from(val: u32) -> Result<Self, Self::Error> {
         Ok(match val {
             0 => Self::SignalCrash,
             2 => Self::Shutdown,
             2405 => Self::Exception,
+            2407 => Self::ExceptionStateIdentity,
             unknown => return Err(unknown),
         })
     }
@@ -306,9 +308,9 @@ struct UserException {
     body: msg::mach_msg_body_t,
     crash_thread: msg::mach_msg_port_descriptor_t,
     flags: u32,
-    exception_kind: i32,
-    exception_code: i64,
-    exception_subcode: i64,
+    exception_kind: u32,
+    exception_code: u64,
+    exception_subcode: u64,
 }
 
 const FLAG_HAS_EXCEPTION: u32 = 0x1;
@@ -400,8 +402,8 @@ unsafe fn exception_handler(port: mach_port_t, us: UserSignal) {
             libc::abort();
         }
 
-        match MessageIds::try_from(request.header.msgh_id) {
-            Ok(MessageIds::Exception) => {
+        match MessageIds::try_from(request.header.id) {
+            Ok(MessageIds::Exception | MessageIds::ExceptionStateIdentity) => {
                 // When forking a child process with the exception handler installed,
                 // if the child crashes, it will send the exception back to the parent
                 // process.  The check for task == self_task() ensures that only
@@ -413,9 +415,7 @@ unsafe fn exception_handler(port: mach_port_t, us: UserSignal) {
                 let ret_code = if request.task.name == mach_task_self() {
                     let _ss = ScopedSuspend::new();
 
-                    let subcode = (request.exception == et::EXC_BAD_ACCESS as i32 // 1
-                        && request.code_count > 1)
-                        .then(|| request.code[1]);
+                    let subcode = (request.code_count > 1).then(|| request.code[1]);
 
                     let exc_info = crash_context::ExceptionInfo {
                         kind: request.exception,
@@ -682,7 +682,7 @@ mod test {
     fn res_exc(kind: ResourceKind, flavor: u8) -> ExceptionInfo {
         ExceptionInfo {
             kind: et::EXC_RESOURCE as _,
-            code: (((kind as u64 & 0x7) << 61) | ((flavor as u64 & 0x7) << 58)) as i64,
+            code: (((kind as u64 & 0x7) << 61) | ((flavor as u64 & 0x7) << 58)),
             subcode: None,
         }
     }

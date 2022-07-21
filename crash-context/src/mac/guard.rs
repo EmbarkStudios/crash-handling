@@ -29,17 +29,17 @@ pub enum GuardKind {
 }
 
 #[inline]
-pub fn extract_guard_kind(code: i64) -> u8 {
+pub fn extract_guard_kind(code: u64) -> u8 {
     ((code >> 61) & 0x7) as u8
 }
 
 #[inline]
-pub fn extract_guard_flavor(code: i64) -> u32 {
+pub fn extract_guard_flavor(code: u64) -> u32 {
     ((code >> 32) & 0x1fffffff) as u32
 }
 
 #[inline]
-pub fn extract_guard_target(code: i64) -> u32 {
+pub fn extract_guard_target(code: u64) -> u32 {
     code as u32
 }
 
@@ -67,12 +67,12 @@ pub struct GuardException {
 /// |[63:0] guard identifier                            |
 /// +---------------------------------------------------+
 #[inline]
-pub fn extract_guard_exception(code: i64, subcode: i64) -> GuardException {
-    GuardDetails {
+pub fn extract_guard_exception(code: u64, subcode: u64) -> GuardException {
+    GuardException {
         kind: extract_guard_kind(code),
         flavor: extract_guard_flavor(code),
         target: extract_guard_target(code),
-        identifier: subcode as u64,
+        identifier: subcode,
     }
 }
 
@@ -80,7 +80,7 @@ impl super::ExceptionInfo {
     /// If this is an `EXC_GUARD` exception, retrieves the exception metadata
     /// from the code, otherwise returns `None`
     pub fn guard_exception(&self) -> Option<GuardException> {
-        if self.kind as u32 != EXC_GUARD {
+        if self.kind != EXC_GUARD {
             return None;
         }
 
@@ -90,61 +90,3 @@ impl super::ExceptionInfo {
         ))
     }
 }
-
-// /// Mach port guard flavors
-// ///
-// /// [Kernel source](https://github.com/apple-oss-distributions/xnu/blob/e6231be02a03711ca404e5121a151b24afbff733/osfmk/mach/port.h#L469-L496)
-// #[derive(Copy, Clone, PartialEq, Debug)]
-// #[repr(u32)]
-// pub enum MachPortFlavors {
-//     // Fatal guards
-//     Destroy = 1 << 0,
-//     ModRefs = 1 << 1,
-//     SetContext = 1 << 2,
-//     Unguarded = 1 << 3,
-//     IncorrectGuard = 1 << 4,
-//     Immovable = 1 << 5,
-//     StrictReply = 1 << 6,
-//     MsgFiltered = 1 << 7,
-
-//     // Optionally fatal guards
-//     InvalidRight = 1 << 8,
-//     InvalidName = 1 << 9,
-//     InvalidValue = 1 << 10,
-//     InvalidArgument = 1 << 11,
-//     RightExists = 1 << 12,
-//     KernNoSpace = 1 << 13,
-//     KernFailure = 1 << 14,
-//     KernResource = 1 << 15,
-//     SendInvalidReply = 1 << 16,
-//     SendInvalidVoucher = 1 << 17,
-//     SendInvalidRight = 1 << 18,
-//     ReceiveInvalidName = 1 << 19,
-
-//     // Non-fatal guards
-//     ReceiveGuardedDesc = 1 << 20,
-//     ModRefsNonFatal = 1 << 1,
-// }
-
-// /// Mach port guards can be either always, never, or optionally fatal
-// #[derive(Copy, Clone PartialEq, Debug)]
-// pub enum Fatal {
-//     Yes,
-//     No,
-//     Optional,
-// }
-
-// impl MachPortFlavors {
-//     /// Retrieves whether the exception is fatal or not
-//     pub fn fatal(self) -> Fatal {
-//         if self as u32 <= Self::MsgFiltered as u32 {
-//             Fatal::Yes
-//         } else if self as u32 >= Self::ReceiveGuardedDesc as u32 {
-//             Fatal::No
-//         } else {
-//             Fatal::Optional
-//         }
-//     }
-// }
-
-// pub struct MachPortException {}

@@ -40,7 +40,7 @@ pub fn handles_crash(flavor: SadnessFlavor) {
                         let expected = match flavor {
                             SadnessFlavor::Abort => {
                                 assert_eq!(exc.code, 0x10003); // EXC_SOFT_SIGNAL
-                                assert_eq!(exc.subcode.unwrap(), libc::SIGABRT as i64);
+                                assert_eq!(exc.subcode.unwrap(), libc::SIGABRT as _);
 
                                 ExceptionType::Software
                             }

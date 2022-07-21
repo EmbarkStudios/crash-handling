@@ -46,8 +46,8 @@ unsafe extern "C" fn signal_handler(
     assert_eq!(signal, libc::SIGABRT);
 
     super::state::simulate_exception(Some(crash_context::ExceptionInfo {
-        kind: ffi::et::EXC_SOFTWARE as i32, // 5
-        code: ffi::EXC_SOFT_SIGNAL as _,    // Unix signal
+        kind: ffi::et::EXC_SOFTWARE,
+        code: ffi::EXC_SOFT_SIGNAL as u64, // Unix signal
         subcode: Some(signal as _),
     }));
 }
