@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Added
+- [PR#46](https://github.com/EmbarkStudios/crash-handling/pull/46) resolved [#33](https://github.com/EmbarkStudios/crash-handling/issues/33) by adding support for `EXC_RESOURCE` exceptions. Since not all resource exceptions are fatal, they are checked and only reported to the user callback if they are indeed fatal.
+- [PR#47](https://github.com/EmbarkStudios/crash-handling/pull/47) resolved [#34](https://github.com/EmbarkStudios/crash-handling/issues/34) by adding support for `EXC_GUARD` exceptions.
+
 ## [0.3.2] - 2022-07-19
 ### Fixed
 - [PR#38](https://github.com/EmbarkStudios/crash-handling/pull/38) resolved [#31](https://github.com/EmbarkStudios/crash-handling/issues/31) and [#35](https://github.com/EmbarkStudios/crash-handling/issues/35) by adding support for 64-bit codes in the mach exception information, as well as now handling `EXC_CRASH` exceptions.
