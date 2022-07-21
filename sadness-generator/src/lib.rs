@@ -428,8 +428,6 @@ pub unsafe fn raise_guard_exception() -> ! {
     const GUARD_SOCKET_IPC: u32 = 1 << 2;
     /// Forbid creating a fileport from a guarded fd
     const GUARD_FILEPORT: u32 = 1 << 3;
-    /// Forbid writes on a guarded fd
-    const GUARD_WRITE: u32 = 1 << 4;
 
     let fd = guarded_open_np(
         b"/tmp/sadness-generator-guard.txt\0".as_ptr(),
