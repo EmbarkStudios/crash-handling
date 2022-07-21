@@ -58,9 +58,10 @@ pub fn handles_crash(flavor: SadnessFlavor) {
                             SadnessFlavor::DivideByZero => ExceptionType::Arithmetic,
                             SadnessFlavor::Illegal => ExceptionType::BadInstruction,
                             SadnessFlavor::Trap => ExceptionType::Breakpoint,
+                            SadnessFlavor::Guard => ExceptionType::Guard,
                         };
 
-                        assert_eq!(exc.kind, expected as i32);
+                        assert_eq!(exc.kind, expected as _);
                     } else if #[cfg(target_os = "windows")] {
                         use ch::ExceptionCode;
 

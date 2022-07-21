@@ -392,6 +392,11 @@ pub unsafe fn raise_invalid_parameter() -> ! {
     std::process::abort()
 }
 
+/// The identifier used when guarding the file resource when raising
+/// an `EXC_GUARD` exception via [`raise_guard_exception`]
+#[cfg(target_os = "macos")]
+pub const GUARD_ID: u64 = 0x1234567890abcdef;
+
 /// [`SadnessFlavor::Guard`]
 ///
 /// # Safety
@@ -410,17 +415,15 @@ pub unsafe fn raise_guard_exception() -> ! {
         ) -> i32;
     }
 
-    const GUARD_ID: u64 = 0x1234567890abcdef;
-
     // https://github.com/apple-oss-distributions/xnu/blob/e7776783b89a353188416a9a346c6cdb4928faad/bsd/sys/guarded.h#L67-L97
 
-    /// Forbid close(2), and the implicit close() that a dup2(2) may do.
+    /// Forbid `close(2)`, and the implicit `close()` that a `dup2(2)` may do.
     /// Forces close-on-fork to be set immutably too.
     const GUARD_CLOSE: u32 = 1 << 0;
-    /// Forbid dup(2), dup2(2), and fcntl(2) subcodes F_DUPFD, F_DUPFD_CLOEXEC
-    /// on a guarded fd. Also forbids open's of a guarded fd via /dev/fd/
+    /// Forbid `dup(2)`, `dup2(2)`, and `fcntl(2)` subcodes `F_DUPFD`, `F_DUPFD_CLOEXEC`
+    /// on a guarded fd. Also forbids open's of a guarded fd via `/dev/fd/`
     /// (an implicit dup.)
-    const GUARD_DUPE: u32 = 1 << 1;
+    const GUARD_DUP: u32 = 1 << 1;
     /// Forbid sending a guarded fd via a socket
     const GUARD_SOCKET_IPC: u32 = 1 << 2;
     /// Forbid creating a fileport from a guarded fd

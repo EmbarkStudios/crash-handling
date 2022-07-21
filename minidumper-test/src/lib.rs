@@ -292,6 +292,7 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
     let native_cpu = get_native_cpu();
 
     let crash_reason = exc.get_crash_reason(native_os, native_cpu);
+    let crash_address = exc.get_crash_address(native_os, native_cpu);
 
     macro_rules! verify {
         ($expected:pat) => {
@@ -352,6 +353,10 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
             Signal::Purecall | Signal::InvalidParameter => {
                 unreachable!("windows only");
             }
+            #[cfg(target_os = "macos")]
+            Signal::Guard => {
+                unreachable!("macos only");
+            }
         },
         Os::Windows => match signal {
             Signal::Fpe => {
@@ -368,6 +373,8 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                 verify!(CrashReason::WindowsAccessViolation(
                     errors::ExceptionCodeWindowsAccessType::WRITE
                 ));
+
+                assert_eq!(crash_address, sadness_generator::SEGFAULT_ADDRESS as _);
             }
             Signal::StackOverflow | Signal::StackOverflowCThread => {
                 verify!(CrashReason::WindowsGeneral(
@@ -390,6 +397,10 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
             #[cfg(unix)]
             Signal::Bus | Signal::Abort => {
                 unreachable!();
+            }
+            #[cfg(target_os = "macos")]
+            Signal::Guard => {
+                unreachable!("macos only");
             }
         },
         #[allow(clippy::match_same_arms)]
@@ -455,6 +466,29 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                     }
                 }
             }
+            #[cfg(target_os = "macos")]
+            Signal::Guard => {
+                // Unfortunately the exception code which contains the details
+                // on the EXC_GUARD exception is bit packed, so we just manually
+                // verify this one
+                if let CrashReason::MacGuard(kind, code, guard_id) = crash_reason {
+                    // We've tried an operation on a guarded file descriptor
+                    assert_eq!(kind, errors::ExceptionCodeMacGuardType::GUARD_TYPE_FD);
+                    // The guard identifier used when opening the file
+                    assert_eq!(guard_id, 0x1234567890abcdef);
+
+                    // +-------------------+----------------+--------------+
+                    // |[63:61] guard type | [60:32] flavor | [31:0] target|
+                    // +-------------------+----------------+--------------+
+                    assert_eq!(
+                        errors::ExceptionCodeMacGuardType::GUARD_TYPE_FD as u8,
+                        ((dbg!(code) >> 61) & 0x7) as u8
+                    );
+                    assert_eq!(1 /* GUARD_CLOSE */, ((code >> 32) & 0x1fffffff) as u32);
+                    // The target is just the file descriptor itself which is kind of pointless
+                } else {
+                    panic!("expected MacGuard crash, crash reason: {:?}", crash_reason);
+                }
             }
             #[cfg(windows)]
             Signal::Purecall | Signal::InvalidParameter => {
