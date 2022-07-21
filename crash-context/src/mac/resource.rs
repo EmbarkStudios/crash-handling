@@ -1,7 +1,7 @@
 //! Contains types and helpers for dealing with `EXC_RESOURCE` exceptions.
 //!
 //! `EXC_RESOURCE` exceptions embed details about the resource and the limits
-//! it exceeded within the `code` and, in some cases, `subcode` fields of the exception
+//! it exceeded within the `code` and, in some cases `subcode`, fields of the exception
 //!
 //! See <https://github.com/apple-oss-distributions/xnu/blob/e6231be02a03711ca404e5121a151b24afbff733/osfmk/kern/exc_resource.h>
 //! for the various constants and decoding of exception information wrapped in
@@ -40,9 +40,9 @@ pub enum Flavor<T: Copy + Clone + std::fmt::Debug> {
     Unknown(u8),
 }
 
-impl<T: TryFrom<u8> + Copy + Clone + std::fmt::Debug> From<i64> for Flavor<T> {
+impl<T: TryFrom<u8> + Copy + Clone + std::fmt::Debug> From<u64> for Flavor<T> {
     #[inline]
-    fn from(code: i64) -> Self {
+    fn from(code: u64) -> Self {
         let flavor = resource_exc_flavor(code);
         if let Ok(known) = T::try_from(flavor) {
             Self::Known(known)
@@ -63,21 +63,21 @@ impl<T: PartialEq + Copy + Clone + std::fmt::Debug> PartialEq<T> for Flavor<T> {
 
 /// Retrieves the resource exception kind from an exception code
 #[inline]
-pub fn resource_exc_kind(code: i64) -> u8 {
+pub fn resource_exc_kind(code: u64) -> u8 {
     ((code >> 61) & 0x7) as u8
 }
 
 /// Retrieves the resource exception flavor from an exception code
 #[inline]
-pub fn resource_exc_flavor(code: i64) -> u8 {
+pub fn resource_exc_flavor(code: u64) -> u8 {
     ((code >> 58) & 0x7) as u8
 }
 
 impl super::ExceptionInfo {
     /// If this is an `EXC_RESOURCE` exception, retrieves the exception metadata
     /// from the code, otherwise returns `None`
-    pub fn get_resource_info(&self) -> Option<ResourceException> {
-        if self.kind as u32 != EXC_RESOURCE {
+    pub fn resource_exception(&self) -> Option<ResourceException> {
+        if self.kind != EXC_RESOURCE {
             return None;
         }
 
@@ -181,7 +181,7 @@ impl CpuResourceException {
      *
      */
     #[inline]
-    pub fn from_exc_info(code: i64, subcode: Option<i64>) -> Self {
+    pub fn from_exc_info(code: u64, subcode: Option<u64>) -> Self {
         debug_assert_eq!(resource_exc_kind(code), ResourceKind::Cpu as u8);
 
         let flavor = Flavor::from(code);
@@ -256,7 +256,7 @@ impl WakeupsResourceException {
      *
      */
     #[inline]
-    pub fn from_exc_info(code: i64, subcode: Option<i64>) -> Self {
+    pub fn from_exc_info(code: u64, subcode: Option<u64>) -> Self {
         debug_assert_eq!(resource_exc_kind(code), ResourceKind::Wakeups as u8);
 
         let flavor = Flavor::from(code);
@@ -323,7 +323,7 @@ impl MemoryResourceException {
      *
      */
     #[inline]
-    pub fn from_exc_info(code: i64) -> Self {
+    pub fn from_exc_info(code: u64) -> Self {
         debug_assert_eq!(resource_exc_kind(code), ResourceKind::Memory as u8);
 
         let flavor = Flavor::from(code);
@@ -384,7 +384,7 @@ impl IoResourceException {
      *
      */
     #[inline]
-    pub fn from_exc_info(code: i64, subcode: Option<i64>) -> Self {
+    pub fn from_exc_info(code: u64, subcode: Option<u64>) -> Self {
         debug_assert_eq!(resource_exc_kind(code), ResourceKind::Io as u8);
 
         let flavor = Flavor::from(code);
@@ -447,7 +447,7 @@ impl ThreadsResourceException {
      *
      */
     #[inline]
-    pub fn from_exc_info(code: i64) -> Self {
+    pub fn from_exc_info(code: u64) -> Self {
         debug_assert_eq!(resource_exc_kind(code), ResourceKind::Threads as u8);
 
         let flavor = Flavor::from(code);
@@ -505,7 +505,7 @@ impl PortsResourceException {
      *
      */
     #[inline]
-    pub fn from_exc_info(code: i64) -> Self {
+    pub fn from_exc_info(code: u64) -> Self {
         debug_assert_eq!(resource_exc_kind(code), ResourceKind::Ports as u8);
 
         let flavor = Flavor::from(code);

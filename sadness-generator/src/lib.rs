@@ -6,7 +6,7 @@
 use std::arch::asm;
 
 /// How you would like your sadness.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum SadnessFlavor {
     /// `SIGABRT` on Unix.
     ///
@@ -55,6 +55,10 @@ pub enum SadnessFlavor {
     /// exception
     #[cfg(windows)]
     InvalidParameter,
+    /// Raises an `EXC_GUARD` exception on Macos by placing a guard on a
+    /// file descriptor then attempting to perform the operation that was guarded
+    #[cfg(target_os = "macos")]
+    Guard,
 }
 
 impl SadnessFlavor {
@@ -95,6 +99,8 @@ impl SadnessFlavor {
             Self::Purecall => raise_purecall(),
             #[cfg(windows)]
             Self::InvalidParameter => raise_invalid_parameter(),
+            #[cfg(target_os = "macos")]
+            Self::Guard => raise_guard_exception(),
         }
     }
 }
@@ -109,13 +115,21 @@ pub unsafe fn raise_abort() -> ! {
     std::process::abort()
 }
 
+/// This is the fixed address used to generate a segfault. It's possible that
+/// this address can be mapped and writable by the your process in which case a
+/// crash may not occur
+#[cfg(target_pointer_width = "64")]
+pub const SEGFAULT_ADDRESS: u64 = u64::MAX - ((u32::MAX >> 1) as u64) + 0x42;
+#[cfg(target_pointer_width = "32")]
+pub const SEGFAULT_ADDRESS: u32 = 0x42;
+
 /// [`SadnessFlavor::Segfault`]
 ///
 /// # Safety
 ///
 /// This is not safe. It intentionally crashes.
 pub unsafe fn raise_segfault() -> ! {
-    let bad_ptr: *mut u8 = 0x42 as _;
+    let bad_ptr: *mut u8 = SEGFAULT_ADDRESS as _;
     std::ptr::write_volatile(bad_ptr, 1);
 
     // If we actually get here that means the address is mapped and writable
@@ -375,5 +389,61 @@ pub unsafe fn raise_invalid_parameter() -> ! {
     }
 
     _mbscmp(std::ptr::null(), std::ptr::null());
+    std::process::abort()
+}
+
+/// The identifier used when guarding the file resource when raising
+/// an `EXC_GUARD` exception via [`raise_guard_exception`]
+#[cfg(target_os = "macos")]
+pub const GUARD_ID: u64 = 0x1234567890abcdef;
+
+/// [`SadnessFlavor::Guard`]
+///
+/// # Safety
+///
+/// This is not safe. It intentionally crashes.
+#[cfg(target_os = "macos")]
+pub unsafe fn raise_guard_exception() -> ! {
+    extern "C" {
+        /// <https://github.com/apple-oss-distributions/xnu/blob/e7776783b89a353188416a9a346c6cdb4928faad/bsd/sys/guarded.h#L48-L49>
+        fn guarded_open_np(
+            path: *const u8,
+            guard_id: *const u64,
+            guard_flags: u32,
+            flags: i32,
+            ...
+        ) -> i32;
+    }
+
+    // https://github.com/apple-oss-distributions/xnu/blob/e7776783b89a353188416a9a346c6cdb4928faad/bsd/sys/guarded.h#L67-L97
+
+    /// Forbid `close(2)`, and the implicit `close()` that a `dup2(2)` may do.
+    /// Forces close-on-fork to be set immutably too.
+    const GUARD_CLOSE: u32 = 1 << 0;
+    /// Forbid `dup(2)`, `dup2(2)`, and `fcntl(2)` subcodes `F_DUPFD`, `F_DUPFD_CLOEXEC`
+    /// on a guarded fd. Also forbids open's of a guarded fd via `/dev/fd/`
+    /// (an implicit dup.)
+    const GUARD_DUP: u32 = 1 << 1;
+    /// Forbid sending a guarded fd via a socket
+    const GUARD_SOCKET_IPC: u32 = 1 << 2;
+    /// Forbid creating a fileport from a guarded fd
+    const GUARD_FILEPORT: u32 = 1 << 3;
+
+    let fd = guarded_open_np(
+        b"/tmp/sadness-generator-guard.txt\0".as_ptr(),
+        &GUARD_ID,
+        GUARD_CLOSE | GUARD_DUP | GUARD_SOCKET_IPC | GUARD_FILEPORT,
+        libc::O_CREAT | libc::O_CLOEXEC | libc::O_RDWR,
+        0o666,
+    );
+
+    assert!(
+        fd != -1,
+        "failed to create guarded file descriptor, unable to crash"
+    );
+
+    // Since this operation was guarded, this will raise an EXC_GUARD exception
+    libc::close(fd);
+
     std::process::abort()
 }

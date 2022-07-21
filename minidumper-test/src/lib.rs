@@ -30,6 +30,8 @@ pub enum Signal {
     Purecall,
     #[cfg(windows)]
     InvalidParameter,
+    #[cfg(target_os = "macos")]
+    Guard,
 }
 
 use std::fmt;
@@ -50,6 +52,8 @@ impl fmt::Display for Signal {
             Self::Purecall => "purecall",
             #[cfg(windows)]
             Self::InvalidParameter => "invalid-parameter",
+            #[cfg(target_os = "macos")]
+            Self::Guard => "guard",
         })
     }
 }
@@ -288,6 +292,7 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
     let native_cpu = get_native_cpu();
 
     let crash_reason = exc.get_crash_reason(native_os, native_cpu);
+    let crash_address = exc.get_crash_address(native_os, native_cpu);
 
     macro_rules! verify {
         ($expected:pat) => {
@@ -348,6 +353,10 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
             Signal::Purecall | Signal::InvalidParameter => {
                 unreachable!("windows only");
             }
+            #[cfg(target_os = "macos")]
+            Signal::Guard => {
+                unreachable!("macos only");
+            }
         },
         Os::Windows => match signal {
             Signal::Fpe => {
@@ -364,6 +373,8 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                 verify!(CrashReason::WindowsAccessViolation(
                     errors::ExceptionCodeWindowsAccessType::WRITE
                 ));
+
+                assert_eq!(crash_address, sadness_generator::SEGFAULT_ADDRESS as _);
             }
             Signal::StackOverflow | Signal::StackOverflowCThread => {
                 verify!(CrashReason::WindowsGeneral(
@@ -387,6 +398,10 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
             Signal::Bus | Signal::Abort => {
                 unreachable!();
             }
+            #[cfg(target_os = "macos")]
+            Signal::Guard => {
+                unreachable!("macos only");
+            }
         },
         #[allow(clippy::match_same_arms)]
         Os::MacOs => match signal {
@@ -399,9 +414,8 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
             }
             #[cfg(unix)]
             Signal::Bus => {
-                verify!(CrashReason::MacGeneral(
-                    errors::ExceptionCodeMac::EXC_BAD_ACCESS,
-                    _ // This will be an actual address
+                verify!(CrashReason::MacBadAccessKern(
+                    errors::ExceptionCodeMacBadAccessKernType::KERN_MEMORY_ERROR,
                 ));
             }
             Signal::Fpe => {
@@ -411,28 +425,70 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                 ));
             }
             Signal::Illegal => {
-                verify!(CrashReason::MacGeneral(
-                    errors::ExceptionCodeMac::EXC_BAD_INSTRUCTION,
-                    0
-                ));
+                cfg_if::cfg_if! {
+                    if #[cfg(target_arch = "aarch64")] {
+                        verify!(CrashReason::MacBadInstructionArm(
+                            errors::ExceptionCodeMacBadInstructionArmType::EXC_ARM_UNDEFINED,
+                        ));
+                    } else if #[cfg(target_arch = "x86_64")] {
+                        verify!(CrashReason::MacBadInstructionX86(
+                            errors::ExceptionCodeMacBadInstructionX86Type::EXC_I386_INVOP,
+                        ));
+                    } else {
+                        panic!("this target architecture is not supported on mac");
+                    }
+                }
             }
             Signal::Segv => {
-                verify!(CrashReason::MacGeneral(
-                    errors::ExceptionCodeMac::EXC_BAD_ACCESS,
-                    0
+                verify!(CrashReason::MacBadAccessKern(
+                    errors::ExceptionCodeMacBadAccessKernType::KERN_INVALID_ADDRESS,
                 ));
+
+                assert_eq!(crash_address, sadness_generator::SEGFAULT_ADDRESS as _);
             }
             Signal::StackOverflow | Signal::StackOverflowCThread => {
-                verify!(CrashReason::MacGeneral(
-                    errors::ExceptionCodeMac::EXC_BAD_ACCESS,
-                    _ // This will be the an actual address
+                verify!(CrashReason::MacBadAccessKern(
+                    errors::ExceptionCodeMacBadAccessKernType::KERN_PROTECTION_FAILURE
                 ));
             }
             Signal::Trap => {
-                verify!(CrashReason::MacGeneral(
-                    errors::ExceptionCodeMac::EXC_BREAKPOINT,
-                    _ // EXC_BREAKPOINT says "details in the code field" but doesn't elaborate what that means and I'm too lazy to look at more mac source code right now
-                ));
+                cfg_if::cfg_if! {
+                    if #[cfg(target_arch = "aarch64")] {
+                        verify!(CrashReason::MacBreakpointArm(
+                            errors::ExceptionCodeMacBreakpointArmType::EXC_ARM_BREAKPOINT,
+                        ));
+                    } else if #[cfg(target_arch = "x86_64")] {
+                        verify!(CrashReason::MacBreakpointX86(
+                            errors::ExceptionCodeMacBreakpointX86Type::EXC_I386_BPT,
+                        ));
+                    } else {
+                        panic!("this target architecture is not supported on mac");
+                    }
+                }
+            }
+            #[cfg(target_os = "macos")]
+            Signal::Guard => {
+                // Unfortunately the exception code which contains the details
+                // on the EXC_GUARD exception is bit packed, so we just manually
+                // verify this one
+                if let CrashReason::MacGuard(kind, code, guard_id) = crash_reason {
+                    // We've tried an operation on a guarded file descriptor
+                    assert_eq!(kind, errors::ExceptionCodeMacGuardType::GUARD_TYPE_FD);
+                    // The guard identifier used when opening the file
+                    assert_eq!(guard_id, sadness_generator::GUARD_ID);
+
+                    // +-------------------+----------------+--------------+
+                    // |[63:61] guard type | [60:32] flavor | [31:0] target|
+                    // +-------------------+----------------+--------------+
+                    assert_eq!(
+                        errors::ExceptionCodeMacGuardType::GUARD_TYPE_FD as u8,
+                        ((code >> 61) & 0x7) as u8
+                    );
+                    assert_eq!(1 /* GUARD_CLOSE */, ((code >> 32) & 0x1fffffff) as u32);
+                    // The target is just the file descriptor itself which is kind of pointless
+                } else {
+                    panic!("expected MacGuard crash, crash reason: {:?}", crash_reason);
+                }
             }
             #[cfg(windows)]
             Signal::Purecall | Signal::InvalidParameter => {

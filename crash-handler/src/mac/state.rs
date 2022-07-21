@@ -3,7 +3,7 @@ use crate::CrashEventResult;
 use crate::Error;
 use std::mem;
 
-#[repr(i32)]
+#[repr(u32)]
 enum MessageIds {
     /// Message ID telling the handler thread to signal a crash w/optional exception information
     SignalCrash = 0,
@@ -11,16 +11,18 @@ enum MessageIds {
     Shutdown = 2,
     /// Taken from mach_exc in /usr/include/mach/exc.defs.
     Exception = 2405,
+    ExceptionStateIdentity = 2407,
 }
 
-impl TryFrom<i32> for MessageIds {
-    type Error = i32;
+impl TryFrom<u32> for MessageIds {
+    type Error = u32;
 
-    fn try_from(val: i32) -> Result<Self, Self::Error> {
+    fn try_from(val: u32) -> Result<Self, Self::Error> {
         Ok(match val {
             0 => Self::SignalCrash,
             2 => Self::Shutdown,
             2405 => Self::Exception,
+            2407 => Self::ExceptionStateIdentity,
             unknown => return Err(unknown),
         })
     }
@@ -32,7 +34,9 @@ const EXCEPTION_MASK: et::exception_mask_t = et::EXC_MASK_BAD_ACCESS // SIGSEGV/
     | et::EXC_MASK_ARITHMETIC // SIGFPE
     | et::EXC_MASK_BREAKPOINT // SIGTRAP
     | et::EXC_MASK_CRASH // technically this is a catch all mask for the previous masks, but no reason not to spell out exactly what we handle
-    | et::EXC_MASK_RESOURCE; // exception thrown when a resource limit is exceeded
+    | et::EXC_MASK_RESOURCE // exception thrown when a resource limit is exceeded
+    | et::EXC_MASK_GUARD // exception thrown when an action that is guarded on a resource is attempted
+    ;
 
 static HANDLER: parking_lot::RwLock<Option<HandlerInner>> = parking_lot::const_rwlock(None);
 
@@ -136,7 +140,7 @@ impl HandlerInner {
         }
 
         if msg::mach_msg(
-            &mut msg.header,
+            (&mut msg.header) as *mut _,
             msg::MACH_SEND_MSG,
             msg.header.msgh_size,
             0,
@@ -221,15 +225,18 @@ pub(super) fn attach(crash_event: Box<dyn crate::CrashEvent>) -> Result<(), Erro
         let mut flavors = [0; EXC_TYPES_COUNT];
 
         let behavior =
-            // The apple source doesn't really say anything useful, but this flag
-            // is basically used to say...we actually want to catch exceptions
+            // Send a catch_exception_raise message including the identity.
             et::EXCEPTION_DEFAULT |
             // Send 64-bit code and subcode in the exception header.
             //
             // Without this flag the code and subcode in the exception will be
-            // 32-bits, which for exceptions such as EXC_BAD_ACCESS where, in
-            // particular, the subcode can contain addresses, they will be
-            // truncated, giving us essentially useless information
+            // 32-bits, losing information for several types of exception
+            // * `EXC_BAD_ACCESS` - the address of the bad access is stored in the subcode
+            // * `EXC_RESOURCE` - the details of the resource exception are stored
+            // using the full 64-bits of the code
+            // * `EXC_GUARD` - the details of the guard exception are stored
+            // in the full 64-bits of the code, and the full 64-bits of the subcode
+            // _can_ be used depending on the guard type
             et::MACH_EXCEPTION_CODES;
 
         // Swap the exception ports so that we use our own
@@ -304,9 +311,9 @@ struct UserException {
     body: msg::mach_msg_body_t,
     crash_thread: msg::mach_msg_port_descriptor_t,
     flags: u32,
-    exception_kind: i32,
-    exception_code: i64,
-    exception_subcode: i64,
+    exception_kind: u32,
+    exception_code: u64,
+    exception_subcode: u64,
 }
 
 const FLAG_HAS_EXCEPTION: u32 = 0x1;
@@ -380,11 +387,11 @@ unsafe fn exception_handler(port: mach_port_t, us: UserSignal) {
     let mut request: ExceptionMessage = mem::zeroed();
 
     loop {
-        request.header.msgh_local_port = port;
-        request.header.msgh_size = mem::size_of_val(&request) as _;
+        request.header.local_port = port;
+        request.header.size = mem::size_of_val(&request) as _;
 
         let kret = msg::mach_msg(
-            &mut request.header,
+            ((&mut request.header) as *mut MachMsgHeader).cast(),
             msg::MACH_RCV_MSG | msg::MACH_RCV_LARGE,
             0,
             mem::size_of_val(&request) as u32,
@@ -398,8 +405,8 @@ unsafe fn exception_handler(port: mach_port_t, us: UserSignal) {
             libc::abort();
         }
 
-        match MessageIds::try_from(request.header.msgh_id) {
-            Ok(MessageIds::Exception) => {
+        match MessageIds::try_from(request.header.id) {
+            Ok(MessageIds::Exception | MessageIds::ExceptionStateIdentity) => {
                 // When forking a child process with the exception handler installed,
                 // if the child crashes, it will send the exception back to the parent
                 // process.  The check for task == self_task() ensures that only
@@ -411,9 +418,7 @@ unsafe fn exception_handler(port: mach_port_t, us: UserSignal) {
                 let ret_code = if request.task.name == mach_task_self() {
                     let _ss = ScopedSuspend::new();
 
-                    let subcode = (request.exception == et::EXC_BAD_ACCESS as i32 // 1
-                        && request.code_count > 1)
-                        .then(|| request.code[1]);
+                    let subcode = (request.code_count > 1).then(|| request.code[1]);
 
                     let exc_info = crash_context::ExceptionInfo {
                         kind: request.exception,
@@ -457,19 +462,17 @@ unsafe fn exception_handler(port: mach_port_t, us: UserSignal) {
                 // 'mig -v /usr/include/mach/mach_exc.defs', or you can look at
                 // https://github.com/doadam/xnu-4570.1.46/blob/2ad7fbf85ff567495a572cd4583961ffd8525083/BUILD/obj/RELEASE_X86_64/osfmk/RELEASE/mach/exc_server.c#L491-L520
                 let mut reply: ExceptionRaiseReply = mem::zeroed();
-                reply.header.msgh_bits = msg::MACH_MSGH_BITS(
-                    request.header.msgh_bits & msg::MACH_MSGH_BITS_REMOTE_MASK,
-                    0,
-                );
-                reply.header.msgh_size = mem::size_of_val(&reply) as u32;
-                reply.header.msgh_remote_port = request.header.msgh_remote_port;
-                reply.header.msgh_local_port = MACH_PORT_NULL;
-                reply.header.msgh_id = request.header.msgh_id + 100;
+                reply.header.bits =
+                    msg::MACH_MSGH_BITS(request.header.bits & msg::MACH_MSGH_BITS_REMOTE_MASK, 0);
+                reply.header.size = mem::size_of_val(&reply) as u32;
+                reply.header.remote_port = request.header.remote_port;
+                reply.header.local_port = MACH_PORT_NULL;
+                reply.header.id = request.header.id + 100;
                 reply.ndr = NDR_record;
                 reply.ret_code = ret_code;
 
                 msg::mach_msg(
-                    &mut reply.header,
+                    ((&mut reply.header) as *mut MachMsgHeader).cast(),
                     msg::MACH_SEND_MSG,
                     mem::size_of_val(&reply) as u32,
                     0,
@@ -591,7 +594,7 @@ fn is_exception_non_fatal(exc_info: crash_context::ExceptionInfo, task: mt::task
     // We want to clearly see the different variants, even if they end up with
     // the same result
     #[allow(clippy::match_same_arms)]
-    match exc_info.get_resource_info() {
+    match exc_info.resource_exception() {
         // CPU exceptions have, currently 2 flavors, fata and non-fatal
         Some(Re::Cpu(cpu_exc)) => !cpu_exc.is_fatal,
         // Wakeups exceptions
@@ -660,7 +663,7 @@ fn is_exception_non_fatal(exc_info: crash_context::ExceptionInfo, task: mt::task
         Some(Re::Memory(mem_exc)) if mem_exc.flavor == res::MemoryFlavor::HighWatermark => true,
         // I/O resource exeptions are never fatal
         Some(Re::Io(_)) => true,
-        // Thread resource exceptions are always fatal
+        // Thread resource exceptions are not possible (at least currently) in production kernels
         Some(Re::Threads(_)) => false,
         // Port resource exceptions are always fatal
         Some(Re::Ports(_)) => false,
@@ -680,7 +683,7 @@ mod test {
     fn res_exc(kind: ResourceKind, flavor: u8) -> ExceptionInfo {
         ExceptionInfo {
             kind: et::EXC_RESOURCE as _,
-            code: (((kind as u64 & 0x7) << 61) | ((flavor as u64 & 0x7) << 58)) as i64,
+            code: (((kind as u64 & 0x7) << 61) | ((flavor as u64 & 0x7) << 58)),
             subcode: None,
         }
     }

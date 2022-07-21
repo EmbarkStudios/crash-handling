@@ -40,19 +40,28 @@ pub fn handles_crash(flavor: SadnessFlavor) {
                         let expected = match flavor {
                             SadnessFlavor::Abort => {
                                 assert_eq!(exc.code, 0x10003); // EXC_SOFT_SIGNAL
-                                assert_eq!(exc.subcode.unwrap(), libc::SIGABRT as i64);
+                                assert_eq!(exc.subcode.unwrap(), libc::SIGABRT as _);
 
                                 ExceptionType::Software
                             }
                             SadnessFlavor::Bus
                             | SadnessFlavor::Segfault
-                            | SadnessFlavor::StackOverflow { .. } => ExceptionType::BadAccess,
+                            | SadnessFlavor::StackOverflow { .. } => {
+                                if flavor == SadnessFlavor::Segfault {
+                                    // For EXC_BAD_ACCESS exceptions, the subcode will be the
+                                    // bad address we tried to access
+                                    assert_eq!(cc.exception.unwrap().subcode.unwrap(), sadness_generator::SEGFAULT_ADDRESS as _);
+                                }
+
+                                ExceptionType::BadAccess
+                            },
                             SadnessFlavor::DivideByZero => ExceptionType::Arithmetic,
                             SadnessFlavor::Illegal => ExceptionType::BadInstruction,
                             SadnessFlavor::Trap => ExceptionType::Breakpoint,
+                            SadnessFlavor::Guard => ExceptionType::Guard,
                         };
 
-                        assert_eq!(exc.kind, expected as i32);
+                        assert_eq!(exc.kind, expected as _);
                     } else if #[cfg(target_os = "windows")] {
                         use ch::ExceptionCode;
 

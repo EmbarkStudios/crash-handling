@@ -1,17 +1,21 @@
+pub mod guard;
 pub mod ipc;
 pub mod resource;
 
-use mach2::{exception_types as et, mach_types as mt};
+use mach2::mach_types as mt;
 
 /// Information on the exception that caused the crash
 #[derive(Copy, Clone, Debug)]
 pub struct ExceptionInfo {
     /// The exception kind
-    pub kind: et::exception_type_t,
+    pub kind: u32,
     /// The exception code
-    pub code: et::mach_exception_data_type_t,
-    /// Optional subcode, typically only present for `EXC_BAD_ACCESS` exceptions
-    pub subcode: Option<et::mach_exception_data_type_t>,
+    pub code: u64,
+    /// Optional subcode with different meanings depending on the exception type
+    /// * `EXC_BAD_ACCESS` - The address that caused the exception
+    /// * `EXC_GUARD` - The unique guard identifier that was guarding a resource
+    /// * `EXC_RESOURCE` - Additional details depending on the resource type
+    pub subcode: Option<u64>,
 }
 
 /// Full Macos crash context

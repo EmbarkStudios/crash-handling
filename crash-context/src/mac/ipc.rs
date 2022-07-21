@@ -25,45 +25,90 @@ extern "C" {
     pub fn pid_for_task(task: port::mach_port_name_t, pid: *mut i32) -> kern_return_t;
 }
 
+/// <https://github.com/apple-oss-distributions/xnu/blob/e6231be02a03711ca404e5121a151b24afbff733/osfmk/mach/message.h#L379-L391>
+#[repr(C, packed(4))]
+struct MachMsgPortDescriptor {
+    name: u32,
+    __pad1: u32,
+    __pad2: u16,
+    disposition: u8,
+    __type: u8,
+}
+
+impl MachMsgPortDescriptor {
+    fn new(name: u32, disposition: u32) -> Self {
+        Self {
+            name,
+            disposition: disposition as u8,
+            __pad1: 0,
+            __pad2: 0,
+            __type: msg::MACH_MSG_PORT_DESCRIPTOR as u8,
+        }
+    }
+}
+
+#[repr(C, packed(4))]
+struct MachMsgBody {
+    pub descriptor_count: u32,
+}
+
+#[repr(C, packed(4))]
+pub struct MachMsgTrailer {
+    pub kind: u32,
+    pub size: u32,
+}
+
+/// <https://github.com/apple-oss-distributions/xnu/blob/e6231be02a03711ca404e5121a151b24afbff733/osfmk/mach/message.h#L545-L552>
+#[repr(C, packed(4))]
+struct MachMsgHeader {
+    pub bits: u32,
+    pub size: u32,
+    pub remote_port: u32,
+    pub local_port: u32,
+    pub voucher_port: u32,
+    pub id: u32,
+}
+
 /// The actual crash context message sent and received. This message is a single
 /// struct since it needs to be contiguous block of memory. I suppose it's like
 /// this because people are expected to use MIG to generate the interface code,
 /// but it's ugly as hell regardless.
-#[repr(C)]
-#[derive(Debug)]
+#[repr(C, packed(4))]
 struct CrashContextMessage {
-    head: msg::mach_msg_header_t,
+    head: MachMsgHeader,
     /// When providing port descriptors, this must be present to say how many
     /// of them follow the header and body
-    body: msg::mach_msg_body_t,
+    body: MachMsgBody,
     // These are the really the critical piece of the payload, during
     // sending (or receiving?) these are turned into descriptors that
     // can actually be used by another process
     /// The task that crashed (ie `mach_task_self`)
-    task: msg::mach_msg_port_descriptor_t,
+    task: MachMsgPortDescriptor,
     /// The thread that crashed
-    crash_thread: msg::mach_msg_port_descriptor_t,
+    crash_thread: MachMsgPortDescriptor,
     /// The handler thread, probably, but not necessarily `mach_thread_self`
-    handler_thread: msg::mach_msg_port_descriptor_t,
+    handler_thread: MachMsgPortDescriptor,
     // Port opened by the client to receive an ack from the server
-    ack_port: msg::mach_msg_port_descriptor_t,
+    ack_port: MachMsgPortDescriptor,
     /// Combination of the FLAG_* constants
     flags: u32,
     /// The exception type
-    exception_kind: i32,
+    exception_kind: u32,
     /// The exception code
-    exception_code: i64,
+    exception_code: u64,
     /// The optional exception subcode
-    exception_subcode: i64,
+    exception_subcode: u64,
+    /// We don't actually send this, but it's tacked on by the kernel :(
+    trailer: MachMsgTrailer,
 }
 
 const FLAG_HAS_EXCEPTION: u32 = 0x1;
 const FLAG_HAS_SUBCODE: u32 = 0x2;
 
 /// Message sent from the [`Receiver`] upon receiving and handling a [`CrashContextMessage`]
-#[repr(C)]
+#[repr(C, packed(4))]
 struct AcknowledgementMessage {
-    head: msg::mach_msg_header_t,
+    head: MachMsgHeader,
     result: u32,
 }
 
@@ -187,41 +232,39 @@ impl Client {
                 };
 
             let mut msg = CrashContextMessage {
-                head: msg::mach_msg_header_t {
-                    msgh_bits: msg::MACH_MSG_TYPE_COPY_SEND | msg::MACH_MSGH_BITS_COMPLEX,
-                    msgh_size: std::mem::size_of::<CrashContextMessage>() as u32,
-                    msgh_remote_port: self.port,
-                    msgh_local_port: port::MACH_PORT_NULL,
-                    msgh_voucher_port: port::MACH_PORT_NULL,
-                    msgh_id: 0,
+                head: MachMsgHeader {
+                    bits: msg::MACH_MSG_TYPE_COPY_SEND | msg::MACH_MSGH_BITS_COMPLEX,
+                    // We don't send the trailer, that's added by the kernel
+                    size: std::mem::size_of::<CrashContextMessage>() as u32 - 8,
+                    remote_port: self.port,
+                    local_port: port::MACH_PORT_NULL,
+                    voucher_port: port::MACH_PORT_NULL,
+                    id: 0,
                 },
-                body: msg::mach_msg_body_t {
-                    msgh_descriptor_count: 4,
+                body: MachMsgBody {
+                    descriptor_count: 4,
                 },
-                task: msg::mach_msg_port_descriptor_t::new(ctx.task, msg::MACH_MSG_TYPE_COPY_SEND),
-                crash_thread: msg::mach_msg_port_descriptor_t::new(
-                    ctx.thread,
-                    msg::MACH_MSG_TYPE_COPY_SEND,
-                ),
-                handler_thread: msg::mach_msg_port_descriptor_t::new(
+                task: MachMsgPortDescriptor::new(ctx.task, msg::MACH_MSG_TYPE_COPY_SEND),
+                crash_thread: MachMsgPortDescriptor::new(ctx.thread, msg::MACH_MSG_TYPE_COPY_SEND),
+                handler_thread: MachMsgPortDescriptor::new(
                     ctx.handler_thread,
                     msg::MACH_MSG_TYPE_COPY_SEND,
                 ),
-                ack_port: msg::mach_msg_port_descriptor_t::new(
-                    ack_port.port,
-                    msg::MACH_MSG_TYPE_COPY_SEND,
-                ),
+                ack_port: MachMsgPortDescriptor::new(ack_port.port, msg::MACH_MSG_TYPE_COPY_SEND),
                 flags,
                 exception_kind,
                 exception_code,
                 exception_subcode,
+                // We don't actually send this but I didn't feel like making
+                // two types
+                trailer: MachMsgTrailer { kind: 0, size: 8 },
             };
 
             // Try to actually send the message to the Server
             msg!(msg::mach_msg(
-                &mut msg.head,
+                ((&mut msg.head) as *mut MachMsgHeader).cast(),
                 msg::MACH_SEND_MSG | msg::MACH_SEND_TIMEOUT,
-                msg.head.msgh_size,
+                msg.head.size,
                 0,
                 port::MACH_PORT_NULL,
                 send_timeout
@@ -308,28 +351,13 @@ impl Server {
         // entire function is not marked unsafe.
         unsafe {
             let mut crash_ctx_msg: CrashContextMessage = std::mem::zeroed();
-            crash_ctx_msg.head.msgh_local_port = self.port;
+            crash_ctx_msg.head.local_port = self.port;
 
             let ret = msg::mach_msg(
-                &mut crash_ctx_msg.head,
+                ((&mut crash_ctx_msg.head) as *mut MachMsgHeader).cast(),
                 msg::MACH_RCV_MSG | msg::MACH_RCV_TIMEOUT,
                 0,
-                // So you may be thinking, wow, you are lying to the kernel about
-                // the size of the buffer it can fill, this is terrible and you
-                // should be ashamed, however, if we don't lie here, mach_msg will
-                // return `MACH_RCV_TOO_LARGE`. I _think_ this might be because
-                // the data payload that follows the header, body, and descriptors
-                // needs to be 4-byte aligned or something? But regardless, if
-                // we lie, the kernel only fills out the actual size of the message,
-                // which is the real size of this struct and everything is happy.
-                // Except me, because this is the kind of stuff that should be
-                // documented, and the documentation that does exist (ie, not Apple's)
-                // makes no mention of this, at least that I have found so far,
-                // but of course, since there is no single source of truth the
-                // "documentation" for this stuff is spread across random blog
-                // posts and GNU documentation that probably comes from the 90s.
-                // NOT SALTY AT ALL
-                std::mem::size_of::<CrashContextMessage>() as u32 + 8,
+                std::mem::size_of::<CrashContextMessage>() as u32,
                 self.port,
                 timeout.map(|t| t.as_millis() as u32).unwrap_or_default(),
                 port::MACH_PORT_NULL,
@@ -411,22 +439,22 @@ impl Acknowledger {
             // entire function is not marked unsafe.
             unsafe {
                 let mut msg = AcknowledgementMessage {
-                    head: msg::mach_msg_header_t {
-                        msgh_bits: msg::MACH_MSG_TYPE_COPY_SEND,
-                        msgh_size: std::mem::size_of::<AcknowledgementMessage>() as u32,
-                        msgh_remote_port: port,
-                        msgh_local_port: port::MACH_PORT_NULL,
-                        msgh_voucher_port: port::MACH_PORT_NULL,
-                        msgh_id: 0,
+                    head: MachMsgHeader {
+                        bits: msg::MACH_MSG_TYPE_COPY_SEND,
+                        size: std::mem::size_of::<AcknowledgementMessage>() as u32,
+                        remote_port: port,
+                        local_port: port::MACH_PORT_NULL,
+                        voucher_port: port::MACH_PORT_NULL,
+                        id: 0,
                     },
                     result: ack,
                 };
 
                 // Try to actually send the message
                 msg!(msg::mach_msg(
-                    &mut msg.head,
+                    ((&mut msg.head) as *mut MachMsgHeader).cast(),
                     msg::MACH_SEND_MSG | msg::MACH_SEND_TIMEOUT,
-                    msg.head.msgh_size,
+                    msg.head.size,
                     0,
                     port::MACH_PORT_NULL,
                     timeout.map(|t| t.as_millis() as u32).unwrap_or_default(),
@@ -489,23 +517,23 @@ impl AckReceiver {
     /// marked unsafe.
     unsafe fn recv_ack(&mut self, timeout: Option<Duration>) -> Result<u32, Error> {
         let mut ack = AcknowledgementMessage {
-            head: msg::mach_msg_header_t {
-                msgh_bits: 0,
-                msgh_size: std::mem::size_of::<AcknowledgementMessage>() as u32,
-                msgh_remote_port: port::MACH_PORT_NULL,
-                msgh_local_port: self.port,
-                msgh_voucher_port: port::MACH_PORT_NULL,
-                msgh_id: 0,
+            head: MachMsgHeader {
+                bits: 0,
+                size: std::mem::size_of::<AcknowledgementMessage>() as u32,
+                remote_port: port::MACH_PORT_NULL,
+                local_port: self.port,
+                voucher_port: port::MACH_PORT_NULL,
+                id: 0,
             },
             result: 0,
         };
 
         // Wait for a response from the Server
         msg!(msg::mach_msg(
-            &mut ack.head,
+            ((&mut ack.head) as *mut MachMsgHeader).cast(),
             msg::MACH_RCV_MSG | msg::MACH_RCV_TIMEOUT,
             0,
-            ack.head.msgh_size,
+            ack.head.size,
             self.port,
             timeout.map(|t| t.as_millis() as u32).unwrap_or_default(),
             port::MACH_PORT_NULL
