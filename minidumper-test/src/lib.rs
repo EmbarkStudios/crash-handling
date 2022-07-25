@@ -9,9 +9,19 @@ pub fn run_test(signal: Signal, counter: u32, use_thread: bool) -> Vec<u8> {
         counter,
         if use_thread { "threaded" } else { "simple" }
     );
-    let md = generate_minidump(&id, signal, use_thread);
+    let md = generate_minidump(&id, signal, use_thread, None);
     assert_minidump(&md, signal);
     md
+}
+
+pub fn dump_test(signal: Signal, use_thread: bool, dump_path: Option<PathBuf>) {
+    let id = format!(
+        "{}-{}-{}",
+        signal,
+        0,
+        if use_thread { "threaded" } else { "simple" }
+    );
+    let _md = generate_minidump(&id, signal, use_thread, dump_path);
 }
 
 #[derive(clap::ArgEnum, Clone, Copy)]
@@ -87,8 +97,8 @@ fn make_dump_path(id: &str) -> PathBuf {
     PathBuf::from(format!(".dumps/{}.dmp", id))
 }
 
-pub fn spinup_server(id: &str) -> Server {
-    let dump_path = make_dump_path(id);
+pub fn spinup_server(id: &str, dump_path: Option<PathBuf>) -> Server {
+    let dump_path = dump_path.unwrap_or_else(|| make_dump_path(id));
 
     if dump_path.exists() {
         if let Err(e) = std::fs::remove_file(&dump_path) {
@@ -103,21 +113,20 @@ pub fn spinup_server(id: &str) -> Server {
     let mut server = minidumper::Server::with_name(id).expect("failed to start server");
 
     struct Inner {
-        id: String,
+        _id: String,
         dump_tx: Mutex<mpsc::Sender<PathBuf>>,
+        dump_path: PathBuf,
     }
 
     impl minidumper::ServerHandler for Inner {
         fn create_minidump_file(&self) -> Result<(std::fs::File, PathBuf), std::io::Error> {
-            let path = make_dump_path(&self.id);
-
-            if !path.parent().unwrap().exists() {
-                let _ = std::fs::create_dir_all(path.parent().unwrap());
+            if !self.dump_path.parent().unwrap().exists() {
+                let _ = std::fs::create_dir_all(self.dump_path.parent().unwrap());
             }
 
-            let file = std::fs::File::create(&path)?;
+            let file = std::fs::File::create(&self.dump_path)?;
 
-            Ok((file, path))
+            Ok((file, self.dump_path.clone()))
         }
 
         fn on_minidump_created(
@@ -147,8 +156,9 @@ pub fn spinup_server(id: &str) -> Server {
     let (tx, rx) = mpsc::channel();
 
     let inner = Inner {
-        id: id.to_owned(),
+        _id: id.to_owned(),
         dump_tx: Mutex::new(tx),
+        dump_path,
     };
 
     let exit = Arc::new(AtomicBool::new(false));
@@ -226,10 +236,15 @@ pub fn capture_output() {
     });
 }
 
-pub fn generate_minidump(id: &str, signal: Signal, use_thread: bool) -> Vec<u8> {
+pub fn generate_minidump(
+    id: &str,
+    signal: Signal,
+    use_thread: bool,
+    dump_path: Option<PathBuf>,
+) -> Vec<u8> {
     capture_output();
 
-    let server = spinup_server(id);
+    let server = spinup_server(id, dump_path);
     run_client(id, signal, use_thread);
 
     let dump_path = server
