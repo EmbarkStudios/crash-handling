@@ -7,7 +7,5 @@ members = [
     "sadness-generator",
 ]
 
-exclude = ["minidumper-test/crash-client"]
-
 [profile.dev]
 debug = 2

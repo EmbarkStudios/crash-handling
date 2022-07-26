@@ -20,3 +20,5 @@ minidumper = { path = "../../minidumper" }
 rayon = "1.5"
 sadness-generator = { path = "../../sadness-generator" }
 tracing-subscriber = { version = "0.3" }
+
+[workspace]
