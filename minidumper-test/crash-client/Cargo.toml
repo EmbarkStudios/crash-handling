@@ -1,0 +1,22 @@
+[package]
+name = "crash-client"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+minidumper-test = { path = "../" }
+anyhow = "1.0"
+clap = { version = "3.1", features = ["derive"] }
+cfg-if = "1.0"
+crash-handler = { path = "../../crash-handler" }
+minidump = "0.12"
+minidump-common = "0.12"
+minidumper = { path = "../../minidumper" }
+# This has some crazy dependencies, can enable manually if needed
+#notify-rust = "4.5"
+rayon = "1.5"
+sadness-generator = { path = "../../sadness-generator" }
+tracing-subscriber = { version = "0.3" }

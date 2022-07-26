@@ -8,10 +8,6 @@ publish = false
 [[bin]]
 name = "minidumper-test"
 
-[[bin]]
-name = "crash-client"
-path = "src/crash-client.rs"
-
 [dependencies]
 anyhow = "1.0"
 clap = { version = "3.1", features = ["derive"] }
@@ -28,3 +24,6 @@ tracing-subscriber = { version = "0.3" }
 
 [package.metadata.release]
 release = false
+
+[workspace]
+members = ["crash-client"]
