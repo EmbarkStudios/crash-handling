@@ -4,7 +4,6 @@ members = [
     "crash-handler",
     "minidumper",
     "minidumper-test",
-    "minidumper-test/crash-client",
     "sadness-generator",
 ]
 
