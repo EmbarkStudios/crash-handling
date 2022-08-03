@@ -333,6 +333,8 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                 verify!(CrashReason::LinuxSigsegv(
                     errors::ExceptionCodeLinuxSigsegvKind::SEGV_MAPERR
                 ));
+
+                //assert_eq!(crash_address, sadness_generator::SEGFAULT_ADDRESS as _);
             }
             Signal::StackOverflow | Signal::StackOverflowCThread => {
                 // Not sure if there is a way to work around this, but on Linux it seems that a stack overflow

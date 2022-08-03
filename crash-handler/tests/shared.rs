@@ -22,11 +22,13 @@ pub fn handles_crash(flavor: SadnessFlavor) {
                                 SadnessFlavor::Bus => Signal::Bus,
                                 SadnessFlavor::DivideByZero => Signal::Fpe,
                                 SadnessFlavor::Illegal => Signal::Illegal,
-                                SadnessFlavor::Segfault | SadnessFlavor::StackOverflow { .. } =>
-                                    Signal::Segv,
-                                    SadnessFlavor::Trap => Signal::Trap,
-                            } as u32
+                                SadnessFlavor::Segfault | SadnessFlavor::StackOverflow { .. } => {
+                                    Signal::Segv
+                                }
+                                SadnessFlavor::Trap => Signal::Trap,
+                            } as u32,
                         );
+
                         //assert_eq!(cc.tid, tid);
 
                         // At least on linux these...aren't set. Which is weird

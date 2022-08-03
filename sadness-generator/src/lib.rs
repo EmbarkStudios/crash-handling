@@ -119,7 +119,7 @@ pub unsafe fn raise_abort() -> ! {
 /// this address can be mapped and writable by the your process in which case a
 /// crash may not occur
 #[cfg(target_pointer_width = "64")]
-pub const SEGFAULT_ADDRESS: u64 = u64::MAX - ((u32::MAX >> 1) as u64) + 0x42;
+pub const SEGFAULT_ADDRESS: u64 = u32::MAX as u64 + 0x42;
 #[cfg(target_pointer_width = "32")]
 pub const SEGFAULT_ADDRESS: u32 = 0x42;
 
