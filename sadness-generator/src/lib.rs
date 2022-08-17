@@ -21,6 +21,11 @@ pub enum SadnessFlavor {
     /// * `EXCEPTION_ACCESS_VIOLATION` on Windows
     /// * `EXC_BAD_ACCESS` on Macos
     Segfault,
+    /// Same as `Segfault`, but with a non-canonical address where possible.
+    ///
+    /// This is a more difficult corner case because certain things will act weird
+    /// with non-canonical addresses when handling a crash.
+    SegfaultNonCanonical,
     /// * `SIGFPE` on Linux
     /// * `EXCEPTION_INT_DIVIDE_BY_ZERO` on Windows
     /// * `EXC_ARITHMETIC` on Macos
@@ -72,6 +77,7 @@ impl SadnessFlavor {
             #[cfg(unix)]
             Self::Abort => raise_abort(),
             Self::Segfault => raise_segfault(),
+            Self::SegfaultNonCanonical => raise_segfault_non_canonical(),
             Self::DivideByZero => raise_floating_point_exception(),
             Self::Illegal => raise_illegal_instruction(),
             #[cfg(unix)]
@@ -122,6 +128,10 @@ pub unsafe fn raise_abort() -> ! {
 pub const SEGFAULT_ADDRESS: u64 = u32::MAX as u64 + 0x42;
 #[cfg(target_pointer_width = "32")]
 pub const SEGFAULT_ADDRESS: u32 = 0x42;
+#[cfg(target_pointer_width = "64")]
+pub const SEGFAULT_ADDRESS_NON_CANONICAL: u64 = u64::MAX - ((u32::MAX >> 1) as u64) + 0x42;
+#[cfg(target_pointer_width = "32")]
+pub const SEGFAULT_ADDRESS_NON_CANONICAL: u32 = SEGFAULT_ADDRESS;
 
 /// [`SadnessFlavor::Segfault`]
 ///
@@ -130,6 +140,20 @@ pub const SEGFAULT_ADDRESS: u32 = 0x42;
 /// This is not safe. It intentionally crashes.
 pub unsafe fn raise_segfault() -> ! {
     let bad_ptr: *mut u8 = SEGFAULT_ADDRESS as _;
+    std::ptr::write_volatile(bad_ptr, 1);
+
+    // If we actually get here that means the address is mapped and writable
+    // by the current process which is...unexpected
+    std::process::abort()
+}
+
+/// [`SadnessFlavor::SegfaultNonCanonical`]
+///
+/// # Safety
+///
+/// This is not safe. It intentionally crashes.
+pub unsafe fn raise_segfault_non_canonical() -> ! {
+    let bad_ptr: *mut u8 = SEGFAULT_ADDRESS_NON_CANONICAL as _;
     std::ptr::write_volatile(bad_ptr, 1);
 
     // If we actually get here that means the address is mapped and writable
