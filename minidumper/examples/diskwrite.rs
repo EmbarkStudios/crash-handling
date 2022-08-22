@@ -3,6 +3,7 @@ const SOCKET_NAME: &str = "minidumper-disk-example";
 use minidumper::{Client, Server};
 
 fn main() {
+    pretty_env_logger::init();
     if std::env::args().any(|a| a == "--server") {
         let mut server = Server::with_name(SOCKET_NAME).expect("failed to create server");
 
