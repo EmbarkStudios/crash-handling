@@ -18,8 +18,13 @@ fn main() {
             ) -> Result<(std::fs::File, std::path::PathBuf), std::io::Error> {
                 let uuid = uuid::Uuid::new_v4();
 
-                let pb = std::path::PathBuf::from(format!("dumps/{}.dmp", uuid));
-                Ok((std::fs::File::create(&pb)?, pb))
+                let dir_path = std::path::PathBuf::from("dumps");
+                let file_path = dir_path.join(format!("{uuid}.dmp"));
+                if !dir_path.try_exists()? {
+                    std::fs::create_dir(dir_path)?;
+                }
+                let file = std::fs::File::create(&file_path)?;
+                Ok((file, file_path))
             }
 
             /// Called when a crash has been fully written as a minidump to the provided
