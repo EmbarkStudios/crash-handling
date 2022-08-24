@@ -4,7 +4,7 @@ mod state;
 use crate::Error;
 
 /// The signals that we support catching and raising
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 #[repr(i32)]
 pub enum Signal {
     Abort = libc::SIGABRT,
