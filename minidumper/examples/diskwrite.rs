@@ -18,8 +18,15 @@ fn main() {
             ) -> Result<(std::fs::File, std::path::PathBuf), std::io::Error> {
                 let uuid = uuid::Uuid::new_v4();
 
-                let pb = std::path::PathBuf::from(format!("dumps/{}.dmp", uuid));
-                Ok((std::fs::File::create(&pb)?, pb))
+                let dump_path = std::path::PathBuf::from(format!("dumps/{uuid}.dmp"));
+
+                if let Some(dir) = dump_path.parent() {
+                    if !dir.try_exists()? {
+                        std::fs::create_dir_all(dir)?;
+                    }
+                }
+                let file = std::fs::File::create(&dump_path)?;
+                Ok((file, dump_path))
             }
 
             /// Called when a crash has been fully written as a minidump to the provided
@@ -45,8 +52,7 @@ fn main() {
 
             fn on_message(&self, kind: u32, buffer: Vec<u8>) {
                 log::info!(
-                    "kind: {}, message: {}",
-                    kind,
+                    "kind: {kind}, message: {}",
                     String::from_utf8(buffer).unwrap()
                 );
             }
