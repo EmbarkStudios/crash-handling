@@ -89,6 +89,13 @@ fn main() {
             // Before we request the crash, send a message to the server
             client.send_message(2, "mistakes were made").unwrap();
 
+            // Send a ping to the server, this ensures that all messages that have been sent
+            // are "flushed" before the crash event is sent. This is only really useful
+            // on macos where messages and crash events are sent via different, unsynchronized,
+            // methods which can result in the crash event closing the server before
+            // the non-crash messages are received/processed
+            client.ping().unwrap();
+
             crash_handler::CrashEventResult::Handled(client.request_dump(crash_context).is_ok())
         })
     })

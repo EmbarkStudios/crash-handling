@@ -6,7 +6,7 @@
 use std::arch::asm;
 
 /// How you would like your sadness.
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum SadnessFlavor {
     /// `SIGABRT` on Unix.
     ///

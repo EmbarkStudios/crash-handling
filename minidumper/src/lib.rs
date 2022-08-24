@@ -20,7 +20,7 @@ pub struct MinidumpBinary {
 
 /// Actions for the [`Server`] message loop to take after a [`ServerHandler`]
 /// method is invoked
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum LoopAction {
     /// Exits the message loop, stops processing messages, and disconnects all
     /// connected clients

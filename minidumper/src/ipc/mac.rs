@@ -60,7 +60,7 @@ impl UnixSocketAddr {
         }
 
         let mut len = sun_path_offset(&addr) + bytes.len();
-        match bytes.get(0) {
+        match bytes.first() {
             Some(&0) | None => {}
             Some(_) => len += 1, // + null terminator
         }

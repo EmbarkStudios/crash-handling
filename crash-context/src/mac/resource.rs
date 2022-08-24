@@ -121,7 +121,7 @@ pub enum ResourceKind {
 }
 
 /// The flavors for a [`CpuResourceException`]
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum CpuFlavor {
     /// The process has surpassed its CPU limit
@@ -203,7 +203,7 @@ impl CpuResourceException {
 }
 
 /// The flavors for a [`WakeupsResourceException`]
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum WakeupsFlavor {
     Monitor = 1,
@@ -276,7 +276,7 @@ impl WakeupsResourceException {
 }
 
 /// The flavors for a [`MemoryResourceException`]
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum MemoryFlavor {
     HighWatermark = 1,
@@ -334,7 +334,7 @@ impl MemoryResourceException {
 }
 
 /// The flavors for an [`IoResourceException`]
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum IoFlavor {
     PhysicalWrites = 1,
@@ -402,7 +402,7 @@ impl IoResourceException {
 }
 
 /// The flavors for a [`ThreadsResourceException`]
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ThreadsFlavor {
     HighWatermark = 1,
@@ -458,7 +458,7 @@ impl ThreadsResourceException {
 }
 
 /// The flavors for a [`PortsResourceException`]
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum PortsFlavor {
     SpaceFull = 1,

@@ -120,7 +120,7 @@ impl<'scope> From<&'scope String> for SocketName<'scope> {
 }
 
 #[derive(Copy, Clone)]
-#[cfg_attr(test, derive(PartialEq, Debug))]
+#[cfg_attr(test, derive(PartialEq, Eq, Debug))]
 #[repr(C)]
 pub struct Header {
     kind: u32,
