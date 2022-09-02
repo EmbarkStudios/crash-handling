@@ -1,3 +1,4 @@
+use std::io::ErrorKind;
 use super::{Connection, Header, Listener, SocketName};
 use crate::{Error, LoopAction};
 use polling::{Event, Poller};
@@ -171,7 +172,23 @@ impl Server {
             }
 
             events.clear();
-            poll.wait(&mut events, Some(Duration::from_millis(10)))?;
+            let timeout = Duration::from_millis(10);
+            let deadline = Instant::now() + timeout;
+            let mut remaining = Some(timeout);
+            while let Some(timeout) = remaining {
+                match poll.wait(&mut events, Some(timeout)) {
+                    Ok(_) => {
+                        break;
+                    }
+                    Err(e) => {
+                        if matches!(e.kind(), ErrorKind::Interrupted) {
+                            remaining = deadline.checked_duration_since(Instant::now());
+                        } else {
+                            return Err(e.into());
+                        }
+                    }
+                }
+            }
 
             #[cfg(target_os = "macos")]
             if self.check_mach_port(&poll, &mut clients, handler.as_ref())? == LoopAction::Exit {
