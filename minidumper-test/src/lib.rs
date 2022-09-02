@@ -24,24 +24,65 @@ pub fn dump_test(signal: Signal, use_thread: bool, dump_path: Option<PathBuf>) {
     let _md = generate_minidump(&id, signal, use_thread, dump_path);
 }
 
+/// Various ways to suddenly exit the process
+///
+/// Some of these may properly exit the process, which is ok, we just want to see
+/// what happens if you do these various things.
 #[derive(clap::ArgEnum, Clone, Copy)]
 pub enum Signal {
+    /// Unix SIGABORT
     #[cfg(unix)]
     Abort,
+    /// Unix SIGBUS
     #[cfg(unix)]
     Bus,
+    /// Floating Point Exception
     Fpe,
+    /// Illegal Instruction
     Illegal,
+    /// Segfault
     Segv,
+    /// Segfault (non-canonical address, if applicable)
+    SegvNonCanonical,
+    /// Stackoverflow in a rust thread
     StackOverflow,
+    /// Stackoverflow in a non-rust thread
     StackOverflowCThread,
+    /// Trap/Breakpoint
     Trap,
     #[cfg(windows)]
+    /// Windows purecall exception
     Purecall,
     #[cfg(windows)]
+    /// Windows invalid parameter exception
     InvalidParameter,
+    /// macOS EXC_GUARD
     #[cfg(target_os = "macos")]
     Guard,
+
+    // These are all more high-level ways for the program to die in typical rust programming,
+    // most of them will show up as panics and unwinding, maybe setting an exit code, and will
+    // generally be the same, but perhaps a Clever crash handler can do more interesting things
+    // with these different flavours (and they will often have different tops of the stack to
+    // unwind through).
+    /// Rust std::process::abort
+    RustProcessAbort,
+    /// Rust panic!()
+    RustPanic,
+    /// Rust assert!()
+    RustAssert,
+    /// Rust assert_eq!()
+    RustAssertEq,
+    /// Rust divide by 0
+    RustDivByZero,
+    /// Rust Option::unwrap
+    RustOptionUnwrap,
+    /// Rust Result::unwrap
+    RustResultUnwrap,
+    /// Rust index out of bounds
+    RustIndexOutOfBounds,
+    /// Rust std::process::exit(-1)
+    RustExit,
 }
 
 use std::fmt;
@@ -55,6 +96,7 @@ impl fmt::Display for Signal {
             Self::Fpe => "fpe",
             Self::Illegal => "illegal",
             Self::Segv => "segv",
+            Self::SegvNonCanonical => "segv-non-canonical",
             Self::StackOverflow => "stack-overflow",
             Self::StackOverflowCThread => "stack-overflow-c-thread",
             Self::Trap => "trap",
@@ -64,6 +106,15 @@ impl fmt::Display for Signal {
             Self::InvalidParameter => "invalid-parameter",
             #[cfg(target_os = "macos")]
             Self::Guard => "guard",
+            Self::RustProcessAbort => "rust-process-abort",
+            Self::RustPanic => "rust-panic",
+            Self::RustAssert => "rust-assert",
+            Self::RustAssertEq => "rust-assert-eq",
+            Self::RustDivByZero => "rust-div-by-zero",
+            Self::RustOptionUnwrap => "rust-option-unwrap",
+            Self::RustResultUnwrap => "rust-result-unwrap",
+            Self::RustIndexOutOfBounds => "rust-index-out-of-bounds",
+            Self::RustExit => "rust-exit",
         })
     }
 }
@@ -344,7 +395,7 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                     errors::ExceptionCodeLinuxSigillKind::ILL_ILLOPN
                 ));
             }
-            Signal::Segv => {
+            Signal::Segv | Signal::SegvNonCanonical => {
                 verify!(CrashReason::LinuxSigsegv(
                     errors::ExceptionCodeLinuxSigsegvKind::SEGV_MAPERR
                 ));
@@ -374,6 +425,15 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
             Signal::Guard => {
                 unreachable!("macos only");
             }
+            Signal::RustProcessAbort => todo!(),
+            Signal::RustPanic => todo!(),
+            Signal::RustAssert => todo!(),
+            Signal::RustAssertEq => todo!(),
+            Signal::RustDivByZero => todo!(),
+            Signal::RustOptionUnwrap => todo!(),
+            Signal::RustResultUnwrap => todo!(),
+            Signal::RustIndexOutOfBounds => todo!(),
+            Signal::RustExit => todo!(),
         },
         Os::Windows => match signal {
             Signal::Fpe => {
@@ -386,7 +446,7 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                     errors::ExceptionCodeWindows::EXCEPTION_ILLEGAL_INSTRUCTION
                 ));
             }
-            Signal::Segv => {
+            Signal::Segv | Signal::SegvNonCanonical => {
                 verify!(CrashReason::WindowsAccessViolation(
                     errors::ExceptionCodeWindowsAccessType::WRITE
                 ));
@@ -419,6 +479,15 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
             Signal::Guard => {
                 unreachable!("macos only");
             }
+            Signal::RustProcessAbort => todo!(),
+            Signal::RustPanic => todo!(),
+            Signal::RustAssert => todo!(),
+            Signal::RustAssertEq => todo!(),
+            Signal::RustDivByZero => todo!(),
+            Signal::RustOptionUnwrap => todo!(),
+            Signal::RustResultUnwrap => todo!(),
+            Signal::RustIndexOutOfBounds => todo!(),
+            Signal::RustExit => todo!(),
         },
         #[allow(clippy::match_same_arms)]
         Os::MacOs => match signal {
@@ -466,7 +535,7 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                     }
                 }
             }
-            Signal::Segv => {
+            Signal::Segv | Signal::SegvNonCanonical => {
                 verify!(CrashReason::MacBadAccessKern(
                     errors::ExceptionCodeMacBadAccessKernType::KERN_INVALID_ADDRESS,
                 ));
@@ -521,6 +590,15 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
             Signal::Purecall | Signal::InvalidParameter => {
                 unreachable!("windows only");
             }
+            Signal::RustProcessAbort => todo!(),
+            Signal::RustPanic => todo!(),
+            Signal::RustAssert => todo!(),
+            Signal::RustAssertEq => todo!(),
+            Signal::RustDivByZero => todo!(),
+            Signal::RustOptionUnwrap => todo!(),
+            Signal::RustResultUnwrap => todo!(),
+            Signal::RustIndexOutOfBounds => todo!(),
+            Signal::RustExit => todo!(),
         },
         _ => unreachable!("apparently we are targeting a new OS"),
     }

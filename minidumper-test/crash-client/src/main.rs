@@ -1,3 +1,5 @@
+#![allow(unconditional_panic)]
+
 use minidumper_test::Signal;
 
 use clap::Parser;
@@ -87,6 +89,9 @@ fn real_main() -> anyhow::Result<()> {
                 Signal::Segv => {
                     sadness_generator::raise_segfault();
                 }
+                Signal::SegvNonCanonical => {
+                    sadness_generator::raise_segfault_non_canonical();
+                }
                 Signal::StackOverflow => {
                     sadness_generator::raise_stack_overflow();
                 }
@@ -112,6 +117,30 @@ fn real_main() -> anyhow::Result<()> {
                 Signal::Guard => {
                     sadness_generator::raise_guard_exception();
                 }
+                Signal::RustProcessAbort => std::process::abort(),
+                Signal::RustPanic => panic!("oh no! something terrible has happened!"),
+                Signal::RustAssert => assert!(5 > 10, "oh no, we're in the normal math universe!"),
+                Signal::RustAssertEq => assert_eq!(7, 13, "it's still the normal math universe!"),
+                Signal::RustDivByZero => {
+                    let x = 10 / 0;
+                    unreachable!("oh god why did div-by-0 work: {}", x);
+                }
+                Signal::RustOptionUnwrap => {
+                    let mut rust_has_no_null = Some(true);
+                    assert!(rust_has_no_null.unwrap());
+                    rust_has_no_null = None;
+                    println!("does rust have no nulls? {}", rust_has_no_null.unwrap());
+                }
+                Signal::RustResultUnwrap => {
+                    println!("{}", parse_int("12 ae3"));
+                }
+                Signal::RustIndexOutOfBounds => {
+                    let data = &[1, 2, 3];
+                    let x = get_important_data(data, 0);
+                    let y = get_important_data(data, 5);
+                    println!("x + y = {}", x + y);
+                }
+                Signal::RustExit => std::process::exit(-1),
             }
         }
     };
@@ -133,6 +162,14 @@ fn real_main() -> anyhow::Result<()> {
     }
 
     anyhow::bail!("we should have raised a signal and exited");
+}
+
+fn parse_int(input: &str) -> i32 {
+    input.parse().unwrap()
+}
+
+fn get_important_data(data: &[u32], idx: usize) -> u32 {
+    data[idx]
 }
 
 fn main() {

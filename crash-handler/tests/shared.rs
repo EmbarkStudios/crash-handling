@@ -72,7 +72,7 @@ pub fn handles_crash(flavor: SadnessFlavor) {
                             SadnessFlavor::Illegal => ExceptionCode::Illegal,
                             SadnessFlavor::InvalidParameter => ExceptionCode::InvalidParameter,
                             SadnessFlavor::Purecall => ExceptionCode::Purecall,
-                            SadnessFlavor::Segfault => ExceptionCode::Segv,
+                            SadnessFlavor::Segfault | SadnessFlavor::SegfaultNonCanonical => ExceptionCode::Segv,
                             SadnessFlavor::StackOverflow { .. }=> ExceptionCode::StackOverflow,
                             SadnessFlavor::Trap => ExceptionCode::Trap,
                         };
