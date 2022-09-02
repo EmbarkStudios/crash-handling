@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.4.2] - 2022-09-02
 ### Changed
 - [PR#52](https://github.com/EmbarkStudios/crash-handling/pull/52) changed the address used to produce a `sigsegv` to be a canonical rather than a non-canonical address on 64-bit architectures. We will eventually add back support for non-canonical addresses.
 
@@ -45,7 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial pass of crash-context, Linux only
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/sadness-generator-0.4.1...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/sadness-generator-0.4.2...HEAD
+[0.4.2]: https://github.com/EmbarkStudios/crash-handling/compare/sadness-generator-0.4.1...sadness-generator-0.4.2
 [0.4.1]: https://github.com/EmbarkStudios/crash-handling/compare/sadness-generator-0.4.0...sadness-generator-0.4.1
 [0.4.0]: https://github.com/EmbarkStudios/crash-handling/compare/0.3.1...sadness-generator-0.4.0
 [0.3.1]: https://github.com/EmbarkStudios/crash-handling/compare/0.3.1...0.3.1

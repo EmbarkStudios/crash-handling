@@ -1,6 +1,6 @@
 [package]
 name = "sadness-generator"
-version = "0.4.1"
+version = "0.4.2"
 description = "Provides various ways to make your program sad"
 repository = "https://github.com/EmbarkStudios/crash-handling"
 authors = [
