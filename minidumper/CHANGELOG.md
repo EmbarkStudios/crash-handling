@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.5.1] - 2022-09-02
 ### Fixed
 - [PR#58](https://github.com/EmbarkStudios/crash-handling/pull/58) fixed an issue on Linux where the socket poll would erroneously return an error if it was interrupted. This is now handled gracefully. Thanks [@MarcusGrass](https://github.com/MarcusGrass)!
 
@@ -46,7 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial pass of crash-context, Linux only
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/minidumper-0.5.0...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/minidumper-0.5.1...HEAD
+[0.5.1]: https://github.com/EmbarkStudios/crash-handling/compare/minidumper-0.5.0...minidumper-0.5.1
 [0.5.0]: https://github.com/EmbarkStudios/crash-handling/compare/minidumper-0.4.0...minidumper-0.5.0
 [0.4.0]: https://github.com/EmbarkStudios/crash-handling/compare/0.3.1...minidumper-0.4.0
 [0.3.1]: https://github.com/EmbarkStudios/crash-handling/compare/0.3.0...0.3.1
