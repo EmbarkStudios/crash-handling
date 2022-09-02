@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#52](https://github.com/EmbarkStudios/crash-handling/pull/52) changed the address used to produce a `sigsegv` to be a canonical rather than a non-canonical address on 64-bit architectures. We will eventually add back support for non-canonical addresses.
+
 ## [0.4.1] - 2022-07-21
 ### Added
 - [PR#47](https://github.com/EmbarkStudios/crash-handling/pull/47) added support for raising `EXC_GUARD` exceptions on MacOS.
