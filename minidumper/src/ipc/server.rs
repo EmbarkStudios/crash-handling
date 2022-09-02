@@ -1,7 +1,7 @@
-use std::io::ErrorKind;
 use super::{Connection, Header, Listener, SocketName};
 use crate::{Error, LoopAction};
 use polling::{Event, Poller};
+use std::io::ErrorKind;
 use std::time::{Duration, Instant};
 
 /// Server side of the connection, which runs in the monitor process that is
