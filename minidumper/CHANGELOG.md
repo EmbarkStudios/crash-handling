@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#58](https://github.com/EmbarkStudios/crash-handling/pull/58) fixed an issue on Linux where the socket poll would erroneously return an error if it was interrupted. This is now handled gracefully. Thanks [@MarcusGrass](https://github.com/MarcusGrass)!
+
 ## [0.5.0] - 2022-07-21
 ### Changed
 - [PR#50](https://github.com/EmbarkStudios/crash-handling/pull/50) updated `minidump-writer` to take advantage of improvements in writing macos minidumps.
