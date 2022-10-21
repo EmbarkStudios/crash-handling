@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.6.0] - 2022-10-21
 ### Changed
 - [PR#60](https://github.com/EmbarkStudios/crash-handling/pull/60) updated `minidump-writer -> 0.5` and `windows-sys -> 0.42`.
 
@@ -50,7 +51,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial pass of crash-context, Linux only
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/minidumper-0.5.1...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/minidumper-0.6.0...HEAD
+[0.6.0]: https://github.com/EmbarkStudios/crash-handling/compare/minidumper-0.5.1...minidumper-0.6.0
 [0.5.1]: https://github.com/EmbarkStudios/crash-handling/compare/minidumper-0.5.0...minidumper-0.5.1
 [0.5.0]: https://github.com/EmbarkStudios/crash-handling/compare/minidumper-0.4.0...minidumper-0.5.0
 [0.4.0]: https://github.com/EmbarkStudios/crash-handling/compare/0.3.1...minidumper-0.4.0
