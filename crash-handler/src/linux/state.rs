@@ -92,7 +92,7 @@ pub unsafe fn install_sigaltstack() -> Result<(), Error> {
     );
 
     *STACK_SAVE.lock() = Some(StackSave {
-        old: (old_stack.ss_flags & libc::SS_DISABLE != 0).then(|| old_stack),
+        old: (old_stack.ss_flags & libc::SS_DISABLE != 0).then_some(old_stack),
         new: new_stack,
     });
 
@@ -392,12 +392,16 @@ static CRASH_CONTEXT: parking_lot::Mutex<mem::MaybeUninit<crash_context::CrashCo
 
 pub(super) struct HandlerInner {
     handler: Box<dyn crate::CrashEvent>,
+    pub(super) dump_process: Option<u32>,
 }
 
 impl HandlerInner {
     #[inline]
     pub(super) fn new(handler: Box<dyn crate::CrashEvent>) -> Self {
-        Self { handler }
+        Self {
+            handler,
+            dump_process: None,
+        }
     }
 
     pub(super) unsafe fn handle_signal(
@@ -412,7 +416,7 @@ impl HandlerInner {
         let nix_info = &*((info as *const libc::siginfo_t).cast::<libc::signalfd_siginfo>());
 
         // Allow ourselves to be dumped, if that is what the user handler wishes to do
-        let _set_dumpable = SetDumpable::new();
+        let _set_dumpable = SetDumpable::new(self.dump_process);
         let mut crash_ctx = CRASH_CONTEXT.lock();
 
         {
@@ -451,6 +455,8 @@ impl HandlerInner {
 /// from eg. Android
 const PR_GET_DUMPABLE: i32 = 3;
 const PR_SET_DUMPABLE: i32 = 4;
+const PR_SET_PTRACER: i32 = 0x59616d61;
+const PR_SET_PTRACER_ANY: i32 = -1;
 
 /// Helper that sets the process as dumpable if it is not, and when dropped
 /// returns it back to the original state if needed
@@ -459,7 +465,7 @@ struct SetDumpable {
 }
 
 impl SetDumpable {
-    unsafe fn new() -> Self {
+    unsafe fn new(dump_process: Option<u32>) -> Self {
         let is_dumpable = libc::syscall(libc::SYS_prctl, PR_GET_DUMPABLE, 0, 0, 0, 0);
         let was_dumpable = is_dumpable > 0;
 
@@ -467,14 +473,30 @@ impl SetDumpable {
             libc::syscall(libc::SYS_prctl, PR_SET_DUMPABLE, 1, 0, 0, 0);
         }
 
+        // Set the process that is allowed to do ptrace operations on this process,
+        // we either set it to the process that the user specified, or allow
+        // any process, which _somewhat_ defeats the purpose of the yama security
+        // that this call is needed for
+        let ptracer = dump_process.map_or(PR_SET_PTRACER_ANY, |dp| dp as i32);
+
+        // Note that this will fail with EINVAL if the pid does not exist, but
+        // that would be on the user. We only need to do this if
+        // `/proc/sys/kernel/yama/ptrace_scope` = 1, but should not have a negative
+        // impact if it is in any other mode
+        libc::syscall(libc::SYS_prctl, PR_SET_PTRACER, ptracer, 0, 0, 0);
+
         Self { was_dumpable }
     }
 }
 
 impl Drop for SetDumpable {
     fn drop(&mut self) {
-        if !self.was_dumpable {
-            unsafe { libc::syscall(libc::SYS_prctl, PR_SET_DUMPABLE, 0, 0, 0, 0) };
+        unsafe {
+            libc::syscall(libc::SYS_prctl, PR_SET_PTRACER, 0, 0, 0, 0);
+
+            if !self.was_dumpable {
+                libc::syscall(libc::SYS_prctl, PR_SET_DUMPABLE, 0, 0, 0, 0);
+            }
         }
     }
 }
