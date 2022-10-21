@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Added
+- [PR#60](https://github.com/EmbarkStudios/crash-handling/pull/60) resolved [#59](https://github.com/EmbarkStudios/crash-handling/issues/59) by adding support for `PR_SET_PTRACER` before invoking the user callback, ensuring that an external process has permissions to perform `ptrace` operations on the crashing process, even if `/proc/sys/kernel/yama/ptrace_scope` is set to restricted (1), as this is the default for most newer distributions.
+
+### Changed
+- [PR#60](https://github.com/EmbarkStudios/crash-handling/pull/60) bumped `windows-sys` to 0.42.
+
 ## [0.3.3] - 2022-07-21
 ### Added
 - [PR#46](https://github.com/EmbarkStudios/crash-handling/pull/46) resolved [#33](https://github.com/EmbarkStudios/crash-handling/issues/33) by adding support for `EXC_RESOURCE` exceptions. Since not all resource exceptions are fatal, they are checked and only reported to the user callback if they are indeed fatal.
