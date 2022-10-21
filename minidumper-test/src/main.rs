@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{ArgEnum, Parser};
+use clap::{Parser, ValueEnum};
 use minidumper_test::*;
 
 #[derive(Parser)]
@@ -10,7 +10,7 @@ struct Command {
     //#[clap(long)]
     //id: String,
     /// The signal/exception to raise
-    #[clap(action, long, arg_enum)]
+    #[clap(action, long)]
     signal: Option<Signal>,
     /// Raises the signal on a separate thread rather than the main thread
     #[clap(action, long)]
@@ -31,7 +31,7 @@ fn main() {
 
     if cli.list {
         for variant in Signal::value_variants() {
-            println!("{}", variant);
+            println!("{variant}");
         }
     } else if let Some(signal) = cli.signal {
         dump_test(signal, cli.use_thread, cli.dump);

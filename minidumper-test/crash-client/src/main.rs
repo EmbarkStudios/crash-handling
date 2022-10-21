@@ -9,7 +9,7 @@ struct Command {
     #[clap(long)]
     id: String,
     /// The signal/exception to raise
-    #[clap(long, arg_enum)]
+    #[clap(long)]
     signal: Signal,
     /// Raises the signal on a separate thread rather than the main thread
     #[clap(long)]

@@ -16,15 +16,13 @@ pub fn run_test(signal: Signal, counter: u32, use_thread: bool) -> Vec<u8> {
 
 pub fn dump_test(signal: Signal, use_thread: bool, dump_path: Option<PathBuf>) {
     let id = format!(
-        "{}-{}-{}",
-        signal,
-        0,
+        "{signal}-0-{}",
         if use_thread { "threaded" } else { "simple" }
     );
     let _md = generate_minidump(&id, signal, use_thread, dump_path);
 }
 
-#[derive(clap::ArgEnum, Clone, Copy)]
+#[derive(clap::ValueEnum, Clone, Copy)]
 pub enum Signal {
     #[cfg(unix)]
     Abort,
