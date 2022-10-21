@@ -24,7 +24,7 @@ libc = "0.2"
 # Basic log emitting
 log = "0.4"
 # Minidump writing
-minidump-writer = "0.4"
+minidump-writer = "0.5"
 # Event loop
 polling = "2.2"
 # Nicer locking primitives
