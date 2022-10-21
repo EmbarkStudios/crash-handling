@@ -8,10 +8,7 @@ targets = [
 vulnerability = "deny"
 unmaintained = "deny"
 yanked = "deny"
-ignore = [
-    # ansi_term is unmaintained, but it works so...
-    "RUSTSEC-2021-0139",
-]
+ignore = []
 
 [licenses]
 unlicensed = "deny"
