@@ -52,6 +52,35 @@ impl CrashHandler {
         state::detach();
     }
 
+    /// Set the process that is allowed to perform `ptrace` operations on the
+    /// current process.
+    ///
+    /// If you want to write a minidump from a child/external process when
+    /// a crash occurs in this process, you can use this method to set that
+    /// process as the only process allowed to use ptrace on this process.
+    ///
+    /// The process set by this method will be used by calling
+    /// `prctl(PR_SET_PTRACER, <the pid you want to ptrace this process>, ...)`
+    /// before handing off control to your user callback, presumably to trigger
+    /// dumping of your process via the specified process. By default if this
+    /// method is not called, `PR_SET_PTRACER_ANY` is used to allow any process
+    /// to dump the current process.
+    ///
+    /// Note that this is only needed of `/proc/sys/kernel/yama/ptrace_scope`
+    /// is 1 "restricted ptrace", but there is no harm in setting this if it is
+    /// in another mode.
+    ///
+    /// See <https://www.kernel.org/doc/Documentation/security/Yama.txt> for
+    /// the full documentation.
+    #[inline]
+    pub fn set_ptracer(&self, pid: Option<u32>) {
+        let mut lock = state::HANDLER.lock();
+
+        if let Some(handler) = &mut *lock {
+            handler.dump_process = pid;
+        }
+    }
+
     /// Sends the specified user signal.
     pub fn simulate_signal(&self, signal: Signal) -> crate::CrashEventResult {
         // Normally this would be an unsafe function, since this unsafe encompasses

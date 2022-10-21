@@ -14,11 +14,11 @@ path = "crash-client/src/main.rs"
 
 [dependencies]
 anyhow = "1.0"
-clap = { version = "3.1", features = ["derive"] }
+clap = { version = "4.0", features = ["derive"] }
 cfg-if = "1.0"
 crash-handler = { path = "../crash-handler" }
-minidump = "0.12"
-minidump-common = "0.12"
+minidump = "0.14"
+minidump-common = "0.14"
 minidumper = { path = "../minidumper" }
 # This has some crazy dependencies, can enable manually if needed
 #notify-rust = "4.5"

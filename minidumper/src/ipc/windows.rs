@@ -10,7 +10,7 @@ use std::{
 };
 use windows_sys::Win32::{
     Foundation::{self as found, HANDLE},
-    Networking::WinSock as ws,
+    Networking::WinSock::{self as ws, SOCKADDR_UN as sockaddr_un},
 };
 
 pub(crate) fn init() {
@@ -30,7 +30,7 @@ fn last_socket_error() -> io::Error {
 }
 
 pub(crate) struct UnixSocketAddr {
-    addr: ws::sockaddr_un,
+    addr: sockaddr_un,
     len: i32,
 }
 
@@ -42,7 +42,7 @@ impl UnixSocketAddr {
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "path is not utf-8"))?
             .as_bytes();
 
-        let mut sock_addr = ws::sockaddr_un {
+        let mut sock_addr = sockaddr_un {
             sun_family: ws::AF_UNIX,
             sun_path: [0u8; 108],
         };
@@ -66,7 +66,7 @@ impl UnixSocketAddr {
     }
 
     #[inline]
-    fn from_parts(addr: ws::sockaddr_un, len: i32) -> io::Result<Self> {
+    fn from_parts(addr: sockaddr_un, len: i32) -> io::Result<Self> {
         if addr.sun_family != ws::AF_UNIX {
             Err(io::Error::new(
                 io::ErrorKind::InvalidData,
@@ -269,7 +269,7 @@ impl UnixListener {
         if unsafe {
             ws::bind(
                 inner.as_raw_socket() as _,
-                (&addr.addr as *const ws::sockaddr_un).cast(),
+                (&addr.addr as *const sockaddr_un).cast(),
                 addr.len as i32,
             )
         } != 0
@@ -289,8 +289,8 @@ impl UnixListener {
     }
 
     pub(crate) fn accept_unix_addr(&self) -> io::Result<(UnixStream, UnixSocketAddr)> {
-        let mut sock_addr = std::mem::MaybeUninit::<ws::sockaddr_un>::uninit();
-        let mut len = std::mem::size_of::<ws::sockaddr_un>() as i32;
+        let mut sock_addr = std::mem::MaybeUninit::<sockaddr_un>::uninit();
+        let mut len = std::mem::size_of::<sockaddr_un>() as i32;
 
         let sock = self.0.accept(sock_addr.as_mut_ptr().cast(), &mut len)?;
         // SAFETY: should have been initialized if accept succeeded
@@ -339,7 +339,7 @@ impl UnixStream {
         if unsafe {
             ws::connect(
                 inner.as_raw_socket() as _,
-                (&addr.addr as *const ws::sockaddr_un).cast(),
+                (&addr.addr as *const sockaddr_un).cast(),
                 addr.len as i32,
             )
         } != 0

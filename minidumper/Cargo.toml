@@ -24,7 +24,7 @@ libc = "0.2"
 # Basic log emitting
 log = "0.4"
 # Minidump writing
-minidump-writer = "0.4"
+minidump-writer = "0.5"
 # Event loop
 polling = "2.2"
 # Nicer locking primitives
@@ -41,7 +41,7 @@ uds = "0.2.6"
 scroll = "0.11"
 
 [target.'cfg(target_os = "windows")'.dependencies.windows-sys]
-version = "0.36" # Keep aligned with parking_lot & minidump-writer & crash-handler
+version = "0.42" # Keep aligned with parking_lot & minidump-writer & crash-handler
 features = [
     "Win32_Foundation",         # Core types eg HANDLE
     "Win32_Networking_WinSock", # Sockets

@@ -66,17 +66,17 @@ fn main() {
         return;
     }
 
-    let mut _server_proc = None;
+    let mut server = None;
 
     // Attempt to connect to the server
-    let client = loop {
+    let (client, _server) = loop {
         if let Ok(client) = Client::with_name(SOCKET_NAME) {
-            break client;
+            break (client, server.unwrap());
         }
 
         let exe = std::env::current_exe().expect("unable to find ourselves");
 
-        _server_proc = Some(
+        server = Some(
             std::process::Command::new(exe)
                 .arg("--server")
                 .spawn()
@@ -107,6 +107,13 @@ fn main() {
         })
     })
     .expect("failed to attach signal handler");
+
+    // On linux we can explicitly allow only the server process to inspect the
+    // process we are monitoring (this one) for crashes
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    {
+        handler.set_ptracer(Some(_server.id()));
+    }
 
     cfg_if::cfg_if! {
         if #[cfg(any(target_os = "linux", target_os = "android"))] {
