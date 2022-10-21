@@ -69,7 +69,7 @@ fn main() {
     let mut server = None;
 
     // Attempt to connect to the server
-    let (client, server) = loop {
+    let (client, _server) = loop {
         if let Ok(client) = Client::with_name(SOCKET_NAME) {
             break (client, server.unwrap());
         }
@@ -112,7 +112,7 @@ fn main() {
     // process we are monitoring (this one) for crashes
     #[cfg(any(target_os = "linux", target_os = "android"))]
     {
-        handler.set_ptracer(Some(server.id()));
+        handler.set_ptracer(Some(_server.id()));
     }
 
     cfg_if::cfg_if! {
