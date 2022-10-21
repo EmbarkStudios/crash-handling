@@ -375,7 +375,7 @@ impl Server {
                     kind: crash_ctx_msg.exception_kind,
                     code: crash_ctx_msg.exception_code,
                     subcode: (crash_ctx_msg.flags & FLAG_HAS_SUBCODE != 0)
-                        .then(|| crash_ctx_msg.exception_subcode),
+                        .then_some(crash_ctx_msg.exception_subcode),
                 })
             } else {
                 None
@@ -399,7 +399,7 @@ impl Server {
             // set or somehow died immediately
             let acker = Acknowledger {
                 port: (ack_port != port::MACH_PORT_DEAD && ack_port != port::MACH_PORT_NULL)
-                    .then(|| ack_port),
+                    .then_some(ack_port),
             };
 
             Ok(Some(ReceivedCrashContext {

@@ -418,7 +418,7 @@ unsafe fn exception_handler(port: mach_port_t, us: UserSignal) {
                 let ret_code = if request.task.name == mach_task_self() {
                     let _ss = ScopedSuspend::new();
 
-                    let subcode = (request.code_count > 1).then(|| request.code[1]);
+                    let subcode = (request.code_count > 1).then_some(request.code[1]);
 
                     let exc_info = crash_context::ExceptionInfo {
                         kind: request.exception,
@@ -493,7 +493,7 @@ unsafe fn exception_handler(port: mach_port_t, us: UserSignal) {
                             kind: user_exception.exception_kind,
                             code: user_exception.exception_code,
                             subcode: (user_exception.flags & FLAG_HAS_SUBCODE != 0)
-                                .then(|| user_exception.exception_subcode),
+                                .then_some(user_exception.exception_subcode),
                         })
                     } else {
                         None
