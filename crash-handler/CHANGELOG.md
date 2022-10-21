@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.4.0] - 2022-10-21
 ### Added
 - [PR#60](https://github.com/EmbarkStudios/crash-handling/pull/60) resolved [#59](https://github.com/EmbarkStudios/crash-handling/issues/59) by adding support for `PR_SET_PTRACER` before invoking the user callback, ensuring that an external process has permissions to perform `ptrace` operations on the crashing process, even if `/proc/sys/kernel/yama/ptrace_scope` is set to restricted (1), as this is the default for most newer distributions.
 
@@ -50,7 +51,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial pass of crash-context, Linux only
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.3.3...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.4.0...HEAD
+[0.4.0]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.3.3...crash-handler-0.4.0
 [0.3.3]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.3.2...crash-handler-0.3.3
 [0.3.2]: https://github.com/EmbarkStudios/crash-handling/compare/0.3.1...crash-handler-0.3.2
 [0.3.1]: https://github.com/EmbarkStudios/crash-handling/compare/0.3.1...0.3.1
