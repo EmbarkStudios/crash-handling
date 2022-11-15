@@ -67,7 +67,6 @@ impl SadnessFlavor {
     /// This is not safe. It intentionally crashes.
     pub unsafe fn make_sad(self) -> ! {
         match self {
-            #[cfg(unix)]
             Self::Abort => raise_abort(),
             Self::Segfault => raise_segfault(),
             Self::DivideByZero => raise_floating_point_exception(),
