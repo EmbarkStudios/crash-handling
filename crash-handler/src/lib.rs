@@ -51,7 +51,13 @@ pub use crash_context::CrashContext;
 pub enum CrashEventResult {
     /// The event was handled in some way
     Handled(bool),
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(all(
+        not(target_os = "macos"),
+        any(
+            target_os = "linux",
+            all(target_os = "windows", target_arch = "x86_64")
+        )
+    ))]
     /// The handler wishes to jump somewhere else, presumably to return
     /// execution and skip the code that caused the exception
     Jump {
@@ -139,7 +145,10 @@ cfg_if::cfg_if! {
     } else if #[cfg(target_os = "windows")] {
         mod windows;
 
-        pub use windows::{CrashHandler, ExceptionCode, jmp};
+        #[cfg(target_arch = "x86_64")]
+        pub use windows::jmp;
+
+        pub use windows::{CrashHandler, ExceptionCode};
     } else if #[cfg(target_os = "macos")] {
         mod mac;
 

@@ -12,7 +12,7 @@ use windows_sys::Win32::Foundation as found;
 /// as eg. a distinction is made between a divide by zero between integers and
 /// floats.
 #[derive(Copy, Clone)]
-#[repr(i32)]
+#[repr(u32)]
 pub enum ExceptionCode {
     Fpe = found::EXCEPTION_INT_DIVIDE_BY_ZERO,
     Illegal = found::EXCEPTION_ILLEGAL_INSTRUCTION,
@@ -46,9 +46,9 @@ impl CrashHandler {
         state::detach();
     }
 
-    // Sends the specified user exception
-    #[allow(clippy::unused_self)]
-    pub fn simulate_exception(&self, exception_code: Option<i32>) -> crate::CrashEventResult {
+    /// Creates an exception with the specified exception code that is passed
+    /// through the user provided callback.
+    pub fn simulate_exception(&self, exception_code: Option<u32>) -> crate::CrashEventResult {
         // Normally this would be an unsafe function, since this unsafe encompasses
         // the entirety of the body, however the user is really not required to
         // uphold any guarantees on their end, so no real need to declare the

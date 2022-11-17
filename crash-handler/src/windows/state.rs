@@ -116,6 +116,38 @@ pub(super) fn detach() {
     lock.take();
 }
 
+pub(super) unsafe fn simulate_exception(exception_code: Option<u32>) -> crate::CrashEventResult {
+    let lock = HANDLER.lock();
+    if let Some(handler) = &*lock {
+        let mut exception_record: ffi::EXCEPTION_RECORD = std::mem::zeroed();
+        let mut exception_context = std::mem::MaybeUninit::zeroed();
+
+        ffi::capture_context(exception_context.as_mut_ptr());
+
+        let mut exception_context = exception_context.assume_init();
+
+        let exception_ptrs = ffi::EXCEPTION_POINTERS {
+            ExceptionRecord: &mut exception_record,
+            ContextRecord: &mut exception_context,
+        };
+
+        // https://github.com/chromium/crashpad/blob/fca8871ca3fb721d3afab370ca790122f9333bfd/util/win/exception_codes.h#L32
+        let exception_code = exception_code.unwrap_or(ExceptionCode::User as u32);
+        exception_record.ExceptionCode = exception_code;
+
+        let cc = crash_context::CrashContext {
+            exception_pointers: (&exception_ptrs as *const ffi::EXCEPTION_POINTERS).cast(),
+            process_id: std::process::id(),
+            thread_id: GetCurrentThreadId(),
+            exception_code,
+        };
+
+        handler.user_handler.on_crash(&cc)
+    } else {
+        crate::CrashEventResult::Handled(false)
+    }
+}
+
 /// While handling any exceptions, especially when calling user code, we restore
 /// and previously registered handlers
 /// Note this keeps the `HANDLER` lock for the duration of the scope
@@ -175,7 +207,7 @@ use crate::CrashEventResult;
 pub(super) unsafe extern "system" fn handle_exception(
     except_info: *const EXCEPTION_POINTERS,
 ) -> i32 {
-    let jump = {
+    let _jump = {
         let lock = HANDLER.lock();
         if let Some(current_handler) = AutoHandler::new(lock) {
             let code = (*(*except_info).ExceptionRecord).ExceptionCode;
@@ -209,6 +241,7 @@ pub(super) unsafe extern "system" fn handle_exception(
                         EXCEPTION_CONTINUE_SEARCH
                     };
                 }
+                #[cfg(target_arch = "x86_64")]
                 CrashEventResult::Jump { jmp_buf, value } => (jmp_buf, value),
             }
         } else {
@@ -216,7 +249,8 @@ pub(super) unsafe extern "system" fn handle_exception(
         }
     };
 
-    super::jmp::longjmp(jump.0, jump.1);
+    #[cfg(target_arch = "x86_64")]
+    super::jmp::longjmp(_jump.0, _jump.1);
 }
 
 /// Handler for invalid parameters to CRT functions, this is not an exception so
@@ -236,7 +270,7 @@ unsafe extern "C" fn handle_invalid_parameter(
     line: u32,
     reserved: usize,
 ) {
-    let jump = {
+    let _jump = {
         let lock = HANDLER.lock();
         if let Some(current_handler) = AutoHandler::new(lock) {
             // Make up an exception record for the current thread and CPU context
@@ -255,13 +289,14 @@ unsafe extern "C" fn handle_invalid_parameter(
                 ContextRecord: &mut exception_context,
             };
 
-            exception_record.ExceptionCode = STATUS_INVALID_PARAMETER;
+            let exception_code = ExceptionCode::InvalidParameter as u32;
+            exception_record.ExceptionCode = exception_code;
 
             match current_handler.user_handler.on_crash(&crate::CrashContext {
                 exception_pointers: (&exception_ptrs as *const EXCEPTION_POINTERS).cast(),
                 process_id: std::process::id(),
                 thread_id: GetCurrentThreadId(),
-                exception_code: STATUS_INVALID_PARAMETER,
+                exception_code,
             }) {
                 CrashEventResult::Handled(true) => return,
                 CrashEventResult::Handled(false) => {
@@ -292,6 +327,7 @@ unsafe extern "C" fn handle_invalid_parameter(
                     // the behavior of "swallowing" exceptions.
                     std::process::exit(0);
                 }
+                #[cfg(target_arch = "x86_64")]
                 CrashEventResult::Jump { jmp_buf, value } => (jmp_buf, value),
             }
         } else {
@@ -299,14 +335,15 @@ unsafe extern "C" fn handle_invalid_parameter(
         }
     };
 
-    super::jmp::longjmp(jump.0, jump.1);
+    #[cfg(target_arch = "x86_64")]
+    super::jmp::longjmp(_jump.0, _jump.1);
 }
 
 /// Handler for pure virtual function calls, this is not an exception so the
 /// context (shouldn't be) isn't compromised
 #[no_mangle]
 unsafe extern "C" fn handle_pure_virtual_call() {
-    let jump = {
+    let _jump = {
         let lock = HANDLER.lock();
         if let Some(current_handler) = AutoHandler::new(lock) {
             // Make up an exception record for the current thread and CPU context
@@ -325,13 +362,14 @@ unsafe extern "C" fn handle_pure_virtual_call() {
                 ContextRecord: &mut exception_context,
             };
 
-            exception_record.ExceptionCode = STATUS_NONCONTINUABLE_EXCEPTION;
+            let exception_code = ExceptionCode::Purecall as u32;
+            exception_record.ExceptionCode = exception_code;
 
             match current_handler.user_handler.on_crash(&crate::CrashContext {
                 exception_pointers: (&exception_ptrs as *const EXCEPTION_POINTERS).cast(),
                 process_id: std::process::id(),
                 thread_id: GetCurrentThreadId(),
-                exception_code: STATUS_NONCONTINUABLE_EXCEPTION,
+                exception_code,
             }) {
                 CrashEventResult::Handled(true) => {
                     // The handler either took care of the invalid parameter problem itself,
@@ -350,6 +388,7 @@ unsafe extern "C" fn handle_pure_virtual_call() {
                     // This will just throw up an assertion dialog.
                     return;
                 }
+                #[cfg(target_arch = "x86_64")]
                 CrashEventResult::Jump { jmp_buf, value } => (jmp_buf, value),
             }
         } else {
@@ -357,5 +396,6 @@ unsafe extern "C" fn handle_pure_virtual_call() {
         }
     };
 
-    super::jmp::longjmp(jump.0, jump.1);
+    #[cfg(target_arch = "x86_64")]
+    super::jmp::longjmp(_jump.0, _jump.1);
 }
