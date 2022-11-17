@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#64](https://github.com/EmbarkStudios/crash-handling/pull/64) fixed compilation for `aarch64-linux-android`. Additional targets were added to CI so they get caught before release.
+
 ## [0.5.0] - 2022-11-17
 ### Added
 - [PR#62](https://github.com/EmbarkStudios/crash-handling/pull/62) and [PR#63](https://github.com/EmbarkStudios/crash-handling/pull/63) added support for handling `SIGABRT` on Windows.
