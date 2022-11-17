@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Added
+- [PR#62](https://github.com/EmbarkStudios/crash-handling/pull/62) and [PR#63](https://github.com/EmbarkStudios/crash-handling/pull/63) added support for handling `SIGABRT` on Windows.
+
+### Fixed
+- [PR#62](https://github.com/EmbarkStudios/crash-handling/pull/62) changed from using `RtlCaptureContext` on Windows to using `crash_context::capture_context`. This implementation fixes a crash issue due to `winapi` and `windows-sys` having [improper bindings](https://github.com/microsoft/win32metadata/issues/1044).
+
+### Changed
+- [PR#62](https://github.com/EmbarkStudios/crash-handling/pull/62) changed from using `RtlCaptureContext` on Windows to using `crash_context::capture_context`. This implementation additionally captures floating point and vector state on `x86_64` unlike `RtlCaptureContext`.
+
 ## [0.4.0] - 2022-10-21
 ### Added
 - [PR#60](https://github.com/EmbarkStudios/crash-handling/pull/60) resolved [#59](https://github.com/EmbarkStudios/crash-handling/issues/59) by adding support for `PR_SET_PTRACER` before invoking the user callback, ensuring that an external process has permissions to perform `ptrace` operations on the crashing process, even if `/proc/sys/kernel/yama/ptrace_scope` is set to restricted (1), as this is the default for most newer distributions.

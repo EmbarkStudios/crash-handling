@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#63](https://github.com/EmbarkStudios/crash-handling/pull/63) replaced `windows-sys` with `winapi`, resolving [#61](https://github.com/EmbarkStudios/crash-handling/issues/61). Eventually `winapi` will be removed as well.
+
 ## [0.6.0] - 2022-10-21
 ### Changed
 - [PR#60](https://github.com/EmbarkStudios/crash-handling/pull/60) updated `minidump-writer -> 0.5` and `windows-sys -> 0.42`.

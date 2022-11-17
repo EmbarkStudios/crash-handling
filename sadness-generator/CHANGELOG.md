@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#63](https://github.com/EmbarkStudios/crash-handling/pull/63) added `SadnessFlavor::Abort` to Windows, and `raise_abort` now uses `libc::abort` instead of `std::process::abort` to have consistent behavior between all targets.
+
+### Fixed
+- [PR#63](https://github.com/EmbarkStudios/crash-handling/pull/63) fixed compilation for `aarch64-pc-windows-msvc`.
+
 ## [0.4.2] - 2022-09-02
 ### Changed
 - [PR#52](https://github.com/EmbarkStudios/crash-handling/pull/52) changed the address used to produce a `sigsegv` to be a canonical rather than a non-canonical address on 64-bit architectures. We will eventually add back support for non-canonical addresses.
