@@ -1,7 +1,6 @@
 pre-release-commit-message = "Release crash-handler-{{version}}"
 tag-message = "Release crash-handler-{{version}}"
 tag-name = "crash-handler-{{version}}"
-consolidate-pushes = true
 pre-release-replacements = [
     { file = "CHANGELOG.md", search = "Unreleased", replace = "{{version}}" },
     { file = "CHANGELOG.md", search = "\\.\\.\\.HEAD", replace = "...{{tag_name}}" },

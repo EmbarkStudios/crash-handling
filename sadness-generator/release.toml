@@ -1,7 +1,6 @@
 pre-release-commit-message = "Release sadness-generator-{{version}}"
 tag-message = "Release sadness-generator-{{version}}"
 tag-name = "sadness-generator-{{version}}"
-consolidate-pushes = true
 pre-release-replacements = [
     { file = "CHANGELOG.md", search = "Unreleased", replace = "{{version}}" },
     { file = "CHANGELOG.md", search = "\\.\\.\\.HEAD", replace = "...{{tag_name}}" },

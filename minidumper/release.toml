@@ -1,7 +1,6 @@
 pre-release-commit-message = "Release minidumper-{{version}}"
 tag-message = "Release minidumper-{{version}}"
 tag-name = "minidumper-{{version}}"
-consolidate-pushes = true
 pre-release-replacements = [
     { file = "CHANGELOG.md", search = "Unreleased", replace = "{{version}}" },
     { file = "CHANGELOG.md", search = "\\.\\.\\.HEAD", replace = "...{{tag_name}}" },
