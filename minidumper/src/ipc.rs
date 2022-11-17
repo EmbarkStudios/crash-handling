@@ -31,7 +31,7 @@ cfg_if::cfg_if! {
             /// The id of the thread in the client process in which the crash originated
             thread_id: u32,
             /// The top level exception code, also found in the `EXCEPTION_POINTERS.ExceptionRecord.ExceptionCode`
-            exception_code: i32,
+            exception_code: u32,
         }
     } else if #[cfg(target_os = "macos")] {
         mod mac;
