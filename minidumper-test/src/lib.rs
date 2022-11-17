@@ -196,7 +196,7 @@ pub fn run_client(id: &str, signal: Signal, use_thread: bool) {
     let mut cmd = std::process::Command::new(&cmd_path);
     cmd.stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
-    cmd.args(&["--id", id, "--signal", &signal.to_string()]);
+    cmd.args(["--id", id, "--signal", &signal.to_string()]);
     if use_thread {
         cmd.arg("--use-thread");
     }

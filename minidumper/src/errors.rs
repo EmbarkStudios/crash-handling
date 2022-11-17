@@ -23,7 +23,7 @@ pub enum Error {
     /// An error occurred during minidump generation
     #[cfg(any(target_os = "linux", target_os = "android"))]
     #[error(transparent)]
-    Writer(#[from] minidump_writer::errors::WriterError),
+    Writer(Box<minidump_writer::errors::WriterError>),
     /// An error occurred during minidump generation
     #[cfg(target_os = "windows")]
     #[error(transparent)]
@@ -38,4 +38,11 @@ pub enum Error {
     Scroll(#[from] scroll::Error),
     #[error("protocol error occurred: {0}")]
     ProtocolError(&'static str),
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+impl From<minidump_writer::errors::WriterError> for Error {
+    fn from(we: minidump_writer::errors::WriterError) -> Self {
+        Self::Writer(Box::new(we))
+    }
 }
