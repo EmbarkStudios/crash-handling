@@ -1,9 +1,8 @@
 pub mod jmp;
+mod signal;
 mod state;
 
 use crate::Error;
-
-use windows_sys::Win32::Foundation as found;
 
 /// Possible exception codes values for the the `exception_code` field
 /// in the crash context.
@@ -13,14 +12,17 @@ use windows_sys::Win32::Foundation as found;
 /// floats.
 #[derive(Copy, Clone)]
 #[repr(u32)]
+//#[allow(overflowing_literals)]
 pub enum ExceptionCode {
-    Fpe = found::EXCEPTION_INT_DIVIDE_BY_ZERO,
-    Illegal = found::EXCEPTION_ILLEGAL_INSTRUCTION,
-    Segv = found::EXCEPTION_ACCESS_VIOLATION,
-    StackOverflow = found::EXCEPTION_STACK_OVERFLOW,
-    Trap = found::EXCEPTION_BREAKPOINT,
-    InvalidParameter = found::STATUS_INVALID_PARAMETER,
-    Purecall = found::STATUS_NONCONTINUABLE_EXCEPTION,
+    Abort = 0x40000015,            // STATUS_FATAL_APP_EXIT
+    Fpe = 0xc0000094,              // EXCEPTION_INT_DIVIDE_BY_ZERO
+    Illegal = 0xc000001d,          // EXCEPTION_ILLEGAL_INSTRUCTION
+    Segv = 0xc0000005,             // EXCEPTION_ACCESS_VIOLATION
+    StackOverflow = 0xc00000fd,    // EXCEPTION_STACK_OVERFLOW
+    Trap = 0x80000003,             // EXCEPTION_BREAKPOINT
+    InvalidParameter = 0xc000000d, // STATUS_INVALID_PARAMETER
+    Purecall = 0xc0000025,         // STATUS_NONCONTINUABLE_EXCEPTION
+    User = 0xcca11ed, // https://github.com/chromium/crashpad/blob/fca8871ca3fb721d3afab370ca790122f9333bfd/util/win/exception_codes.h#L32
 }
 
 /// A Windows exception handler
@@ -53,38 +55,7 @@ impl CrashHandler {
         // the entirety of the body, however the user is really not required to
         // uphold any guarantees on their end, so no real need to declare the
         // function itself unsafe.
-        unsafe {
-            let lock = state::HANDLER.lock();
-            if let Some(handler) = &*lock {
-                let mut exception_record: state::EXCEPTION_RECORD = std::mem::zeroed();
-                let mut exception_context = std::mem::MaybeUninit::uninit();
-
-                state::RtlCaptureContext(exception_context.as_mut_ptr());
-
-                let mut exception_context = exception_context.assume_init();
-
-                let exception_ptrs = state::EXCEPTION_POINTERS {
-                    ExceptionRecord: &mut exception_record,
-                    ContextRecord: &mut exception_context,
-                };
-
-                let exception_code =
-                    exception_code.unwrap_or(state::STATUS_NONCONTINUABLE_EXCEPTION);
-                exception_record.ExceptionCode = exception_code;
-
-                let cc = crash_context::CrashContext {
-                    exception_pointers: (&exception_ptrs as *const state::EXCEPTION_POINTERS)
-                        .cast(),
-                    process_id: std::process::id(),
-                    thread_id: state::GetCurrentThreadId(),
-                    exception_code,
-                };
-
-                handler.user_handler.on_crash(&cc)
-            } else {
-                crate::CrashEventResult::Handled(false)
-            }
-        }
+        unsafe { state::simulate_exception(exception_code) }
     }
 }
 

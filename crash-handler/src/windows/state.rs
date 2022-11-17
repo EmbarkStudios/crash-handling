@@ -1,16 +1,18 @@
 #![allow(non_camel_case_types, clippy::exit)]
 
+use super::ExceptionCode;
 use crate::Error;
-pub(super) use windows_sys::Win32::{
-    Foundation::{STATUS_INVALID_PARAMETER, STATUS_NONCONTINUABLE_EXCEPTION},
-    System::{
-        Diagnostics::Debug::{
-            RtlCaptureContext, SetUnhandledExceptionFilter, EXCEPTION_POINTERS, EXCEPTION_RECORD,
-            LPTOP_LEVEL_EXCEPTION_FILTER,
-        },
-        Threading::GetCurrentThreadId,
-    },
-};
+use crash_context::ffi;
+
+type LPTOP_LEVEL_EXCEPTION_FILTER =
+    Option<unsafe extern "system" fn(exceptioninfo: *const ffi::EXCEPTION_POINTERS) -> i32>;
+
+extern "system" {
+    fn GetCurrentThreadId() -> u32;
+    fn SetUnhandledExceptionFilter(
+        filter: LPTOP_LEVEL_EXCEPTION_FILTER,
+    ) -> LPTOP_LEVEL_EXCEPTION_FILTER;
+}
 
 extern "C" {
     /// MSVCRT has its own error handling function for invalid parameters to crt functions
@@ -59,6 +61,8 @@ pub(super) struct HandlerInner {
     previous_iph: Option<_invalid_parameter_handler>,
     /// The previously installed purecall handler
     previous_pch: Option<_purecall_handler>,
+    /// The previously installed SIGABRT handler
+    previous_abort_handler: Option<libc::sighandler_t>,
 }
 
 impl HandlerInner {
@@ -71,12 +75,14 @@ impl HandlerInner {
             let previous_filter = SetUnhandledExceptionFilter(Some(handle_exception));
             let previous_iph = _set_invalid_parameter_handler(Some(handle_invalid_parameter));
             let previous_pch = _set_purecall_handler(Some(handle_pure_virtual_call));
+            let previous_abort_handler = super::signal::install_abort_handler().ok();
 
             Self {
                 user_handler,
                 previous_filter,
                 previous_iph,
                 previous_pch,
+                previous_abort_handler,
             }
         }
     }
@@ -86,6 +92,9 @@ impl HandlerInner {
     pub(crate) fn restore_previous_handlers(&self) {
         // SAFETY: syscalls
         unsafe {
+            if let Some(ah) = self.previous_abort_handler {
+                super::signal::restore_abort_handler(ah);
+            }
             SetUnhandledExceptionFilter(self.previous_filter);
             _set_invalid_parameter_handler(self.previous_iph);
             _set_purecall_handler(self.previous_pch);
@@ -205,7 +214,7 @@ use crate::CrashEventResult;
 /// Called on the exception thread when an unhandled exception occurs.
 /// Signals the exception handler thread to handle the exception.
 pub(super) unsafe extern "system" fn handle_exception(
-    except_info: *const EXCEPTION_POINTERS,
+    except_info: *const ffi::EXCEPTION_POINTERS,
 ) -> i32 {
     let _jump = {
         let lock = HANDLER.lock();
@@ -277,14 +286,14 @@ unsafe extern "C" fn handle_invalid_parameter(
             // to make it possible for the crash processor to classify these
             // as do regular crashes, and to make it humane for developers to
             // analyze them.
-            let mut exception_record: EXCEPTION_RECORD = std::mem::zeroed();
-            let mut exception_context = std::mem::MaybeUninit::uninit();
+            let mut exception_record: ffi::EXCEPTION_RECORD = std::mem::zeroed();
+            let mut exception_context = std::mem::MaybeUninit::zeroed();
 
-            RtlCaptureContext(exception_context.as_mut_ptr());
+            ffi::capture_context(exception_context.as_mut_ptr());
 
             let mut exception_context = exception_context.assume_init();
 
-            let exception_ptrs = EXCEPTION_POINTERS {
+            let exception_ptrs = ffi::EXCEPTION_POINTERS {
                 ExceptionRecord: &mut exception_record,
                 ContextRecord: &mut exception_context,
             };
@@ -293,7 +302,7 @@ unsafe extern "C" fn handle_invalid_parameter(
             exception_record.ExceptionCode = exception_code;
 
             match current_handler.user_handler.on_crash(&crate::CrashContext {
-                exception_pointers: (&exception_ptrs as *const EXCEPTION_POINTERS).cast(),
+                exception_pointers: (&exception_ptrs as *const ffi::EXCEPTION_POINTERS).cast(),
                 process_id: std::process::id(),
                 thread_id: GetCurrentThreadId(),
                 exception_code,
@@ -350,14 +359,14 @@ unsafe extern "C" fn handle_pure_virtual_call() {
             // to make it possible for the crash processor to classify these
             // as do regular crashes, and to make it humane for developers to
             // analyze them.
-            let mut exception_record: EXCEPTION_RECORD = std::mem::zeroed();
-            let mut exception_context = std::mem::MaybeUninit::uninit();
+            let mut exception_record: ffi::EXCEPTION_RECORD = std::mem::zeroed();
+            let mut exception_context = std::mem::MaybeUninit::zeroed();
 
-            RtlCaptureContext(exception_context.as_mut_ptr());
+            ffi::capture_context(exception_context.as_mut_ptr());
 
             let mut exception_context = exception_context.assume_init();
 
-            let exception_ptrs = EXCEPTION_POINTERS {
+            let exception_ptrs = ffi::EXCEPTION_POINTERS {
                 ExceptionRecord: &mut exception_record,
                 ContextRecord: &mut exception_context,
             };
@@ -366,7 +375,7 @@ unsafe extern "C" fn handle_pure_virtual_call() {
             exception_record.ExceptionCode = exception_code;
 
             match current_handler.user_handler.on_crash(&crate::CrashContext {
-                exception_pointers: (&exception_ptrs as *const EXCEPTION_POINTERS).cast(),
+                exception_pointers: (&exception_ptrs as *const ffi::EXCEPTION_POINTERS).cast(),
                 process_id: std::process::id(),
                 thread_id: GetCurrentThreadId(),
                 exception_code,

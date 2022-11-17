@@ -28,15 +28,6 @@ libc = "0.2"
 # Nicer sync primitives
 parking_lot = "0.12"
 
-[target.'cfg(target_os = "windows")'.dependencies.windows-sys]
-version = "0.42" # Keep aligned with parking_lot & minidump-writer
-features = [
-    "Win32_Foundation",
-    "Win32_System_Diagnostics_Debug",
-    "Win32_System_Kernel",
-    "Win32_System_Threading",
-]
-
 [target.'cfg(target_os = "macos")'.dependencies]
 # Bindings to MacOS specific APIs that are used. Note we don't use the `mach`
 # crate as it is unmaintained
