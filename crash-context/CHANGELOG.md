@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.5.0] - 2022-11-17
 ### Added
 - [PR#62](https://github.com/EmbarkStudios/crash-handling/pull/62) added a replacement implementation of `RtlCaptureContext`, and defines its own `CONTEXT` structure. This was needed due to both `winapi` and `windows-sys` incorrectly defining the `CONTEXT` and related structures on both x86_64 and aarch64 to not be correctly aligned, as well as `RtlCaptureContext` not actually capturing the floating point and vector state.
 
@@ -48,7 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial pass of crash-context, Linux only
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/crash-context-0.4.0...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/crash-context-0.5.0...HEAD
+[0.5.0]: https://github.com/EmbarkStudios/crash-handling/compare/crash-context-0.4.0...crash-context-0.5.0
 [0.4.0]: https://github.com/EmbarkStudios/crash-handling/compare/0.3.1...crash-context-0.4.0
 [0.3.1]: https://github.com/EmbarkStudios/crash-handling/compare/0.3.0...0.3.1
 [0.3.0]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-v0.1.0...0.3.0
