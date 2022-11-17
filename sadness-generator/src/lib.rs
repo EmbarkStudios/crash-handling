@@ -369,7 +369,12 @@ pub unsafe fn raise_stack_overflow_in_non_rust_thread_longjmp() -> ! {
 /// This is not safe. It intentionally crashes.
 #[cfg(target_os = "windows")]
 pub unsafe fn raise_purecall() -> ! {
-    asm!("call _purecall");
+    extern "C" {
+        fn _purecall() -> i32;
+    }
+
+    _purecall();
+
     std::process::abort()
 }
 
