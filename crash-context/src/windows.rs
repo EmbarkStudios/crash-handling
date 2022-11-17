@@ -1,3 +1,5 @@
+pub mod ffi;
+
 /// Full Windows crash context
 pub struct CrashContext {
     /// The information on the exception.
