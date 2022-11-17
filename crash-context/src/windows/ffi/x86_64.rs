@@ -126,10 +126,10 @@ std::arch::global_asm! {
   ".global capture_context",
 "capture_context:",
   ".seh_proc capture_context",
-  "push %rbp",
-  ".seh_pushreg %rbp",
-  "movq %rsp, %rbp",
-  ".seh_setframe %rbp, 0",
+  "push rbp",
+  ".seh_pushreg rbp",
+  "mov rbp, rsp",
+  ".seh_setframe rbp, 0",
 
   // Note that 16-byte stack alignment is not maintained because this function
   // does not call out to any other.
@@ -139,113 +139,112 @@ std::arch::global_asm! {
   ".seh_stackalloc 8",
   ".seh_endprologue",
 
-  "movl $0x10000f, 0x30(%rcx)",  // ContextFlags
+  "mov dword ptr [rcx+0x30], 0x10000",  // ContextFlags
 
   // General-purpose registers whose values haven’t changed can be captured directly.
-  "movq %rax, 0x78(%rcx)",       // Rax
-  "movq %rdx, 0x88(%rcx)",       // Rdx
-  "movq %rbx, 0x90(%rcx)",       // Rbx
-  "movq %rsi, 0xa8(%rcx)",       // Rsi
-  "movq %rdi, 0xb0(%rcx)",       // Rdi
-  "movq %r8, 0xb8(%rcx)",        // R8
-  "movq %r9, 0xc0(%rcx)",        // R9
-  "movq %r10, 0xc8(%rcx)",       // R10
-  "movq %r11, 0xd0(%rcx)",       // R11
-  "movq %r12, 0xd8(%rcx)",       // R12
-  "movq %r13, 0xe0(%rcx)",       // R13
-  "movq %r14, 0xe8(%rcx)",       // R14
-  "movq %r15, 0xf0(%rcx)",       // R15
+  "mov qword ptr [rcx+0x78], rax",       // Rax
+  "mov qword ptr [rcx+0x88], rdx",       // Rdx
+  "mov qword ptr [rcx+0x90], rbx",       // Rbx
+  "mov qword ptr [rcx+0xa8], rsi",       // Rsi
+  "mov qword ptr [rcx+0xb0], rdi",       // Rdi
+  "mov qword ptr [rcx+0xb8], r8",        // R8
+  "mov qword ptr [rcx+0xc0], r9",        // R9
+  "mov qword ptr [rcx+0xc8], r10",       // R10
+  "mov qword ptr [rcx+0xd0], r11",       // R11
+  "mov qword ptr [rcx+0xd8], r12",       // R12
+  "mov qword ptr [rcx+0xe0], r13",       // R13
+  "mov qword ptr [rcx+0xe8], r14",       // R14
+  "mov qword ptr [rcx+0xf0], r15",       // R15
 
   // Because of the calling convention, there’s no way to recover the value of
   // the caller’s rcx as it existed prior to calling this function. This
   // function captures a snapshot of the register state at its return, which
   // involves rcx containing a pointer to its first argument.
-  "movq %rcx, 0x80(%rcx)",       // Rcx
+  "mov qword ptr [rcx+0x80], rcx",       // Rcx
 
   // Now that the original value of rax has been saved, it can be repurposed to
   // hold other registers’ values.
 
   // Save mxcsr. This is duplicated in context->FltSave.MxCsr, saved by fxsave
   // below.
-  "stmxcsr 0x34(%rcx)",         // MxCsr
+  "stmxcsr [rcx+0x34]",         // MxCsr
 
   // Segment registers.
-  "movw %cs, 0x38(%rcx)",        // SegCs
-  "movw %ds, 0x3a(%rcx)",        // SegDs
-  "movw %es, 0x3c(%rcx)",        // SegEs
-  "movw %fs, 0x3e(%rcx)",        // SegFs
-  "movw %gs, 0x40(%rcx)",        // SegGs
-  "movw %ss, 0x42(%rcx)",        // SegSs
+  "mov word ptr [rcx+0x38], cs",       // SegCs
+  "mov word ptr [rcx+0x3a], ds",       // SegDs
+  "mov word ptr [rcx+0x3c], es",       // SegEs
+  "mov word ptr [rcx+0x3e], fs",       // SegFs
+  "mov word ptr [rcx+0x40], gs",       // SegGs
+  "mov word ptr [rcx+0x42], ss",       // SegSs
 
   // The original rflags was saved on the stack above. Note that the CONTEXT
   // structure only stores eflags, the low 32 bits. The high 32 bits in rflags
   // are reserved.
-  "movq -8(%rbp), %rax",
-  "mov %eax, 0x44(%rcx)",       // EFlags
+  "mov rax, [rbp-8]",
+  "mov dword ptr [rcx+0x44], eax",       // EFlags
 
   // rsp was saved in rbp in this function’s prologue, but the caller’s rsp is
   // 16 more than this value: 8 for the original rbp saved on the stack in this
   // function’s prologue, and 8 for the return address saved on the stack by the
   // call instruction that reached this function.
-  "leaq 16(%rbp), %rax",
-  "movq %rax, 0x98(%rcx)",
+  "lea rax, qword ptr [rbp+16]",
+  "mov qword ptr [rcx+0x98], rax",
 
   // The original rbp was saved on the stack in this function’s prologue.
-  "movq %rbp, %rax",
-  "movq %rax, 0xa0(%rcx)",
+  "mov rax, rbp",
+  "mov qword ptr [rcx+0xa0], rax",
 
   // rip can’t be accessed directly, but the return address saved on the stack by
   // the call instruction that reached this function can be used.
-  "movq 8(%rbp), %rax",
-  "movq %rax, 0xf8(%rcx)",
+  "mov rax, [rbp+8]",
+  "mov qword ptr [rcx+0xf8], rax",
 
   // Zero out the fxsave area before performing the fxsave. Some of the fxsave
   // area may not be written by fxsave, and some is definitely not written by
   // fxsave. This also zeroes out the rest of the CONTEXT structure to its end,
   // including the unused VectorRegister and VectorControl fields, and the debug
   // control register fields.
-  "movq %rcx, %rbx",
+  "mov rbx, rcx",
   "cld",
-  "leaq 0x100(%rcx), %rdi",
-  "xor %rax, %rax",
-  "movq $122, %rcx",
+  "lea rdi, [rcx+0x100]",
+  "xor rax, rax",
+  "mov rcx, 122",
   "rep stosq",
-  "movq %rbx, %rcx",
+  "mov rcx, rbx",
 
   // Save the floating point (including SSE) state. The CONTEXT structure is
   // declared as 16-byte-aligned, which is correct for this operation.
-  "fxsave 0x100(%rcx)",
+  "fxsave [rcx+0x100]",
 
   // TODO: AVX/xsave support. https://crashpad.chromium.org/bug/58
 
   // The register parameter home address fields aren’t used, so zero them out.
-  "movq $0, 0x0(%rcx)",
-  "movq $0, 0x8(%rcx)",
-  "movq $0, 0x10(%rcx)",
-  "movq $0, 0x18(%rcx)",
-  "movq $0, 0x20(%rcx)",
+  "mov qword ptr [rcx+0], 0",
+  "mov qword ptr [rcx+0x8], 0",
+  "mov qword ptr [rcx+0x10], 0",
+  "mov qword ptr [rcx+0x18], 0",
+  "mov qword ptr [rcx+0x20], 0",
 
   // The debug registers can’t be read from user code, so zero them out in the
   // CONTEXT structure. context->ContextFlags doesn’t indicate that they are
   // present.
-  "movq $0, 0x48(%rcx)",
-  "movq $0, 0x50(%rcx)",
-  "movq $0, 0x58(%rcx)",
-  "movq $0, 0x60(%rcx)",
-  "movq $0, 0x68(%rcx)",
-  "movq $0, 0x70(%rcx)",
-  "movq $0, 0x78(%rcx)",
+  "mov qword ptr [rcx+0x48], 0",
+  "mov qword ptr [rcx+0x50], 0",
+  "mov qword ptr [rcx+0x58], 0",
+  "mov qword ptr [rcx+0x60], 0",
+  "mov qword ptr [rcx+0x68], 0",
+  "mov qword ptr [rcx+0x70], 0",
+  "mov qword ptr [rcx+0x78], 0",
 
   // Clean up by restoring clobbered registers, even those considered volatile by
   // the ABI, so that the captured context represents the state at this
   // function’s exit.
-  "movq 0x78(%rcx), %rax",
-  "movq 0x90(%rcx), %rbx",
-  "movq 0xb0(%rcx), %rdi",
+  "mov rax, [rcx+0x78]",
+  "mov rbx, [rcx+0x90]",
+  "mov rdi, [rcx+0xb0]",
   "popfq",
 
-  "popq %rbp",
+  "pop rbp",
   "ret",
   ".seh_endproc",
-  options(att_syntax)
 }
