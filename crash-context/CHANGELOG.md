@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Added
+- [PR#62](https://github.com/EmbarkStudios/crash-handling/pull/62) added a replacement implementation of `RtlCaptureContext`, and defines its own `CONTEXT` structure. This was needed due to both `winapi` and `windows-sys` incorrectly defining the `CONTEXT` and related structures on both x86_64 and aarch64 to not be correctly aligned, as well as `RtlCaptureContext` not actually capturing the floating point and vector state.
+
 ## [0.4.0] - 2022-07-21
 ### Added
 - [PR#46](https://github.com/EmbarkStudios/crash-handling/pull/46) added support for unpacking `EXC_RESOURCE` exceptions on MacOS.
