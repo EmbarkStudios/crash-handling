@@ -31,6 +31,10 @@ skip = [
     # The crate is in the repo, so we have the path, but it's also a crates.io
     # dependency
     { name = "crash-context" },
+
+    # crossbeam-epoch uses an old version
+    { name = "memoffset", version = "=0.6.5" },
+
     # range-map uses an old version, and is unfortunately unmaintained and has
     # not seen a release in 5 years
     { name = "num-traits", version = "=0.1.43" },
