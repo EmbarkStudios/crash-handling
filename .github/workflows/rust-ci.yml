@@ -51,6 +51,29 @@ jobs:
       - name: cargo test
         run: cargo test
 
+  build-android:
+    name: Build sources
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        job:
+          - { target: aarch64-unknown-linux-gnu }
+          - { target: aarch64-unknown-linux-musl }
+          - { target: aarch64-linux-android }
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          target: ${{ matrix.job.target }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          use-cross: true
+          args: --target ${{ matrix.job.target }} --verbose --all-targets
+
   deny-check:
     name: cargo-deny
     runs-on: ubuntu-22.04
