@@ -68,6 +68,7 @@ pub fn handles_crash(flavor: SadnessFlavor) {
                         use ch::ExceptionCode;
 
                         let ec = match flavor {
+                            SadnessFlavor::Abort => ExceptionCode::Abort,
                             SadnessFlavor::DivideByZero => ExceptionCode::Fpe,
                             SadnessFlavor::Illegal => ExceptionCode::Illegal,
                             SadnessFlavor::InvalidParameter => ExceptionCode::InvalidParameter,

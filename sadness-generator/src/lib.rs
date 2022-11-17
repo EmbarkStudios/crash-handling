@@ -8,14 +8,12 @@ use std::arch::asm;
 /// How you would like your sadness.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum SadnessFlavor {
-    /// `SIGABRT` on Unix.
+    /// `SIGABRT`
     ///
-    /// This is not implemented on Windows as [`std::process::abort`], the
-    /// canonical way to abort processes in Rust, uses the [fastfail](
-    /// https://docs.microsoft.com/en-us/cpp/intrinsics/fastfail?view=msvc-170)
+    /// Note that on Windows, [`std::process::abort`], the canonical way to
+    /// abort processes in Rust, uses the [fastfail](https://docs.microsoft.com/en-us/cpp/intrinsics/fastfail?view=msvc-170)
     /// intrinsic, which neither raises a `SIGABRT` signal, nor issue a Windows
-    /// exception.
-    #[cfg(unix)]
+    /// exception. The method in this library always uses `libc::abort`
     Abort,
     /// * `SIGSEGV` on Linux
     /// * `EXCEPTION_ACCESS_VIOLATION` on Windows
@@ -69,7 +67,6 @@ impl SadnessFlavor {
     /// This is not safe. It intentionally crashes.
     pub unsafe fn make_sad(self) -> ! {
         match self {
-            #[cfg(unix)]
             Self::Abort => raise_abort(),
             Self::Segfault => raise_segfault(),
             Self::DivideByZero => raise_floating_point_exception(),
@@ -109,10 +106,9 @@ impl SadnessFlavor {
 ///
 /// # Safety
 ///
-/// This is not safe. It intentionally crashes.
-#[cfg(unix)]
+/// This is not safe. It intentionally emits `SIGABRT`.
 pub unsafe fn raise_abort() -> ! {
-    std::process::abort()
+    libc::abort()
 }
 
 /// This is the fixed address used to generate a segfault. It's possible that
@@ -373,7 +369,12 @@ pub unsafe fn raise_stack_overflow_in_non_rust_thread_longjmp() -> ! {
 /// This is not safe. It intentionally crashes.
 #[cfg(target_os = "windows")]
 pub unsafe fn raise_purecall() -> ! {
-    asm!("call _purecall");
+    extern "C" {
+        fn _purecall() -> i32;
+    }
+
+    _purecall();
+
     std::process::abort()
 }
 

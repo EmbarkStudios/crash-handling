@@ -24,7 +24,6 @@ pub fn dump_test(signal: Signal, use_thread: bool, dump_path: Option<PathBuf>) {
 
 #[derive(clap::ValueEnum, Clone, Copy)]
 pub enum Signal {
-    #[cfg(unix)]
     Abort,
     #[cfg(unix)]
     Bus,
@@ -46,7 +45,6 @@ use std::fmt;
 impl fmt::Display for Signal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
-            #[cfg(unix)]
             Self::Abort => "abort",
             #[cfg(unix)]
             Self::Bus => "bus",
@@ -319,7 +317,6 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
 
     match native_os {
         Os::Linux => match signal {
-            #[cfg(unix)]
             Signal::Abort => {
                 verify!(CrashReason::LinuxGeneral(
                     errors::ExceptionCodeLinux::SIGABRT,
@@ -374,6 +371,9 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
             }
         },
         Os::Windows => match signal {
+            Signal::Abort => {
+                assert_eq!(crash_reason, CrashReason::from_windows_code(0x40000015));
+            }
             Signal::Fpe => {
                 verify!(CrashReason::WindowsGeneral(
                     errors::ExceptionCodeWindows::EXCEPTION_INT_DIVIDE_BY_ZERO
@@ -410,7 +410,7 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                 assert_eq!(crash_reason, CrashReason::from_windows_error(0xc000000d));
             }
             #[cfg(unix)]
-            Signal::Bus | Signal::Abort => {
+            Signal::Bus => {
                 unreachable!();
             }
             #[cfg(target_os = "macos")]
@@ -420,7 +420,6 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
         },
         #[allow(clippy::match_same_arms)]
         Os::MacOs => match signal {
-            #[cfg(unix)]
             Signal::Abort => {
                 verify!(CrashReason::MacGeneral(
                     errors::ExceptionCodeMac::EXC_SOFTWARE,

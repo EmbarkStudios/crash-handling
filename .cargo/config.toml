@@ -1,4 +1,6 @@
 # add the below section to `.cargo/config.toml`
+# [target.x86_64-pc-windows-msvc]
+# linker = "lld-link"
 
 [target.'cfg(all())']
 rustflags = [

@@ -8,10 +8,17 @@ use std::{
     io,
     os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket},
 };
-use windows_sys::Win32::{
-    Foundation::{self as found, HANDLE},
-    Networking::WinSock::{self as ws, SOCKADDR_UN as sockaddr_un},
+use winapi::{
+    shared::ws2def as ws_def,
+    um::{handleapi::SetHandleInformation, winbase::HANDLE_FLAG_INHERIT, winsock2 as ws},
 };
+
+#[derive(Copy, Clone)]
+#[repr(C)]
+pub struct sockaddr_un {
+    pub sun_family: u16,
+    pub sun_path: [u8; 108],
+}
 
 pub(crate) fn init() {
     static INIT: parking_lot::Once = parking_lot::Once::new();
@@ -43,7 +50,7 @@ impl UnixSocketAddr {
             .as_bytes();
 
         let mut sock_addr = sockaddr_un {
-            sun_family: ws::AF_UNIX,
+            sun_family: ws::PF_UNIX as _,
             sun_path: [0u8; 108],
         };
 
@@ -67,7 +74,7 @@ impl UnixSocketAddr {
 
     #[inline]
     fn from_parts(addr: sockaddr_un, len: i32) -> io::Result<Self> {
-        if addr.sun_family != ws::AF_UNIX {
+        if addr.sun_family != ws::PF_UNIX as _ {
             Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "socket address is not a unix domain socket",
@@ -83,7 +90,7 @@ struct Socket(ws::SOCKET);
 impl Socket {
     pub fn new() -> io::Result<Socket> {
         // SAFETY: syscall
-        let socket = unsafe { ws::socket(ws::AF_UNIX as i32, ws::SOCK_STREAM as i32, 0) };
+        let socket = unsafe { ws::socket(ws::PF_UNIX as i32, ws::SOCK_STREAM as i32, 0) };
 
         if socket == ws::INVALID_SOCKET {
             Err(last_socket_error())
@@ -94,7 +101,7 @@ impl Socket {
         }
     }
 
-    fn accept(&self, storage: *mut ws::SOCKADDR, len: &mut i32) -> io::Result<Self> {
+    fn accept(&self, storage: *mut ws_def::SOCKADDR, len: &mut i32) -> io::Result<Self> {
         // SAFETY: syscall
         let socket = unsafe { ws::accept(self.0, storage, len) };
 
@@ -110,9 +117,7 @@ impl Socket {
     #[inline]
     fn set_no_inherit(&self) -> io::Result<()> {
         // SAFETY: syscall
-        if unsafe { found::SetHandleInformation(self.0 as HANDLE, found::HANDLE_FLAG_INHERIT, 0) }
-            == 0
-        {
+        if unsafe { SetHandleInformation(self.0 as _, HANDLE_FLAG_INHERIT, 0) } == 0 {
             Err(io::Error::last_os_error())
         } else {
             Ok(())
@@ -198,7 +203,7 @@ impl Socket {
         let result = unsafe {
             ws::WSASend(
                 self.as_raw_socket() as _,
-                bufs.as_ptr().cast::<ws::WSABUF>() as *mut _,
+                bufs.as_ptr().cast::<ws_def::WSABUF>() as *mut _,
                 length,
                 &mut nwritten,
                 0,

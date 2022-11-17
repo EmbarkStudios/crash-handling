@@ -73,7 +73,6 @@ fn real_main() -> anyhow::Result<()> {
                 Signal::Trap => {
                     sadness_generator::raise_trap();
                 }
-                #[cfg(unix)]
                 Signal::Abort => {
                     sadness_generator::raise_abort();
                 }
