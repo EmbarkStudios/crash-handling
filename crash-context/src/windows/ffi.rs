@@ -33,8 +33,8 @@ cfg_if::cfg_if! {
         mod x86_64;
         pub use x86_64::*;
     } else if #[cfg(target_arch = "x86")] {
-        compile_error!("Please file an issue if you care about this target");
-        //mod x86;
+        mod x86;
+        pub use x86::*;
     } else if #[cfg(target_arch = "aarch64")] {
         mod aarch64;
         pub use aarch64::*;
