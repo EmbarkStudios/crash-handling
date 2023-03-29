@@ -26,8 +26,3 @@ libc = "0.2"
 [target.'cfg(target_os = "macos")'.dependencies]
 # provides bindings to mach specifics
 mach2 = "0.4"
-
-# Provides bindings to Win32
-[target.'cfg(target_os = "windows")'.dependencies.winapi]
-version = "0.3"
-features = ["winnt"]
