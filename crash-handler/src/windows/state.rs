@@ -2,10 +2,10 @@
 
 use super::ExceptionCode;
 use crate::Error;
-use crash_context::ffi;
 
-type LPTOP_LEVEL_EXCEPTION_FILTER =
-    Option<unsafe extern "system" fn(exceptioninfo: *const ffi::EXCEPTION_POINTERS) -> i32>;
+type LPTOP_LEVEL_EXCEPTION_FILTER = Option<
+    unsafe extern "system" fn(exceptioninfo: *const crash_context::EXCEPTION_POINTERS) -> i32,
+>;
 
 extern "system" {
     fn GetCurrentThreadId() -> u32;
@@ -128,24 +128,25 @@ pub(super) fn detach() {
 pub(super) unsafe fn simulate_exception(exception_code: Option<u32>) -> crate::CrashEventResult {
     let lock = HANDLER.lock();
     if let Some(handler) = &*lock {
-        let mut exception_record: ffi::EXCEPTION_RECORD = std::mem::zeroed();
+        let mut exception_record: crash_context::EXCEPTION_RECORD = std::mem::zeroed();
         let mut exception_context = std::mem::MaybeUninit::zeroed();
 
-        ffi::capture_context(exception_context.as_mut_ptr());
+        crash_context::capture_context(exception_context.as_mut_ptr());
 
         let mut exception_context = exception_context.assume_init();
 
-        let exception_ptrs = ffi::EXCEPTION_POINTERS {
+        let exception_ptrs = crash_context::EXCEPTION_POINTERS {
             ExceptionRecord: &mut exception_record,
             ContextRecord: &mut exception_context,
         };
 
         // https://github.com/chromium/crashpad/blob/fca8871ca3fb721d3afab370ca790122f9333bfd/util/win/exception_codes.h#L32
         let exception_code = exception_code.unwrap_or(ExceptionCode::User as u32);
-        exception_record.ExceptionCode = exception_code;
+        exception_record.ExceptionCode = exception_code as _;
 
         let cc = crash_context::CrashContext {
-            exception_pointers: (&exception_ptrs as *const ffi::EXCEPTION_POINTERS).cast(),
+            exception_pointers: (&exception_ptrs as *const crash_context::EXCEPTION_POINTERS)
+                .cast(),
             process_id: std::process::id(),
             thread_id: GetCurrentThreadId(),
             exception_code,
@@ -214,7 +215,7 @@ use crate::CrashEventResult;
 /// Called on the exception thread when an unhandled exception occurs.
 /// Signals the exception handler thread to handle the exception.
 pub(super) unsafe extern "system" fn handle_exception(
-    except_info: *const ffi::EXCEPTION_POINTERS,
+    except_info: *const crash_context::EXCEPTION_POINTERS,
 ) -> i32 {
     let _jump = {
         let lock = HANDLER.lock();
@@ -225,7 +226,7 @@ pub(super) unsafe extern "system" fn handle_exception(
                 exception_pointers: except_info.cast(),
                 process_id: std::process::id(),
                 thread_id: GetCurrentThreadId(),
-                exception_code: code,
+                exception_code: code as _,
             }) {
                 CrashEventResult::Handled(true) => {
                     // The handler fully handled the exception.  Returning
@@ -286,23 +287,24 @@ unsafe extern "C" fn handle_invalid_parameter(
             // to make it possible for the crash processor to classify these
             // as do regular crashes, and to make it humane for developers to
             // analyze them.
-            let mut exception_record: ffi::EXCEPTION_RECORD = std::mem::zeroed();
+            let mut exception_record: crash_context::EXCEPTION_RECORD = std::mem::zeroed();
             let mut exception_context = std::mem::MaybeUninit::zeroed();
 
-            ffi::capture_context(exception_context.as_mut_ptr());
+            crash_context::capture_context(exception_context.as_mut_ptr());
 
             let mut exception_context = exception_context.assume_init();
 
-            let exception_ptrs = ffi::EXCEPTION_POINTERS {
+            let exception_ptrs = crash_context::EXCEPTION_POINTERS {
                 ExceptionRecord: &mut exception_record,
                 ContextRecord: &mut exception_context,
             };
 
             let exception_code = ExceptionCode::InvalidParameter as u32;
-            exception_record.ExceptionCode = exception_code;
+            exception_record.ExceptionCode = exception_code as _;
 
             match current_handler.user_handler.on_crash(&crate::CrashContext {
-                exception_pointers: (&exception_ptrs as *const ffi::EXCEPTION_POINTERS).cast(),
+                exception_pointers: (&exception_ptrs as *const crash_context::EXCEPTION_POINTERS)
+                    .cast(),
                 process_id: std::process::id(),
                 thread_id: GetCurrentThreadId(),
                 exception_code,
@@ -359,23 +361,24 @@ unsafe extern "C" fn handle_pure_virtual_call() {
             // to make it possible for the crash processor to classify these
             // as do regular crashes, and to make it humane for developers to
             // analyze them.
-            let mut exception_record: ffi::EXCEPTION_RECORD = std::mem::zeroed();
+            let mut exception_record: crash_context::EXCEPTION_RECORD = std::mem::zeroed();
             let mut exception_context = std::mem::MaybeUninit::zeroed();
 
-            ffi::capture_context(exception_context.as_mut_ptr());
+            crash_context::capture_context(exception_context.as_mut_ptr());
 
             let mut exception_context = exception_context.assume_init();
 
-            let exception_ptrs = ffi::EXCEPTION_POINTERS {
+            let exception_ptrs = crash_context::EXCEPTION_POINTERS {
                 ExceptionRecord: &mut exception_record,
                 ContextRecord: &mut exception_context,
             };
 
             let exception_code = ExceptionCode::Purecall as u32;
-            exception_record.ExceptionCode = exception_code;
+            exception_record.ExceptionCode = exception_code as _;
 
             match current_handler.user_handler.on_crash(&crate::CrashContext {
-                exception_pointers: (&exception_ptrs as *const ffi::EXCEPTION_POINTERS).cast(),
+                exception_pointers: (&exception_ptrs as *const crash_context::EXCEPTION_POINTERS)
+                    .cast(),
                 process_id: std::process::id(),
                 thread_id: GetCurrentThreadId(),
                 exception_code,
