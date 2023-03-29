@@ -8,10 +8,109 @@ use std::{
     io,
     os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket},
 };
-use winapi::{
-    shared::ws2def as ws_def,
-    um::{handleapi::SetHandleInformation, winbase::HANDLE_FLAG_INHERIT, winsock2 as ws},
-};
+
+#[allow(non_camel_case_types, non_snake_case, clippy::upper_case_acronyms)]
+mod bindings {
+    pub const PF_UNIX: u16 = 1;
+    pub const SOCK_STREAM: u16 = 1;
+    pub const FIONBIO: i32 = -2147195266;
+    pub const INVALID_SOCKET: usize = !0;
+    pub const SD_SEND: u32 = 1;
+    pub const SOCKET_ERROR: i32 = -1;
+
+    #[repr(C)]
+    pub struct WSABUF {
+        pub len: u32,
+        pub buf: *const u8,
+    }
+
+    pub type ADDRESS_FAMILY = u16;
+
+    #[repr(C)]
+    pub struct SOCKADDR {
+        pub sa_family: ADDRESS_FAMILY,
+        pub sa_data: [u8; 14],
+    }
+
+    pub type BOOL = i32;
+    pub type HANDLE = isize;
+    pub type HANDLE_FLAGS = u32;
+    pub const HANDLE_FLAG_INHERIT: HANDLE_FLAGS = 1;
+
+    pub type SOCKET = usize;
+
+    pub type SEND_RECV_FLAGS = i32;
+    pub const MSG_PEEK: SEND_RECV_FLAGS = 2;
+
+    #[repr(C)]
+    pub struct OVERLAPPED_0_0 {
+        pub Offset: u32,
+        pub OffsetHigh: u32,
+    }
+
+    #[repr(C)]
+    pub union OVERLAPPED_0 {
+        pub Anonymous: std::mem::ManuallyDrop<OVERLAPPED_0_0>,
+        pub Pointer: *mut std::ffi::c_void,
+    }
+
+    #[repr(C)]
+    pub struct OVERLAPPED {
+        pub Internal: usize,
+        pub InternalHigh: usize,
+        pub Anonymous: OVERLAPPED_0,
+        pub hEvent: HANDLE,
+    }
+
+    pub type LPWSAOVERLAPPED_COMPLETION_ROUTINE = Option<
+        unsafe extern "system" fn(
+            dwError: u32,
+            cbTransferred: u32,
+            lpOverlapped: *mut OVERLAPPED,
+            dwFlags: u32,
+        ),
+    >;
+
+    pub type WSA_ERROR = i32;
+    pub const WSAESHUTDOWN: WSA_ERROR = 10058;
+
+    #[link(name = "kernel32")]
+    extern "system" {
+        pub fn SetHandleInformation(hObject: HANDLE, dwMask: u32, dwFlags: HANDLE_FLAGS) -> BOOL;
+    }
+
+    #[link(name = "ws2_32")]
+    extern "system" {
+        pub fn socket(af: i32, type_: i32, protocol: i32) -> SOCKET;
+        pub fn closesocket(s: SOCKET) -> i32;
+        pub fn accept(s: SOCKET, addr: *mut SOCKADDR, addrlen: *mut i32) -> SOCKET;
+        pub fn recv(s: SOCKET, buf: *const u8, len: i32, flags: SEND_RECV_FLAGS) -> i32;
+        pub fn WSARecv(
+            s: SOCKET,
+            lpBuffers: *const WSABUF,
+            dwBufferCount: u32,
+            lpNumberOfBytesRecvd: *mut u32,
+            lpFlags: *mut u32,
+            lpOverlapped: *mut OVERLAPPED,
+            lpCompletionRoutine: LPWSAOVERLAPPED_COMPLETION_ROUTINE,
+        ) -> i32;
+        pub fn WSASend(
+            s: SOCKET,
+            lpBuffers: *const WSABUF,
+            dwBufferCount: u32,
+            lpNumberOfBytesSent: *mut u32,
+            dwFlags: u32,
+            lpOverlapped: *mut OVERLAPPED,
+            lpCompletionRoutine: LPWSAOVERLAPPED_COMPLETION_ROUTINE,
+        ) -> i32;
+        pub fn ioctlsocket(s: SOCKET, cmd: i32, argp: *mut u32) -> i32;
+        pub fn WSAGetLastError() -> WSA_ERROR;
+        pub fn shutdown(s: SOCKET, how: i32) -> i32;
+        pub fn bind(s: SOCKET, name: *const SOCKADDR, namelen: i32) -> i32;
+        pub fn listen(s: SOCKET, backlog: i32) -> i32;
+        pub fn connect(s: SOCKET, name: *const SOCKADDR, namelen: i32) -> i32;
+    }
+}
 
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -33,7 +132,7 @@ pub(crate) fn init() {
 #[inline]
 fn last_socket_error() -> io::Error {
     // SAFETY: syscall
-    io::Error::from_raw_os_error(unsafe { ws::WSAGetLastError() })
+    io::Error::from_raw_os_error(unsafe { bindings::WSAGetLastError() })
 }
 
 pub(crate) struct UnixSocketAddr {
@@ -50,7 +149,7 @@ impl UnixSocketAddr {
             .as_bytes();
 
         let mut sock_addr = sockaddr_un {
-            sun_family: ws::PF_UNIX as _,
+            sun_family: bindings::PF_UNIX as _,
             sun_path: [0u8; 108],
         };
 
@@ -74,7 +173,7 @@ impl UnixSocketAddr {
 
     #[inline]
     fn from_parts(addr: sockaddr_un, len: i32) -> io::Result<Self> {
-        if addr.sun_family != ws::PF_UNIX as _ {
+        if addr.sun_family != bindings::PF_UNIX as _ {
             Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "socket address is not a unix domain socket",
@@ -85,14 +184,14 @@ impl UnixSocketAddr {
     }
 }
 
-struct Socket(ws::SOCKET);
+struct Socket(bindings::SOCKET);
 
 impl Socket {
     pub fn new() -> io::Result<Socket> {
         // SAFETY: syscall
-        let socket = unsafe { ws::socket(ws::PF_UNIX, ws::SOCK_STREAM, 0) };
+        let socket = unsafe { bindings::socket(bindings::PF_UNIX, bindings::SOCK_STREAM, 0) };
 
-        if socket == ws::INVALID_SOCKET {
+        if socket == bindings::INVALID_SOCKET {
             Err(last_socket_error())
         } else {
             let socket = Self(socket);
@@ -101,11 +200,11 @@ impl Socket {
         }
     }
 
-    fn accept(&self, storage: *mut ws_def::SOCKADDR, len: &mut i32) -> io::Result<Self> {
+    fn accept(&self, storage: *mut bindings::SOCKADDR, len: &mut i32) -> io::Result<Self> {
         // SAFETY: syscall
-        let socket = unsafe { ws::accept(self.0, storage, len) };
+        let socket = unsafe { bindings::accept(self.0, storage, len) };
 
-        if socket == ws::INVALID_SOCKET {
+        if socket == bindings::INVALID_SOCKET {
             Err(last_socket_error())
         } else {
             let socket = Self(socket);
@@ -117,7 +216,9 @@ impl Socket {
     #[inline]
     fn set_no_inherit(&self) -> io::Result<()> {
         // SAFETY: syscall
-        if unsafe { SetHandleInformation(self.0 as _, HANDLE_FLAG_INHERIT, 0) } == 0 {
+        if unsafe { bindings::SetHandleInformation(self.0 as _, bindings::HANDLE_FLAG_INHERIT, 0) }
+            == 0
+        {
             Err(io::Error::last_os_error())
         } else {
             Ok(())
@@ -127,7 +228,7 @@ impl Socket {
     fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         let mut nonblocking = nonblocking as u32;
         // SAFETY: syscall
-        let r = unsafe { ws::ioctlsocket(self.0, ws::FIONBIO, &mut nonblocking) };
+        let r = unsafe { bindings::ioctlsocket(self.0, bindings::FIONBIO, &mut nonblocking) };
         if r == 0 {
             Ok(())
         } else {
@@ -141,7 +242,7 @@ impl Socket {
         let length = std::cmp::min(buf.len(), i32::MAX as usize) as i32;
         // SAFETY: syscall
         let result = unsafe {
-            ws::recv(
+            bindings::recv(
                 self.as_raw_socket() as _,
                 buf.as_mut_ptr().cast(),
                 length,
@@ -150,10 +251,10 @@ impl Socket {
         };
 
         match result {
-            ws::SOCKET_ERROR => {
-                let error = unsafe { ws::WSAGetLastError() };
+            bindings::SOCKET_ERROR => {
+                let error = unsafe { bindings::WSAGetLastError() };
 
-                if error == ws::WSAESHUTDOWN {
+                if error == bindings::WSAESHUTDOWN {
                     Ok(0)
                 } else {
                     Err(io::Error::from_raw_os_error(error))
@@ -171,7 +272,7 @@ impl Socket {
         let mut flags = 0;
         // SAFETY: syscall
         let result = unsafe {
-            ws::WSARecv(
+            bindings::WSARecv(
                 self.as_raw_socket() as _,
                 bufs.as_mut_ptr().cast(),
                 length,
@@ -186,9 +287,9 @@ impl Socket {
             Ok(nread as usize)
         } else {
             // SAFETY: syscall
-            let error = unsafe { ws::WSAGetLastError() };
+            let error = unsafe { bindings::WSAGetLastError() };
 
-            if error == ws::WSAESHUTDOWN {
+            if error == bindings::WSAESHUTDOWN {
                 Ok(0)
             } else {
                 Err(io::Error::from_raw_os_error(error))
@@ -201,9 +302,9 @@ impl Socket {
         let mut nwritten = 0;
         // SAFETY: syscall
         let result = unsafe {
-            ws::WSASend(
+            bindings::WSASend(
                 self.as_raw_socket() as _,
-                bufs.as_ptr().cast::<ws_def::WSABUF>() as *mut _,
+                bufs.as_ptr().cast::<bindings::WSABUF>() as *mut _,
                 length,
                 &mut nwritten,
                 0,
@@ -228,7 +329,7 @@ impl AsRawSocket for Socket {
 
 impl FromRawSocket for Socket {
     unsafe fn from_raw_socket(sock: RawSocket) -> Self {
-        Self(sock as ws::SOCKET)
+        Self(sock as bindings::SOCKET)
     }
 }
 
@@ -245,7 +346,7 @@ impl Drop for Socket {
         // SAFETY: syscalls
         let _ = unsafe {
             // https://docs.microsoft.com/en-us/windows/win32/winsock/graceful-shutdown-linger-options-and-socket-closure-2
-            if ws::shutdown(self.0, ws::SD_SEND /* 1 */) == 0 {
+            if bindings::shutdown(self.0, bindings::SD_SEND as i32) == 0 {
                 // Loop until we've received all data
                 let mut chunk = [0u8; 1024];
                 while let Ok(sz) = self.recv_with_flags(&mut chunk, 0) {
@@ -255,7 +356,7 @@ impl Drop for Socket {
                 }
             }
 
-            ws::closesocket(self.0)
+            bindings::closesocket(self.0)
         };
     }
 }
@@ -272,7 +373,7 @@ impl UnixListener {
 
         // SAFETY: syscall
         if unsafe {
-            ws::bind(
+            bindings::bind(
                 inner.as_raw_socket() as _,
                 (&addr.addr as *const sockaddr_un).cast(),
                 addr.len,
@@ -284,7 +385,7 @@ impl UnixListener {
 
         // SAFETY: syscall
         if unsafe {
-            ws::listen(inner.as_raw_socket() as _, 128 /* backlog */)
+            bindings::listen(inner.as_raw_socket() as _, 128 /* backlog */)
         } != 0
         {
             Err(last_socket_error())
@@ -342,7 +443,7 @@ impl UnixStream {
 
         // SAFETY: syscall
         if unsafe {
-            ws::connect(
+            bindings::connect(
                 inner.as_raw_socket() as _,
                 (&addr.addr as *const sockaddr_un).cast(),
                 addr.len,
@@ -357,7 +458,7 @@ impl UnixStream {
 
     #[inline]
     pub(crate) fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
-        self.0.recv_with_flags(buf, ws::MSG_PEEK)
+        self.0.recv_with_flags(buf, bindings::MSG_PEEK)
     }
 
     #[inline]

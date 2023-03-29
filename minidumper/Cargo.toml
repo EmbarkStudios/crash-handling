@@ -40,11 +40,6 @@ uds = "0.2.6"
 # Nicer binary interop
 scroll = "0.11"
 
-# Bindings to Win32
-[target.'cfg(target_os = "windows")'.dependencies.winapi]
-version = "0.3"
-features = ["handleapi", "winbase", "winsock2"]
-
 [dev-dependencies]
 # Diskwrite example
 crash-handler = { path = "../crash-handler" }
