@@ -79,9 +79,9 @@ pub fn handles_crash(flavor: SadnessFlavor) {
                         };
 
                         assert_eq!(
-                            cc.exception_code, ec as u32,
+                            cc.exception_code, ec as i32,
                             "0x{:x} != 0x{:x}",
-                            cc.exception_code, ec as u32
+                            cc.exception_code, ec as i32
                         );
                     }
                 }

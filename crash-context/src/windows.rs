@@ -8,7 +8,7 @@ pub struct CrashContext {
     /// The top level exception code from the exception_pointers. This is provided
     /// so that external processes don't need to use `ReadProcessMemory` to inspect
     /// the exception code
-    pub exception_code: u32,
+    pub exception_code: i32,
     /// The pid of the process that crashed
     pub process_id: u32,
     /// The thread id on which the exception occurred

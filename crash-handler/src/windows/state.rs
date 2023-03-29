@@ -125,7 +125,7 @@ pub(super) fn detach() {
     lock.take();
 }
 
-pub(super) unsafe fn simulate_exception(exception_code: Option<u32>) -> crate::CrashEventResult {
+pub(super) unsafe fn simulate_exception(exception_code: Option<i32>) -> crate::CrashEventResult {
     let lock = HANDLER.lock();
     if let Some(handler) = &*lock {
         let mut exception_record: crash_context::EXCEPTION_RECORD = std::mem::zeroed();
@@ -141,8 +141,8 @@ pub(super) unsafe fn simulate_exception(exception_code: Option<u32>) -> crate::C
         };
 
         // https://github.com/chromium/crashpad/blob/fca8871ca3fb721d3afab370ca790122f9333bfd/util/win/exception_codes.h#L32
-        let exception_code = exception_code.unwrap_or(ExceptionCode::User as u32);
-        exception_record.ExceptionCode = exception_code as _;
+        let exception_code = exception_code.unwrap_or(ExceptionCode::User as i32);
+        exception_record.ExceptionCode = exception_code;
 
         let cc = crash_context::CrashContext {
             exception_pointers: (&exception_ptrs as *const crash_context::EXCEPTION_POINTERS)
@@ -299,8 +299,8 @@ unsafe extern "C" fn handle_invalid_parameter(
                 ContextRecord: &mut exception_context,
             };
 
-            let exception_code = ExceptionCode::InvalidParameter as u32;
-            exception_record.ExceptionCode = exception_code as _;
+            let exception_code = ExceptionCode::InvalidParameter as i32;
+            exception_record.ExceptionCode = exception_code;
 
             match current_handler.user_handler.on_crash(&crate::CrashContext {
                 exception_pointers: (&exception_ptrs as *const crash_context::EXCEPTION_POINTERS)
@@ -373,8 +373,8 @@ unsafe extern "C" fn handle_pure_virtual_call() {
                 ContextRecord: &mut exception_context,
             };
 
-            let exception_code = ExceptionCode::Purecall as u32;
-            exception_record.ExceptionCode = exception_code as _;
+            let exception_code = ExceptionCode::Purecall as i32;
+            exception_record.ExceptionCode = exception_code;
 
             match current_handler.user_handler.on_crash(&crate::CrashContext {
                 exception_pointers: (&exception_ptrs as *const crash_context::EXCEPTION_POINTERS)
