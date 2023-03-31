@@ -90,7 +90,7 @@ struct Socket(ws::SOCKET);
 impl Socket {
     pub fn new() -> io::Result<Socket> {
         // SAFETY: syscall
-        let socket = unsafe { ws::socket(ws::PF_UNIX as i32, ws::SOCK_STREAM as i32, 0) };
+        let socket = unsafe { ws::socket(ws::PF_UNIX, ws::SOCK_STREAM, 0) };
 
         if socket == ws::INVALID_SOCKET {
             Err(last_socket_error())
@@ -245,7 +245,7 @@ impl Drop for Socket {
         // SAFETY: syscalls
         let _ = unsafe {
             // https://docs.microsoft.com/en-us/windows/win32/winsock/graceful-shutdown-linger-options-and-socket-closure-2
-            if ws::shutdown(self.0, ws::SD_SEND /* 1 */ as i32) == 0 {
+            if ws::shutdown(self.0, ws::SD_SEND /* 1 */) == 0 {
                 // Loop until we've received all data
                 let mut chunk = [0u8; 1024];
                 while let Ok(sz) = self.recv_with_flags(&mut chunk, 0) {
@@ -275,7 +275,7 @@ impl UnixListener {
             ws::bind(
                 inner.as_raw_socket() as _,
                 (&addr.addr as *const sockaddr_un).cast(),
-                addr.len as i32,
+                addr.len,
             )
         } != 0
         {
@@ -345,7 +345,7 @@ impl UnixStream {
             ws::connect(
                 inner.as_raw_socket() as _,
                 (&addr.addr as *const sockaddr_un).cast(),
-                addr.len as i32,
+                addr.len,
             )
         } != 0
         {
@@ -357,7 +357,7 @@ impl UnixStream {
 
     #[inline]
     pub(crate) fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
-        self.0.recv_with_flags(buf, ws::MSG_PEEK as i32)
+        self.0.recv_with_flags(buf, ws::MSG_PEEK)
     }
 
     #[inline]
