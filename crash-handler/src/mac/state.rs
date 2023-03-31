@@ -135,7 +135,7 @@ impl HandlerInner {
 
         // Reset the condition variable in case a user signal was already raised
         {
-            let &(ref lock, ref _cvar) = &*self.user_signal;
+            let (lock, _cvar) = &*self.user_signal;
             *lock.lock() = None;
         }
 
@@ -157,7 +157,7 @@ impl HandlerInner {
         } else {
             // Wait on the handler thread to signal the user callback has finished
             // with the exception
-            let &(ref lock, ref cvar) = &*self.user_signal;
+            let (lock, cvar) = &*self.user_signal;
             let mut processed = lock.lock();
             if processed.is_none() {
                 cvar.wait(&mut processed);
@@ -511,7 +511,7 @@ unsafe fn exception_handler(port: mach_port_t, us: UserSignal) {
                 };
 
                 {
-                    let &(ref lock, ref cvar) = &*us;
+                    let (lock, cvar) = &*us;
                     let mut processed = lock.lock();
                     *processed = Some(matches!(res, CrashEventResult::Handled(true)));
                     cvar.notify_one();
