@@ -8,7 +8,12 @@ targets = [
 vulnerability = "deny"
 unmaintained = "deny"
 yanked = "deny"
-ignore = []
+ignore = [
+    # PR https://github.com/rust-minidump/rust-minidump/pull/826 already merged, just needs release
+    "RUSTSEC-2021-0153",
+    # Irrelevant, dev-only
+    "RUSTSEC-2021-0145",
+]
 
 [licenses]
 unlicensed = "deny"
@@ -32,12 +37,13 @@ skip = [
     # dependency
     { name = "crash-context" },
 
-    # crossbeam-epoch uses an old version
-    { name = "memoffset", version = "=0.6.5" },
-
-    # range-map uses an old version, and is unfortunately unmaintained and has
-    # not seen a release in 5 years
+    # minidump-writer uses old versions
+    { name = "memoffset", version = "=0.7.1" },
+    { name = "minidump-common", version = "=0.14.0" },
+    { name = "range-map", version = "=0.1.5" },
     { name = "num-traits", version = "=0.1.43" },
+
+    { name = "syn", version = "1.0" },
 ]
 skip-tree = []
 

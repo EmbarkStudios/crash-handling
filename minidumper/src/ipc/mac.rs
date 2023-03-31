@@ -267,7 +267,7 @@ impl UnixStream {
 
     #[inline]
     pub(crate) fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
-        self.0.recv_with_flags(buf, libc::MSG_PEEK as i32)
+        self.0.recv_with_flags(buf, libc::MSG_PEEK)
     }
 
     #[inline]

@@ -57,14 +57,16 @@ jobs:
     strategy:
       matrix:
         job:
-          - { target: aarch64-unknown-linux-gnu }
-          - { target: aarch64-unknown-linux-musl }
-          - { target: aarch64-linux-android }
+          - { target: aarch64-unknown-linux-gnu, toolchain: stable }
+          - { target: aarch64-unknown-linux-musl, toolchain: stable }
+          # workaround for https://github.com/cross-rs/cross/issues/1222
+          - { target: aarch64-linux-android, toolchain: "1.67.0" }
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: ${{ matrix.job.toolchain }}
           target: ${{ matrix.job.target }}
       - uses: Swatinem/rust-cache@v2
       - name: Build
