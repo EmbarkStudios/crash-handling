@@ -488,7 +488,7 @@ impl Drop for Server {
             // Note we don't check for the existence of the path since there
             // appears to be a bug on MacOS and Windows, or at least an oversight
             // in std, where checking the existence of the path always fails
-            let _res = std::fs::remove_file(&path);
+            let _res = std::fs::remove_file(path);
         }
     }
 }
