@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#70](https://github.com/EmbarkStudios/crash-handling/pull/70) removed the `winapi` dependency in favor of embedded bindings to avoid dependencies.
+- [PR#70](https://github.com/EmbarkStudios/crash-handling/pull/70) removed the asm implementations for Windows CPU context retrieval in favor of using `RtlCaptureContext`. This means that floating state is not captured, but is otherwise and improvement.
+
 ## [0.5.1] - 2022-11-17
 ### Fixed
 - [PR#66](https://github.com/EmbarkStudios/crash-handling/pull/66) (apparently) resolved [#65](https://github.com/EmbarkStudios/crash-handling/issues/65) by...changing from AT&T to Intel syntax. This shouldn't have changed anything, but it did, and I'm too tired and have other things to work on, so here we are.
