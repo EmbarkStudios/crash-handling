@@ -11,8 +11,8 @@ use std::{
 
 #[allow(non_camel_case_types, non_snake_case, clippy::upper_case_acronyms)]
 mod bindings {
-    pub const PF_UNIX: u16 = 1;
-    pub const SOCK_STREAM: u16 = 1;
+    pub const PF_UNIX: i32 = 1;
+    pub const SOCK_STREAM: i32 = 1;
     pub const FIONBIO: i32 = -2147195266;
     pub const INVALID_SOCKET: usize = !0;
     pub const SD_SEND: u32 = 1;
