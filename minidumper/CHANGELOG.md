@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#70](https://github.com/EmbarkStudios/crash-handling/pull/70) removed `winapi` in favor of embedded bindings.
+
 ## [0.7.0] - 2022-11-17
 ### Fixed
 - [PR#63](https://github.com/EmbarkStudios/crash-handling/pull/63) replaced `windows-sys` with `winapi`, resolving [#61](https://github.com/EmbarkStudios/crash-handling/issues/61). Eventually `winapi` will be removed as well.

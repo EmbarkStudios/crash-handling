@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#70](https://github.com/EmbarkStudios/crash-handling/pull/70) removed `winapi` in favor of embedded bindings.
+
 ## [0.5.1] - 2022-11-17
 ### Fixed
 - [PR#64](https://github.com/EmbarkStudios/crash-handling/pull/64) fixed compilation for `aarch64-linux-android`. Additional targets were added to CI so they get caught before release.
