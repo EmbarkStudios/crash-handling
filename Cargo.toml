@@ -9,7 +9,3 @@ members = [
 
 [profile.dev]
 debug = 2
-
-[patch.crates-io]
-minidump-writer = { git = "https://github.com/rust-minidump/minidump-writer", branch = "remove-winapi" }
-crash-context = { path = "crash-context" }
