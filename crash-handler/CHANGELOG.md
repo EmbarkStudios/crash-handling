@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.6.0] - 2023-04-03
 ### Changed
 - [PR#70](https://github.com/EmbarkStudios/crash-handling/pull/70) removed `winapi` in favor of embedded bindings.
 
@@ -68,7 +69,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial pass of crash-context, Linux only
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.5.1...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.6.0...HEAD
+[0.6.0]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.5.1...crash-handler-0.6.0
 [0.5.1]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.5.0...crash-handler-0.5.1
 [0.5.0]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.4.0...crash-handler-0.5.0
 [0.4.0]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.3.3...crash-handler-0.4.0
