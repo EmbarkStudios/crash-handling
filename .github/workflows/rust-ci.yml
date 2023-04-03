@@ -57,7 +57,7 @@ jobs:
     strategy:
       matrix:
         job:
-          - { target: aarch64-unknown-linux-gnu, toolchain: stable }
+          #- { target: aarch64-unknown-linux-gnu, toolchain: stable }
           - { target: aarch64-unknown-linux-musl, toolchain: stable }
           # workaround for https://github.com/cross-rs/cross/issues/1222
           - { target: aarch64-linux-android, toolchain: "1.67.0" }

@@ -32,5 +32,5 @@ unsafe extern "C" fn signal_handler(signal: i32, _subcode: i32) {
     assert_eq!(signal, libc::SIGABRT);
 
     // https://github.com/chromium/crashpad/blob/fca8871ca3fb721d3afab370ca790122f9333bfd/client/crashpad_client_win.cc#L197
-    super::state::simulate_exception(Some(super::ExceptionCode::Abort as u32));
+    super::state::simulate_exception(Some(super::ExceptionCode::Abort as _));
 }

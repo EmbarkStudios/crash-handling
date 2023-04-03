@@ -272,7 +272,7 @@ impl Server {
                                             // the client process, and inform the dump writer that they are pointers
                                             // to a different process, as MiniDumpWriteDump will internally read
                                             // the processes memory as needed
-                                            let exception_pointers = dump_request.exception_pointers as *const crash_context::ffi::EXCEPTION_POINTERS;
+                                            let exception_pointers = dump_request.exception_pointers as *const crash_context::EXCEPTION_POINTERS;
 
                                             let crash_ctx = crash_context::CrashContext {
                                                 exception_pointers,
@@ -410,7 +410,7 @@ impl Server {
                 // many layers, so really, we are falling back on Windows to actually correctly handle
                 // if the interior pointers have become invalid which it should? do ok with
                 let result =
-                    minidump_writer::minidump_writer::MinidumpWriter::dump_crash_context(crash_context, &mut minidump_file);
+                    minidump_writer::minidump_writer::MinidumpWriter::dump_crash_context(crash_context, None, &mut minidump_file);
             } else if #[cfg(target_os = "macos")] {
                 let mut writer = minidump_writer::minidump_writer::MinidumpWriter::with_crash_context(crash_context);
             }
