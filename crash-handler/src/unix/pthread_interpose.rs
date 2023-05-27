@@ -9,6 +9,8 @@ use libc::c_void;
 use std::ptr;
 
 pub type pthread_main_t = unsafe extern "C" fn(_: *mut c_void) -> *mut c_void;
+
+#[cfg(not(miri))]
 type pthread_create_t = unsafe extern "C" fn(
     thread: *mut libc::pthread_t,
     attr: *const libc::pthread_attr_t,
@@ -26,7 +28,7 @@ struct PthreadCreateParams {
 /// in the `pthread_key` destructor
 static mut THREAD_DESTRUCTOR_KEY: libc::pthread_key_t = 0;
 
-#[cfg(target_env = "musl")]
+#[cfg(all(target_env = "musl", not(miri)))]
 extern "C" {
     /// This is the weak alias for `pthread_create`. We declare this so we can
     /// use its address when targeting musl, as we can't lookup the actual
@@ -48,6 +50,7 @@ extern "C" {
 /// This will fail if we're unable to retrieve the address of the actual
 /// libc `pthread_create`, or if we do find the address but it's actually the
 /// address of this interpose function which would result in infinte recursion
+#[cfg(not(miri))]
 #[no_mangle]
 pub extern "C" fn pthread_create(
     thread: *mut libc::pthread_t,
