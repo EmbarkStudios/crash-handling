@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Added
+- [PR#76](https://github.com/EmbarkStudios/crash-handling/pull/76) added support for `i686-linux-android` and `x86_64-linux-android`. Thanks [@gabrielesvelto](https://github.com/gabrielesvelto)!
+
 ## [0.6.0] - 2023-04-03
 ### Changed
 - [PR#70](https://github.com/EmbarkStudios/crash-handling/pull/70) removed the `winapi` dependency in favor of embedded bindings to avoid dependencies.
