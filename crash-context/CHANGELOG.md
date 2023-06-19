@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.6.1] - 2023-06-19
 ### Added
 - [PR#76](https://github.com/EmbarkStudios/crash-handling/pull/76) added support for `i686-linux-android` and `x86_64-linux-android`. Thanks [@gabrielesvelto](https://github.com/gabrielesvelto)!
 
@@ -67,7 +68,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial pass of crash-context, Linux only
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/crash-context-0.6.0...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/crash-context-0.6.1...HEAD
+[0.6.1]: https://github.com/EmbarkStudios/crash-handling/compare/crash-context-0.6.0...crash-context-0.6.1
 [0.6.0]: https://github.com/EmbarkStudios/crash-handling/compare/crash-context-0.5.1...crash-context-0.6.0
 [0.5.1]: https://github.com/EmbarkStudios/crash-handling/compare/crash-context-0.5.0...crash-context-0.5.1
 [0.5.0]: https://github.com/EmbarkStudios/crash-handling/compare/crash-context-0.4.0...crash-context-0.5.0
