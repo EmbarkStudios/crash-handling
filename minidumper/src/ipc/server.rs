@@ -39,7 +39,7 @@ impl ClientConn {
         let mut hdr_buf = [0u8; std::mem::size_of::<Header>()];
         cfg_if::cfg_if! {
             if #[cfg(any(target_os = "linux", target_os = "android"))] {
-                let (len, _trunc) = self.socket.peek(&mut hdr_buf).ok()?;
+                let len = self.socket.0.peek(&mut hdr_buf).ok()?;
             } else {
                 let len = self.socket.peek(&mut hdr_buf).ok()?;
             }
@@ -106,7 +106,7 @@ impl Server {
                     }
                 };
 
-                let listener = Listener::bind_unix_addr(&socket_addr)?;
+                let listener = Listener(uds::nonblocking::UnixSeqpacketListener::bind_unix_addr(&socket_addr)?);
             } else if #[cfg(target_os = "windows")] {
                 let SocketName::Path(path) = sn;
                 let listener = Listener::bind(path)?;
@@ -152,18 +152,64 @@ impl Server {
     ///
     /// This method uses basic I/O event notification via [`polling`] which
     /// can fail for a number of different reasons
+    #[allow(unsafe_code)]
     pub fn run(
         &mut self,
         handler: Box<dyn crate::ServerHandler>,
         shutdown: &std::sync::atomic::AtomicBool,
         stale_timeout: Option<std::time::Duration>,
     ) -> Result<(), Error> {
-        let poll = Poller::new()?;
-        let mut events = Vec::new();
+        let mut events = polling::Events::new();
+        let listener = self.listener.take().unwrap();
 
-        poll.add(self.listener.as_ref().unwrap(), Event::readable(0))?;
+        struct Poll {
+            listener: Listener,
+            clients: Vec<ClientConn>,
+            poll: Poller,
+        }
 
-        let mut clients = Vec::new();
+        impl Poll {
+            fn new(listener: Listener) -> std::io::Result<Self> {
+                let s = Self {
+                    listener,
+                    poll: Poller::new()?,
+                    clients: Vec::new(),
+                };
+
+                // SAFETY: We ensure we delete the listener during drop
+                unsafe {
+                    s.poll.add(&s.listener, Event::readable(0))?;
+                }
+
+                Ok(s)
+            }
+
+            #[inline]
+            fn add(
+                &mut self,
+                src: impl polling::AsRawSource,
+                interest: Event,
+            ) -> std::io::Result<()> {
+                // SAFETY: We ensure we delete all sources we add before dropping the poll
+                unsafe { self.poll.add(src, interest) }
+            }
+        }
+
+        impl Drop for Poll {
+            fn drop(&mut self) {
+                for client in std::mem::take(&mut self.clients) {
+                    if let Err(err) = self.poll.delete(client.socket) {
+                        log::error!("failed to deregister socket: {err}");
+                    }
+                }
+
+                if let Err(err) = self.poll.delete(&self.listener) {
+                    log::error!("failed to deregister listener: {err}");
+                }
+            }
+        }
+
+        let mut polling = Poll::new(listener)?;
         let mut id = 1;
 
         loop {
@@ -176,7 +222,7 @@ impl Server {
             let deadline = Instant::now() + timeout;
             let mut remaining = Some(timeout);
             while let Some(timeout) = remaining {
-                match poll.wait(&mut events, Some(timeout)) {
+                match polling.poll.wait(&mut events, Some(timeout)) {
                     Ok(_) => {
                         break;
                     }
@@ -191,21 +237,23 @@ impl Server {
             }
 
             #[cfg(target_os = "macos")]
-            if self.check_mach_port(&poll, &mut clients, handler.as_ref())? == LoopAction::Exit {
+            if self.check_mach_port(&polling.poll, &mut polling.clients, handler.as_ref())?
+                == LoopAction::Exit
+            {
                 return Ok(());
             }
 
             for event in events.iter() {
                 if event.key == 0 {
-                    match self.listener.as_ref().unwrap().accept_unix_addr() {
+                    match polling.listener.accept_unix_addr() {
                         Ok((accepted, _addr)) => {
                             let key = id;
                             id += 1;
 
-                            poll.add(&accepted, Event::readable(key))?;
+                            polling.add(&accepted, Event::readable(key))?;
 
-                            log::debug!("accepted connection {}", key);
-                            clients.push(ClientConn {
+                            log::debug!("accepted connection {key}");
+                            polling.clients.push(ClientConn {
                                 socket: accepted,
                                 key,
                                 last_update: Instant::now(),
@@ -213,22 +261,25 @@ impl Server {
                                 pid: None,
                             });
 
-                            if handler.on_client_connected(clients.len()) == LoopAction::Exit {
+                            if handler.on_client_connected(polling.clients.len())
+                                == LoopAction::Exit
+                            {
                                 log::debug!("on_client_connected exited message loop");
                                 return Ok(());
                             }
                         }
                         Err(err) => {
-                            log::error!("failed to accept socket connection: {}", err);
+                            log::error!("failed to accept socket connection: {err}");
                         }
                     }
 
                     // We need to reregister insterest every time
-                    poll.modify(self.listener.as_ref().unwrap(), Event::readable(0))?;
-                } else if let Some(pos) = clients.iter().position(|cc| cc.key == event.key) {
-                    clients[pos].last_update = Instant::now();
+                    polling.poll.modify(&polling.listener, Event::readable(0))?;
+                } else if let Some(pos) = polling.clients.iter().position(|cc| cc.key == event.key)
+                {
+                    polling.clients[pos].last_update = Instant::now();
 
-                    let deregister = match clients[pos].recv(handler.as_ref()) {
+                    let deregister = match polling.clients[pos].recv(handler.as_ref()) {
                         Some((super::CRASH, buffer)) => {
                             cfg_if::cfg_if! {
                                 if #[cfg(target_os = "macos")] {
@@ -242,11 +293,11 @@ impl Server {
 
                                     None
                                 } else {
-                                    let cc = clients.swap_remove(pos);
+                                    let cc = polling.clients.swap_remove(pos);
 
                                     cfg_if::cfg_if! {
                                         if #[cfg(any(target_os = "linux", target_os = "android"))] {
-                                            let peer_creds = cc.socket.initial_peer_credentials()?;
+                                            let peer_creds = cc.socket.0.initial_peer_credentials()?;
 
                                             let pid = peer_creds.pid().ok_or(Error::UnknownClientPid)?;
 
@@ -286,7 +337,7 @@ impl Server {
                                     let action =
                                         match Self::handle_crash_request(crash_ctx, handler.as_ref()) {
                                             Err(err) => {
-                                                log::error!("failed to capture minidump: {}", err);
+                                                log::error!("failed to capture minidump: {err}");
                                                 LoopAction::Continue
                                             }
                                             Ok(action) => {
@@ -300,8 +351,8 @@ impl Server {
                                         size: 0,
                                     };
 
-                                    if let Err(e) = cc.socket.send(ack.as_bytes()) {
-                                        log::error!("failed to send ack: {}", e);
+                                    if let Err(err) = cc.socket.send(ack.as_bytes()) {
+                                        log::error!("failed to send ack: {err}");
                                     }
 
                                     if action == LoopAction::Exit {
@@ -319,10 +370,10 @@ impl Server {
                                 size: 0,
                             };
 
-                            if let Err(e) = clients[pos].socket.send(pong.as_bytes()) {
-                                log::error!("failed to send PONG: {}", e);
+                            if let Err(err) = polling.clients[pos].socket.send(pong.as_bytes()) {
+                                log::error!("failed to send PONG: {err}");
 
-                                let cc = clients.swap_remove(pos);
+                                let cc = polling.clients.swap_remove(pos);
                                 Some(cc.socket)
                             } else {
                                 None
@@ -343,47 +394,51 @@ impl Server {
                             None
                         }
                         None => {
-                            log::debug!("client closed socket {}", pos);
-                            let cc = clients.swap_remove(pos);
+                            log::debug!("client closed socket {pos}");
+                            let cc = polling.clients.swap_remove(pos);
                             Some(cc.socket)
                         }
                     };
 
                     if let Some(socket) = deregister {
-                        if let Err(e) = poll.delete(&socket) {
-                            log::error!("failed to deregister socket: {}", e);
+                        if let Err(err) = polling.poll.delete(&socket) {
+                            log::error!("failed to deregister socket: {err}");
                         }
 
-                        if handler.on_client_disconnected(clients.len()) == LoopAction::Exit {
+                        if handler.on_client_disconnected(polling.clients.len()) == LoopAction::Exit
+                        {
                             log::debug!("on_client_disconnected exited message loop");
                             return Ok(());
                         }
                     } else {
-                        poll.modify(&clients[pos].socket, Event::readable(clients[pos].key))?;
+                        let conn = &polling.clients[pos];
+                        polling
+                            .poll
+                            .modify(&conn.socket, Event::readable(conn.key))?;
                     }
                 }
             }
 
             if let Some(st) = stale_timeout {
-                let before = clients.len();
+                let before = polling.clients.len();
 
                 // Reap any connections that haven't sent a message in the period
                 // specified by the user
-                clients.retain(|conn| {
+                polling.clients.retain(|conn| {
                     let keep = conn.last_update.elapsed() < st;
 
                     if !keep {
                         log::debug!("dropping stale connection {:?}", conn.last_update.elapsed());
-                        if let Err(e) = poll.delete(&conn.socket) {
-                            log::error!("failed to deregister timed-out socket: {}", e);
+                        if let Err(err) = polling.poll.delete(&conn.socket) {
+                            log::error!("failed to deregister timed-out socket: {err}");
                         }
                     }
 
                     keep
                 });
 
-                if before > clients.len()
-                    && handler.on_client_disconnected(clients.len()) == LoopAction::Exit
+                if before > polling.clients.len()
+                    && handler.on_client_disconnected(polling.clients.len()) == LoopAction::Exit
                 {
                     log::debug!("on_client_disconnected exited message loop");
                     return Ok(());
@@ -456,7 +511,7 @@ impl Server {
 
             let action = match Self::handle_crash_request(rcc.crash_context, handler) {
                 Err(err) => {
-                    log::error!("failed to capture minidump: {}", err);
+                    log::error!("failed to capture minidump: {err}");
                     LoopAction::Continue
                 }
                 Ok(action) => {
@@ -465,12 +520,12 @@ impl Server {
                 }
             };
 
-            if let Err(e) = rcc.acker.send_ack(1, Some(Duration::from_secs(2))) {
-                log::error!("failed to send ack: {}", e);
+            if let Err(err) = rcc.acker.send_ack(1, Some(Duration::from_secs(2))) {
+                log::error!("failed to send ack: {err}");
             }
 
-            if let Err(e) = poll.delete(&cc.socket) {
-                log::error!("failed to deregister socket: {}", e);
+            if let Err(err) = poll.delete(&cc.socket) {
+                log::error!("failed to deregister socket: {err}");
             }
 
             Ok(action)

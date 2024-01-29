@@ -421,7 +421,7 @@ impl HandlerInner {
 
         {
             *crash_ctx = mem::MaybeUninit::zeroed();
-            let mut cc = &mut *crash_ctx.as_mut_ptr();
+            let cc = &mut *crash_ctx.as_mut_ptr();
 
             ptr::copy_nonoverlapping(nix_info, &mut cc.siginfo, 1);
 
