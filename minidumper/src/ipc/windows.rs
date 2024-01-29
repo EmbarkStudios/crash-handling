@@ -6,7 +6,10 @@
 
 use std::{
     io,
-    os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket},
+    os::windows::{
+        io::{AsRawSocket, AsSocket, FromRawSocket, IntoRawSocket, RawSocket},
+        prelude::BorrowedSocket,
+    },
 };
 
 #[allow(non_camel_case_types, non_snake_case, clippy::upper_case_acronyms)]
@@ -417,6 +420,12 @@ impl AsRawSocket for UnixListener {
     }
 }
 
+impl AsSocket for UnixListener {
+    fn as_socket(&self) -> BorrowedSocket<'_> {
+        unsafe { BorrowedSocket::borrow_raw(self.as_raw_socket()) }
+    }
+}
+
 impl FromRawSocket for UnixListener {
     unsafe fn from_raw_socket(sock: RawSocket) -> Self {
         Self(Socket::from_raw_socket(sock))
@@ -485,6 +494,12 @@ impl UnixStream {
 impl AsRawSocket for UnixStream {
     fn as_raw_socket(&self) -> RawSocket {
         self.0.as_raw_socket()
+    }
+}
+
+impl AsSocket for UnixStream {
+    fn as_socket(&self) -> BorrowedSocket<'_> {
+        unsafe { BorrowedSocket::borrow_raw(self.as_raw_socket()) }
     }
 }
 

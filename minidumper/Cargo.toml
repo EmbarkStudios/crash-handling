@@ -26,7 +26,7 @@ log = "0.4"
 # Minidump writing
 minidump-writer = "0.8"
 # Event loop
-polling = "2.2"
+polling = "3.2"
 # Nicer locking primitives
 parking_lot = "0.12"
 # Nicer error creation
@@ -34,15 +34,15 @@ thiserror = "1.0"
 
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
 # Improved Unix domain socket support, includes features that are not available in std
-uds = "0.2.6"
+uds = "0.4"
 
 [target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
-# Nicer binary interop
-scroll = "0.11"
+# Nicer binary interop, keep aligned with minidump-writer
+scroll = { version = "0.11", features = ["derive"] }
 
 [dev-dependencies]
 # Diskwrite example
 crash-handler = { path = "../crash-handler" }
-pretty_env_logger = "0.4.0"
+pretty_env_logger = "0.5.0"
 # uuid generation
 uuid = { version = "1.0", features = ["v4"] }

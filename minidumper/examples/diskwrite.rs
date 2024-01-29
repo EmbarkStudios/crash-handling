@@ -117,7 +117,7 @@ fn main() {
 
     cfg_if::cfg_if! {
         if #[cfg(any(target_os = "linux", target_os = "android"))] {
-            handler.simulate_signal(crash_handler::Signal::Segv);
+            handler.simulate_signal(libc::SIGALRM as _);
         } else if #[cfg(windows)] {
             handler.simulate_exception(None);
         } else if #[cfg(target_os = "macos")] {

@@ -1,9 +1,76 @@
 cfg_if::cfg_if! {
     if #[cfg(any(target_os = "linux", target_os = "android"))] {
+        use std::os::{
+            unix::{prelude::{RawFd, BorrowedFd}, io::AsRawFd},
+            fd::AsFd,
+        };
+
         type Stream = uds::UnixSeqpacketConn;
 
-        type Listener = uds::nonblocking::UnixSeqpacketListener;
-        type Connection = uds::nonblocking::UnixSeqpacketConn;
+        struct Connection(uds::nonblocking::UnixSeqpacketConn);
+
+        impl polling::AsRawSource for Connection {
+            fn raw(&self) -> RawFd {
+                self.0.as_raw_fd()
+            }
+        }
+
+        impl AsRawFd for Connection {
+            fn as_raw_fd(&self) -> RawFd {
+                self.0.as_raw_fd()
+            }
+        }
+
+        impl AsFd for Connection {
+            fn as_fd(&self) -> BorrowedFd<'_> {
+                #[allow(unsafe_code)]
+                unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
+            }
+        }
+
+        impl Connection {
+            #[inline]
+            fn send(&self, buf: &[u8]) -> Result<usize, std::io::Error> {
+                self.0.send(buf)
+            }
+
+            #[inline]
+            fn recv(&self, buf: &mut [u8]) -> Result<usize, std::io::Error> {
+                self.0.recv(buf)
+            }
+
+            #[inline]
+            fn recv_vectored(&self, buf: &mut [std::io::IoSliceMut<'_>]) -> Result<(usize, bool), std::io::Error> {
+                self.0.recv_vectored(buf)
+            }
+        }
+
+        struct Listener(uds::nonblocking::UnixSeqpacketListener);
+
+        impl polling::AsRawSource for Listener {
+            fn raw(&self) -> RawFd {
+                self.0.as_raw_fd()
+            }
+        }
+
+        impl AsRawFd for Listener {
+            fn as_raw_fd(&self) -> RawFd {
+                self.0.as_raw_fd()
+            }
+        }
+
+        impl AsFd for Listener {
+            fn as_fd(&self) -> BorrowedFd<'_> {
+                #[allow(unsafe_code)]
+                unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
+            }
+        }
+
+        impl Listener {
+            fn accept_unix_addr(&self) -> Result<(Connection, uds::UnixSocketAddr), std::io::Error> {
+                self.0.accept_unix_addr().map(|(conn, addr)| (Connection(conn), addr))
+            }
+        }
     } else if #[cfg(target_os = "windows")] {
         mod windows;
 

@@ -1,6 +1,5 @@
 #![allow(unsafe_code)]
 
-pub use ch::debug_print;
 use crash_handler as ch;
 
 pub use sadness_generator::SadnessFlavor;
