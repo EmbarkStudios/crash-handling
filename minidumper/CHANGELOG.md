@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#81](https://github.com/EmbarkStudios/crash-handling/pull/81) resolved [#80](https://github.com/EmbarkStudios/crash-handling/issues/80) by updating `polling` to 0.3.
+
 ## [0.8.0] - 2023-04-03
 ### Changed
 - [PR#70](https://github.com/EmbarkStudios/crash-handling/pull/70) removed `winapi` in favor of embedded bindings.

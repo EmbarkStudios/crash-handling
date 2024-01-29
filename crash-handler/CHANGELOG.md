@@ -9,9 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
-### Changed
-- [PR#81](https://github.com/EmbarkStudios/crash-handling/pull/81) resolved [#80](https://github.com/EmbarkStudios/crash-handling/issues/80) by updating `polling` to 0.3.
-
 ### Added
 - [PR#81](https://github.com/EmbarkStudios/crash-handling/pull/81) resolved [#79](https://github.com/EmbarkStudios/crash-handling/issues/79) by adding `make_single_crash_event`.
 
