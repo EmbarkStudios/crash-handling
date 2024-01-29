@@ -69,11 +69,11 @@ jobs:
           target: ${{ matrix.job.target }}
       - uses: Swatinem/rust-cache@v2
       - name: Build
-        run:
-          # We need to install cross from git, because https://github.com/cross-rs/cross/issues/1222
-          # is still unreleased (it's been almost a year since the last release)
-          # and we can't use 1.67.0 any longer because some dependencies (sigh,
-          # home, really?) have a higher MSRV...so...
+        # We need to install cross from git, because https://github.com/cross-rs/cross/issues/1222
+        # is still unreleased (it's been almost a year since the last release)
+        # and we can't use 1.67.0 any longer because some dependencies (sigh,
+        # home, really?) have a higher MSRV...so...
+        run: |
           cargo install cross --git https://github.com/cross-rs/cross --rev 185398b
           cross build --target ${{ matrix.job.target }} --verbose --all-targets
 
