@@ -82,13 +82,14 @@ impl CrashHandler {
     }
 
     /// Sends the specified user signal.
-    pub fn simulate_signal(&self, signal: Signal) -> crate::CrashEventResult {
+    pub fn simulate_signal(&self, signal: u32) -> crate::CrashEventResult {
         // Normally this would be an unsafe function, since this unsafe encompasses
         // the entirety of the body, however the user is really not required to
         // uphold any guarantees on their end, so no real need to declare the
         // function itself unsafe.
         unsafe {
             let mut siginfo: libc::signalfd_siginfo = std::mem::zeroed();
+            siginfo.ssi_signo = signal;
             siginfo.ssi_code = state::SI_USER;
             siginfo.ssi_pid = std::process::id();
 
@@ -98,7 +99,6 @@ impl CrashHandler {
             let lock = state::HANDLER.lock();
             if let Some(handler) = &*lock {
                 handler.handle_signal(
-                    signal as i32,
                     &mut *(&mut siginfo as *mut libc::signalfd_siginfo).cast::<libc::siginfo_t>(),
                     &mut *(&mut context as *mut crash_context::ucontext_t).cast::<libc::c_void>(),
                 )

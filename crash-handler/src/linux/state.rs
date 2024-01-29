@@ -334,7 +334,7 @@ unsafe extern "C" fn signal_handler(
         let handler = HANDLER.lock();
 
         if let Some(handler) = &*handler {
-            match handler.handle_signal(sig as i32, info, uc) {
+            match handler.handle_signal(info, uc) {
                 crate::CrashEventResult::Handled(true) => Action::RestoreDefault,
                 crate::CrashEventResult::Handled(false) => Action::RestorePrevious,
                 crate::CrashEventResult::Jump { jmp_buf, value } => Action::Jump((jmp_buf, value)),
@@ -406,7 +406,6 @@ impl HandlerInner {
 
     pub(super) unsafe fn handle_signal(
         &self,
-        _sig: libc::c_int,
         info: &mut libc::siginfo_t,
         uc: &mut libc::c_void,
     ) -> crate::CrashEventResult {
