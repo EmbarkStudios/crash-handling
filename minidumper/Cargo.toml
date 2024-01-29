@@ -37,8 +37,8 @@ thiserror = "1.0"
 uds = "0.4"
 
 [target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
-# Nicer binary interop
-scroll = { version = "0.12", features = ["derive"] }
+# Nicer binary interop, keep aligned with minidump-writer
+scroll = { version = "0.11", features = ["derive"] }
 
 [dev-dependencies]
 # Diskwrite example
