@@ -285,10 +285,10 @@ impl Server {
                                 if #[cfg(target_os = "macos")] {
                                     use scroll::Pread;
                                     let pid: u32 = buffer.pread(0)?;
-                                    clients[pos].pid = Some(pid);
+                                    polling.clients[pos].pid = Some(pid);
 
-                                    if let Err(e) = clients[pos].socket.send(&[1]) {
-                                        log::error!("failed to send ack: {}", e);
+                                    if let Err(err) = polling.clients[pos].socket.send(&[1]) {
+                                        log::error!("failed to send ack: {err}");
                                     }
 
                                     None

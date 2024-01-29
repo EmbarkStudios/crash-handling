@@ -8,9 +8,13 @@
 
 use std::{
     io,
-    os::unix::{
-        ffi::OsStrExt,
-        io::{AsRawFd, IntoRawFd, RawFd},
+    os::{
+        fd::AsFd,
+        unix::{
+            ffi::OsStrExt,
+            io::{AsRawFd, IntoRawFd, RawFd},
+            prelude::BorrowedFd,
+        },
     },
 };
 
@@ -203,6 +207,15 @@ impl AsRawFd for Uds {
     }
 }
 
+impl AsFd for Uds {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        #[allow(unsafe_code)]
+        unsafe {
+            BorrowedFd::borrow_raw(self.as_raw_fd())
+        }
+    }
+}
+
 impl Drop for Uds {
     fn drop(&mut self) {
         // SAFETY: syscall
@@ -239,6 +252,15 @@ impl UnixListener {
 impl AsRawFd for UnixListener {
     fn as_raw_fd(&self) -> RawFd {
         self.0.as_raw_fd()
+    }
+}
+
+impl AsFd for UnixListener {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        #[allow(unsafe_code)]
+        unsafe {
+            BorrowedFd::borrow_raw(self.as_raw_fd())
+        }
     }
 }
 
@@ -294,5 +316,14 @@ impl UnixStream {
 impl AsRawFd for UnixStream {
     fn as_raw_fd(&self) -> RawFd {
         self.0.as_raw_fd()
+    }
+}
+
+impl AsFd for UnixStream {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        #[allow(unsafe_code)]
+        unsafe {
+            BorrowedFd::borrow_raw(self.as_raw_fd())
+        }
     }
 }
