@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.6.1] - 2024-01-29
 ### Added
 - [PR#81](https://github.com/EmbarkStudios/crash-handling/pull/81) resolved [#79](https://github.com/EmbarkStudios/crash-handling/issues/79) by adding `make_single_crash_event`.
 
@@ -72,7 +73,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial pass of crash-context, Linux only
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.6.0...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.6.1...HEAD
+[0.6.1]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.6.0...crash-handler-0.6.1
 [0.6.0]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.5.1...crash-handler-0.6.0
 [0.5.1]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.5.0...crash-handler-0.5.1
 [0.5.0]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.4.0...crash-handler-0.5.0
