@@ -104,12 +104,18 @@ impl From<bool> for CrashEventResult {
 /// exception handler which makes them slightly safer to handle than UNIX signals,
 /// but it is again recommended to do as little work as possible.
 pub unsafe trait CrashEvent: Send + Sync {
-    /// Method invoked when a crash occurs. Returning true indicates your handler
-    /// has processed the crash and that no further handlers should run.
+    /// Method invoked when a crash occurs.
+    ///
+    /// Returning true indicates your handler has processed the crash and that
+    /// no further handlers should run.
     fn on_crash(&self, context: &CrashContext) -> CrashEventResult;
 }
 
 /// Creates a [`CrashEvent`] using the supplied closure as the implementation.
+///
+/// The supplied closure will be called for both real crash events as well as
+/// those simulated by calling `simulate_signal/exception`, which is why it is
+/// not `FnOnce`
 ///
 /// # Safety
 ///
@@ -133,6 +139,46 @@ where
     }
 
     Box::new(Wrapper { inner: closure })
+}
+
+/// Creates a [`CrashEvent`] using the supplied closure as the implementation.
+///
+/// This uses an `FnOnce` closure instead of `Fn` like `[make_crash_event]`, but
+/// means this closure can only be used for the first crash, and cannot be used
+/// in a situation where user-triggered crashes via the `simulate_signal/exception`
+/// methods are used.
+///
+/// # Safety
+///
+/// See the [`CrashEvent`] Safety section for information on why this is `unsafe`.
+#[inline]
+pub unsafe fn make_single_crash_event<F>(closure: F) -> Box<dyn CrashEvent>
+where
+    F: Send + Sync + FnOnce(&CrashContext) -> CrashEventResult + 'static,
+{
+    struct Wrapper<F> {
+        // technically mutexes are not async signal safe on linux, but this is
+        // an internal-only detail that will be safe _unless_ the callback invoked
+        // by the user also crashes, but if that occurs...that's on them
+        inner: parking_lot::Mutex<Option<F>>,
+    }
+
+    unsafe impl<F> CrashEvent for Wrapper<F>
+    where
+        F: Send + Sync + FnOnce(&CrashContext) -> CrashEventResult,
+    {
+        fn on_crash(&self, context: &CrashContext) -> CrashEventResult {
+            if let Some(inner) = self.inner.lock().take() {
+                (inner)(context)
+            } else {
+                false.into()
+            }
+        }
+    }
+
+    Box::new(Wrapper {
+        inner: parking_lot::Mutex::new(Some(closure)),
+    })
 }
 
 cfg_if::cfg_if! {

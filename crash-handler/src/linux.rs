@@ -66,7 +66,7 @@ impl CrashHandler {
     /// method is not called, `PR_SET_PTRACER_ANY` is used to allow any process
     /// to dump the current process.
     ///
-    /// Note that this is only needed of `/proc/sys/kernel/yama/ptrace_scope`
+    /// Note that this is only needed if `/proc/sys/kernel/yama/ptrace_scope`
     /// is 1 "restricted ptrace", but there is no harm in setting this if it is
     /// in another mode.
     ///
