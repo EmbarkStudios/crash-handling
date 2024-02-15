@@ -39,7 +39,7 @@ skip-tree = [
     # parking_lot uses an old version https://github.com/Amanieu/parking_lot/pull/425,
     # my original PR didn't have windows-targets since it's not needed at all,
     # but it is what it is
-    { name = "windows-targets" },
+    { name = "windows-targets", version = "=0.48.5" },
 ]
 
 [sources]

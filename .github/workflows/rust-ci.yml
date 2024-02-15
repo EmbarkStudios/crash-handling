@@ -16,10 +16,10 @@ jobs:
     name: Lint
     strategy:
       matrix:
-        os: [ubuntu-22.04, windows-2022, macos-12]
+        os: [ubuntu-22.04, windows-2022, macos-14]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: "clippy, rustfmt"
@@ -39,10 +39,10 @@ jobs:
     name: Test
     strategy:
       matrix:
-        os: [ubuntu-22.04, windows-2022, macos-12]
+        os: [ubuntu-22.04, windows-2022, macos-14]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo fetch
@@ -81,14 +81,14 @@ jobs:
     name: cargo-deny
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: EmbarkStudios/cargo-deny-action@v1
 
   publish-check:
     name: Publish Check
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo fetch
@@ -98,3 +98,9 @@ jobs:
           cargo publish --dry-run --manifest-path crash-handler/Cargo.toml
           cargo publish --dry-run --manifest-path minidumper/Cargo.toml
           cargo publish --dry-run --manifest-path sadness-generator/Cargo.toml
+
+  all:
+    runs-on: ubuntu-22.04
+    needs: [lint, test, build-android, deny-check, publish-check]
+    steps:
+      - run: echo "All test jobs passed"
