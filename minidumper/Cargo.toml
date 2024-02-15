@@ -1,6 +1,6 @@
 [package]
 name = "minidumper"
-version = "0.8.1"
+version = "0.8.2"
 description = "IPC impl for creating a minidump for a crashed process"
 repository = "https://github.com/EmbarkStudios/crash-handling"
 authors = [
