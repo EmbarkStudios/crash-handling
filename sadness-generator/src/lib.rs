@@ -99,6 +99,8 @@ impl SadnessFlavor {
             Self::Purecall => raise_purecall(),
             #[cfg(windows)]
             Self::InvalidParameter => raise_invalid_parameter(),
+            #[cfg(windows)]
+            Self::HeapCorruption => raise_heap_corruption(),
             #[cfg(target_os = "macos")]
             Self::Guard => raise_guard_exception(),
         }
@@ -413,14 +415,12 @@ pub unsafe fn raise_heap_corruption() -> ! {
     if kernel32 != 0 {
         let heap_free: Option<
             unsafe extern "system" fn(HeapHandle, u32, *const core::ffi::c_void) -> Bool,
-        > = std::mem::transmute(GetProcAddress(kernel32, b"HeapFree\0".as_ptr()));
+        > = std::mem::transmute(get_proc_address(kernel32, b"HeapFree\0".as_ptr()));
 
         let heap_free = heap_free.expect("failed to acquire HeapFree function");
 
-        let heap = GetProcessHeap();
         let bad_pointer = 3 as *mut core::ffi::c_void;
-        heap_free(heap, 0, bad_pointer);
-        panic!("We should have crashed on the previous line");
+        heap_free(get_process_heap(), 0, bad_pointer);
     } else {
         panic!("Can't corrupt heap: failed to load kernel32");
     }
