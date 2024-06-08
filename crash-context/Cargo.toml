@@ -1,6 +1,6 @@
 [package]
 name = "crash-context"
-version = "0.6.1"
+version = "0.6.2"
 description = "Provides portable types containing target specific contextual information at the time of a crash"
 repository = "https://github.com/EmbarkStudios/crash-handling"
 authors = [
