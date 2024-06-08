@@ -17,8 +17,8 @@ anyhow = "1.0"
 clap = { version = "4.0", features = ["derive"] }
 cfg-if = "1.0"
 crash-handler = { path = "../crash-handler" }
-minidump = "0.20"
-minidump-common = "0.20"
+minidump = "0.21"
+minidump-common = "0.21"
 minidumper = { path = "../minidumper" }
 # This has some crazy dependencies, can enable manually if needed
 #notify-rust = "4.5"

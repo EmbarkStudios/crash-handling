@@ -81,7 +81,10 @@ pub extern "C" fn pthread_create(
             REAL_PTHREAD_CREATE = Some(std::mem::transmute(ptr));
         }
 
-        libc::pthread_key_create(&mut THREAD_DESTRUCTOR_KEY, Some(uninstall_sig_alt_stack));
+        libc::pthread_key_create(
+            std::ptr::addr_of_mut!(THREAD_DESTRUCTOR_KEY),
+            Some(uninstall_sig_alt_stack),
+        );
     });
 
     let real_pthread_create = unsafe { REAL_PTHREAD_CREATE.as_ref() }.expect("pthread_create() intercept failed but the intercept function is still being called, this won't work");

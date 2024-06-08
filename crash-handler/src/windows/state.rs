@@ -7,12 +7,25 @@ type LPTOP_LEVEL_EXCEPTION_FILTER = Option<
     unsafe extern "system" fn(exceptioninfo: *const crash_context::EXCEPTION_POINTERS) -> i32,
 >;
 
+type PVECTORED_EXCEPTION_HANDLER = Option<
+    unsafe extern "system" fn(exceptioninfo: *const crash_context::EXCEPTION_POINTERS) -> i32,
+>;
+
 extern "system" {
     fn GetCurrentThreadId() -> u32;
     fn SetUnhandledExceptionFilter(
         filter: LPTOP_LEVEL_EXCEPTION_FILTER,
     ) -> LPTOP_LEVEL_EXCEPTION_FILTER;
+    fn AddVectoredExceptionHandler(
+        first_handler: u32,
+        handler: PVECTORED_EXCEPTION_HANDLER,
+    ) -> *mut core::ffi::c_void;
+    fn RemoveVectoredExceptionHandler(handle: *mut core::ffi::c_void) -> u32;
 }
+
+struct VehHandler(std::ptr::NonNull<libc::c_void>);
+unsafe impl Send for VehHandler {}
+unsafe impl Sync for VehHandler {}
 
 extern "C" {
     /// MSVCRT has its own error handling function for invalid parameters to crt functions
@@ -63,6 +76,8 @@ pub(super) struct HandlerInner {
     previous_pch: Option<_purecall_handler>,
     /// The previously installed SIGABRT handler
     previous_abort_handler: Option<libc::sighandler_t>,
+    /// The handle of our own vectored exception handler
+    veh_handle: Option<VehHandler>,
 }
 
 impl HandlerInner {
@@ -76,6 +91,8 @@ impl HandlerInner {
             let previous_iph = _set_invalid_parameter_handler(Some(handle_invalid_parameter));
             let previous_pch = _set_purecall_handler(Some(handle_pure_virtual_call));
             let previous_abort_handler = super::signal::install_abort_handler().ok();
+            let veh_handle = AddVectoredExceptionHandler(1, Some(vectored_handle_exception));
+            let veh_handle = std::ptr::NonNull::new(veh_handle).map(VehHandler);
 
             Self {
                 user_handler,
@@ -83,13 +100,14 @@ impl HandlerInner {
                 previous_iph,
                 previous_pch,
                 previous_abort_handler,
+                veh_handle,
             }
         }
     }
 
     /// Sets the handlers to the previous handlers that were registered when the
     /// specified handler was attached
-    pub(crate) fn restore_previous_handlers(&self) {
+    pub(crate) fn restore_previous_handlers(&mut self) {
         // SAFETY: syscalls
         unsafe {
             if let Some(ah) = self.previous_abort_handler {
@@ -98,6 +116,9 @@ impl HandlerInner {
             SetUnhandledExceptionFilter(self.previous_filter);
             _set_invalid_parameter_handler(self.previous_iph);
             _set_purecall_handler(self.previous_pch);
+            if let Some(handler) = self.veh_handle.take() {
+                RemoveVectoredExceptionHandler(handler.0.as_ptr());
+            }
         }
     }
 }
@@ -166,8 +187,8 @@ struct AutoHandler<'scope> {
 }
 
 impl<'scope> AutoHandler<'scope> {
-    fn new(lock: parking_lot::MutexGuard<'scope, Option<HandlerInner>>) -> Option<Self> {
-        if let Some(hi) = &*lock {
+    fn new(mut lock: parking_lot::MutexGuard<'scope, Option<HandlerInner>>) -> Option<Self> {
+        if let Some(hi) = &mut *lock {
             // In case another exception occurs while this handler is doing its thing,
             // it should be delivered to the previous filter.
             hi.restore_previous_handlers();
@@ -261,6 +282,21 @@ pub(super) unsafe extern "system" fn handle_exception(
 
     #[cfg(target_arch = "x86_64")]
     super::jmp::longjmp(_jump.0, _jump.1);
+}
+
+const STATUS_HEAP_CORRUPTION: u32 = 0xC0000374;
+
+/// Called on the exception thread when an exception occurs.
+/// Gets to act before other exception handlers.
+pub(super) unsafe extern "system" fn vectored_handle_exception(
+    except_info: *const crash_context::EXCEPTION_POINTERS,
+) -> i32 {
+    let exception_code = (*(*except_info).ExceptionRecord).ExceptionCode as u32;
+    if exception_code == STATUS_HEAP_CORRUPTION {
+        handle_exception(except_info)
+    } else {
+        EXCEPTION_CONTINUE_SEARCH
+    }
 }
 
 /// Handler for invalid parameters to CRT functions, this is not an exception so

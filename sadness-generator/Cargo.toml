@@ -16,7 +16,7 @@ homepage = "https://github.com/EmbarkStudios/crash-handling/tree/main/sadness-ge
 categories = ["simulation"]
 keywords = ["crash", "sadness", "signal", "exception"]
 # We use `asm!`
-rust-version = "1.59.0"
+rust-version = "1.62.0"
 
 [dependencies]
 libc = "0.2"

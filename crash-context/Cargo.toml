@@ -14,7 +14,7 @@ documentation = "https://docs.rs/crash-context"
 homepage = "https://github.com/EmbarkStudios/crash-handling/tree/main/crash-context"
 categories = ["external-ffi-bindings"]
 keywords = ["crash", "libc", "getcontext"]
-rust-version = "1.59.0" # We use `global_asm!`
+rust-version = "1.62.0" # We use `global_asm!`
 
 [dependencies]
 # Nicer cfg handling

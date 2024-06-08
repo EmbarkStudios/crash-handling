@@ -10,7 +10,7 @@ pub struct CrashContext {
     ///
     /// Note that we use [`crate::ucontext_t`] instead of [`libc::ucontext_t`]
     /// as libc's differs between glibc and musl <https://github.com/rust-lang/libc/pull/1646>
-    /// even though the ucontext_t received from a signal will be the same
+    /// even though the `ucontext_t` received from a signal will be the same
     /// regardless of the libc implementation used as it is only arch specific
     /// and not libc specific
     ///
