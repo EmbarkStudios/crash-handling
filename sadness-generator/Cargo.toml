@@ -15,8 +15,8 @@ homepage = "https://github.com/EmbarkStudios/crash-handling/tree/main/sadness-ge
 # so we use simulation, the simulation is so good it's real!
 categories = ["simulation"]
 keywords = ["crash", "sadness", "signal", "exception"]
-# We use `asm!`
-rust-version = "1.62.0"
+# We use `asm!` and rawdylib Windows bindings
+rust-version = "1.71.0"
 
 [dependencies]
 libc = "0.2"

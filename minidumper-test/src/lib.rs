@@ -37,6 +37,8 @@ pub enum Signal {
     Purecall,
     #[cfg(windows)]
     InvalidParameter,
+    #[cfg(windows)]
+    HeapCorruption,
     #[cfg(target_os = "macos")]
     Guard,
 }
@@ -58,6 +60,8 @@ impl fmt::Display for Signal {
             Self::Purecall => "purecall",
             #[cfg(windows)]
             Self::InvalidParameter => "invalid-parameter",
+            #[cfg(windows)]
+            Self::HeapCorruption => "heap-corruption",
             #[cfg(target_os = "macos")]
             Self::Guard => "guard",
         })
@@ -408,6 +412,10 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
             #[cfg(windows)]
             Signal::InvalidParameter => {
                 assert_eq!(crash_reason, CrashReason::from_windows_error(0xc000000d));
+            }
+            #[cfg(windows)]
+            Signal::HeapCorruption => {
+                assert_eq!(crash_reason, CrashReason::from_windows_error(0xc0000374));
             }
             #[cfg(unix)]
             Signal::Bus => {

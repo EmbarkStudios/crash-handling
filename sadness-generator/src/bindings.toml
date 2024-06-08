@@ -1,0 +1,11 @@
+output = "win_bindings.rs"
+binds = ["LoadLibraryA", "GetProcAddress", "GetProcessHeap", "HeapFree"]
+
+[bind-mode]
+mode = "minwin"
+
+[bind-mode.config]
+enum-style = "minwin"
+fix-naming = true
+use-rust-casing = true
+linking-style = "raw-dylib"
