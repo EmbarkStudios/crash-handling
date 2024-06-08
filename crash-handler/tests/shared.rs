@@ -75,6 +75,7 @@ pub fn handles_crash(flavor: SadnessFlavor) {
                             SadnessFlavor::Segfault => ExceptionCode::Segv,
                             SadnessFlavor::StackOverflow { .. }=> ExceptionCode::StackOverflow,
                             SadnessFlavor::Trap => ExceptionCode::Trap,
+                            SadnessFlavor::HeapCorruption => ExceptionCode::HeapCorruption,
                         };
 
                         assert_eq!(

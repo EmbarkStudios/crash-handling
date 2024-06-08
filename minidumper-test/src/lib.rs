@@ -366,7 +366,7 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                 ));
             }
             #[cfg(windows)]
-            Signal::Purecall | Signal::InvalidParameter => {
+            Signal::Purecall | Signal::InvalidParameter | Signal::HeapCorruption => {
                 unreachable!("windows only");
             }
             #[cfg(target_os = "macos")]
@@ -523,7 +523,7 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                 }
             }
             #[cfg(windows)]
-            Signal::Purecall | Signal::InvalidParameter => {
+            Signal::Purecall | Signal::InvalidParameter | Signal::HeapCorruption => {
                 unreachable!("windows only");
             }
         },

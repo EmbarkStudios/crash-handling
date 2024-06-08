@@ -107,6 +107,10 @@ fn real_main() -> anyhow::Result<()> {
                 Signal::InvalidParameter => {
                     sadness_generator::raise_invalid_parameter();
                 }
+                #[cfg(windows)]
+                Signal::HeapCorruption => {
+                    sadness_generator::raise_heap_corruption();
+                }
                 #[cfg(target_os = "macos")]
                 Signal::Guard => {
                     sadness_generator::raise_guard_exception();

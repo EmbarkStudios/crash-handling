@@ -284,7 +284,7 @@ pub(super) unsafe extern "system" fn handle_exception(
     super::jmp::longjmp(_jump.0, _jump.1);
 }
 
-const STATUS_HEAP_CORRUPTION: u32 = 0xC0000374;
+const STATUS_HEAP_CORRUPTION: u32 = 0xc0000374;
 
 /// Called on the exception thread when an exception occurs.
 /// Gets to act before other exception handlers.

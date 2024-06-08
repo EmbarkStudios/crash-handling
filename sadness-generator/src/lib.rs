@@ -399,6 +399,7 @@ pub unsafe fn raise_invalid_parameter() -> ! {
 }
 
 #[cfg(target_os = "windows")]
+#[allow(dead_code)]
 mod win_bindings;
 
 /// [`SadnessFlavor::HeapCorruption`]

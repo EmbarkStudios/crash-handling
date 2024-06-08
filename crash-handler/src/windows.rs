@@ -12,7 +12,7 @@ use crate::Error;
 /// floats.
 #[derive(Copy, Clone)]
 #[repr(i32)]
-//#[allow(overflowing_literals)]
+#[allow(overflowing_literals)]
 pub enum ExceptionCode {
     Abort = 0x40000015,             // STATUS_FATAL_APP_EXIT
     Fpe = -1073741676,              // EXCEPTION_INT_DIVIDE_BY_ZERO
@@ -23,6 +23,7 @@ pub enum ExceptionCode {
     InvalidParameter = -1073741811, // STATUS_INVALID_PARAMETER
     Purecall = -1073741787,         // STATUS_NONCONTINUABLE_EXCEPTION
     User = 0xcca11ed, // https://github.com/chromium/crashpad/blob/fca8871ca3fb721d3afab370ca790122f9333bfd/util/win/exception_codes.h#L32
+    HeapCorruption = 0xc0000374, // STATUS_HEAP_CORRUPTION
 }
 
 /// A Windows exception handler
