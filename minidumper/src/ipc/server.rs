@@ -11,7 +11,7 @@ pub struct Server {
     #[cfg(target_os = "macos")]
     port: crash_context::ipc::Server,
     /// For abstract sockets, we don't have to worry about cleanup as it is
-    /// handled by the OS, but on Windows and MacOS we need to clean them up
+    /// handled by the OS, but on Windows and `MacOS` we need to clean them up
     /// manually. We basically rely on the crash monitor program this Server
     /// is running in to exit cleanly, which should be mostly true, but we
     /// may need to harden this code if people experience issues with socket

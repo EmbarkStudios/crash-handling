@@ -9,7 +9,7 @@ enum MessageIds {
     SignalCrash = 0,
     /// Message ID telling the handler thread to quit.
     Shutdown = 2,
-    /// Taken from mach_exc in /usr/include/mach/exc.defs.
+    /// Taken from `mach_exc` in `/usr/include/mach/exc.defs`.
     Exception = 2405,
     ExceptionStateIdentity = 2407,
 }
