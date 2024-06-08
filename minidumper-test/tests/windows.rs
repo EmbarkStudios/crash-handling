@@ -21,3 +21,8 @@ fn invalid_param_simple() {
 fn invalid_param_threaded() {
     run_threaded_test(Signal::InvalidParameter);
 }
+
+#[test]
+fn heap_corruption() {
+    run_threaded_test(Signal::HeapCorruption);
+}

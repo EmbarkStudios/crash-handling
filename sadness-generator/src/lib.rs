@@ -53,6 +53,9 @@ pub enum SadnessFlavor {
     /// exception
     #[cfg(windows)]
     InvalidParameter,
+    /// Raises a `STATUS_HEAP_CORRUPTION` exception by freeing an invalid pointer
+    #[cfg(windows)]
+    HeapCorruption,
     /// Raises an `EXC_GUARD` exception on Macos by placing a guard on a
     /// file descriptor then attempting to perform the operation that was guarded
     #[cfg(target_os = "macos")]
@@ -96,6 +99,8 @@ impl SadnessFlavor {
             Self::Purecall => raise_purecall(),
             #[cfg(windows)]
             Self::InvalidParameter => raise_invalid_parameter(),
+            #[cfg(windows)]
+            Self::HeapCorruption => raise_heap_corruption(),
             #[cfg(target_os = "macos")]
             Self::Guard => raise_guard_exception(),
         }
@@ -390,6 +395,36 @@ pub unsafe fn raise_invalid_parameter() -> ! {
     }
 
     _mbscmp(std::ptr::null(), std::ptr::null());
+    std::process::abort()
+}
+
+#[cfg(target_os = "windows")]
+#[allow(dead_code)]
+mod win_bindings;
+
+/// [`SadnessFlavor::HeapCorruption`]
+///
+/// # Safety
+///
+/// This is not safe. It intentionally crashes.
+#[cfg(target_os = "windows")]
+pub unsafe fn raise_heap_corruption() -> ! {
+    use win_bindings::*;
+
+    let kernel32 = load_library_a(b"kernel32.dll\0".as_ptr());
+
+    if kernel32 != 0 {
+        let heap_free: Option<
+            unsafe extern "system" fn(HeapHandle, u32, *const core::ffi::c_void) -> Bool,
+        > = std::mem::transmute(get_proc_address(kernel32, b"HeapFree\0".as_ptr()));
+
+        let heap_free = heap_free.expect("failed to acquire HeapFree function");
+
+        let bad_pointer = 3 as *mut core::ffi::c_void;
+        heap_free(get_process_heap(), 0, bad_pointer);
+    } else {
+        panic!("Can't corrupt heap: failed to load kernel32");
+    }
     std::process::abort()
 }
 
