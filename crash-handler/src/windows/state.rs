@@ -77,7 +77,7 @@ pub(super) struct HandlerInner {
     /// The previously installed SIGABRT handler
     previous_abort_handler: Option<libc::sighandler_t>,
     /// The handle of our own vectored exception handler
-    veh_handler_handle: Option<VehHandler>,
+    veh_handle: Option<VehHandler>,
 }
 
 impl HandlerInner {
@@ -91,9 +91,8 @@ impl HandlerInner {
             let previous_iph = _set_invalid_parameter_handler(Some(handle_invalid_parameter));
             let previous_pch = _set_purecall_handler(Some(handle_pure_virtual_call));
             let previous_abort_handler = super::signal::install_abort_handler().ok();
-            let veh_handler_handle =
-                AddVectoredExceptionHandler(1, Some(handle_vectored_exception));
-            let veh_handler_handle = std::ptr::NonNull::new(veh_handler_handle).map(VehHandler);
+            let veh_handle = AddVectoredExceptionHandler(1, Some(vectored_handle_exception));
+            let veh_handle = std::ptr::NonNull::new(veh_handle).map(VehHandler);
 
             Self {
                 user_handler,
@@ -101,7 +100,7 @@ impl HandlerInner {
                 previous_iph,
                 previous_pch,
                 previous_abort_handler,
-                veh_handler_handle,
+                veh_handle,
             }
         }
     }
@@ -117,7 +116,7 @@ impl HandlerInner {
             SetUnhandledExceptionFilter(self.previous_filter);
             _set_invalid_parameter_handler(self.previous_iph);
             _set_purecall_handler(self.previous_pch);
-            if let Some(handler) = self.veh_handler_handle.take() {
+            if let Some(handler) = self.veh_handle.take() {
                 RemoveVectoredExceptionHandler(handler.0.as_ptr());
             }
         }
@@ -289,7 +288,7 @@ const STATUS_HEAP_CORRUPTION: u32 = 0xC0000374;
 
 /// Called on the exception thread when an exception occurs.
 /// Gets to act before other exception handlers.
-pub(super) unsafe extern "system" fn handle_vectored_exception(
+pub(super) unsafe extern "system" fn vectored_handle_exception(
     except_info: *const crash_context::EXCEPTION_POINTERS,
 ) -> i32 {
     let exception_code = (*(*except_info).ExceptionRecord).ExceptionCode as u32;
