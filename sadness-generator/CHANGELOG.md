@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- Update MSRV to 1.62.0
+
 ## [0.5.0] - 2022-11-17
 ### Changed
 - [PR#63](https://github.com/EmbarkStudios/crash-handling/pull/63) added `SadnessFlavor::Abort` to Windows, and `raise_abort` now uses `libc::abort` instead of `std::process::abort` to have consistent behavior between all targets.
