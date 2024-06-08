@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.6.2] - 2024-06-08
 ### Added
 - [PR#86](https://github.com/EmbarkStudios/crash-handling/pull/86) (carrying on from [PR#85](https://github.com/EmbarkStudios/crash-handling/pull/85)) added support for [vectored exception handlers](https://learn.microsoft.com/en-us/windows/win32/debug/vectored-exception-handling) on Windows, which can catch heap corruption exceptions that the vanilla exception handler cannot catch. Thanks [Tom!](https://github.com/h3r2tic)!
 
@@ -76,7 +77,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial pass of crash-context, Linux only
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.6.1...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.6.2...HEAD
+[0.6.2]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.6.1...crash-handler-0.6.2
 [0.6.1]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.6.0...crash-handler-0.6.1
 [0.6.0]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.5.1...crash-handler-0.6.0
 [0.5.1]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.5.0...crash-handler-0.5.1
