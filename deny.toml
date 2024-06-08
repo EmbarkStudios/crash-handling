@@ -1,24 +1,21 @@
+[graph]
 targets = [
-    { triple = "x86_64-unknown-linux-gnu" },
-    { triple = "x86_64-unknown-linux-musl" },
-    { triple = "x86_64-pc-windows-msvc" },
+    "x86_64-unknown-linux-gnu",
+    "x86_64-unknown-linux-musl",
+    "x86_64-pc-windows-msvc",
 ]
+all-features = true
 # This crate is not published, exclude it since it triggers various warnings
 # downstream users wouldn't see
 exclude = ["minidumper-test"]
 
 [advisories]
-vulnerability = "deny"
-unmaintained = "deny"
-yanked = "deny"
+version = 2
 ignore = []
 
 [licenses]
-unlicensed = "deny"
+version = 2
 allow = ["MIT", "Apache-2.0"]
-copyleft = "deny"
-allow-osi-fsf-free = "neither"
-default = "deny"
 confidence-threshold = 0.8
 exceptions = [{ allow = ["Unicode-DFS-2016"], name = "unicode-ident" }]
 
