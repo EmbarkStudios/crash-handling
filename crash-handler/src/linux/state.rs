@@ -242,7 +242,10 @@ pub unsafe fn install_handlers() {
 
     // Everything is initialized. Transmute the array to the
     // initialized type.
-    *ohl = Some(mem::transmute::<[std::mem::MaybeUninit<libc::sigaction>; 6], [libc::sigaction; 6]>(old_handlers));
+    *ohl = Some(mem::transmute::<
+        [std::mem::MaybeUninit<libc::sigaction>; 6],
+        [libc::sigaction; 6],
+    >(old_handlers));
 }
 
 pub(super) fn attach(on_crash: Box<dyn crate::CrashEvent>) -> Result<(), Error> {

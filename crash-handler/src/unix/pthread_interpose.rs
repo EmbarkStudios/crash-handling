@@ -78,7 +78,9 @@ pub extern "C" fn pthread_create(
         }
 
         if !ptr.is_null() {
-            REAL_PTHREAD_CREATE = Some(std::mem::transmute::<*mut libc::c_void, pthread_create_t>(ptr));
+            REAL_PTHREAD_CREATE = Some(std::mem::transmute::<*mut libc::c_void, pthread_create_t>(
+                ptr,
+            ));
         }
 
         libc::pthread_key_create(
