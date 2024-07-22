@@ -21,7 +21,7 @@ pub use mach2::{kern_return::kern_return_t, message::mach_msg_return_t};
 use std::{ffi::CStr, time::Duration};
 
 extern "C" {
-    /// From <usr/include/mach/mach_traps.h>, there is no binding for this in mach2
+    /// From `<usr/include/mach/mach_traps.h>`, there is no binding for this in mach2
     pub fn pid_for_task(task: port::mach_port_name_t, pid: *mut i32) -> kern_return_t;
 }
 

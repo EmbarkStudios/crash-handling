@@ -3,6 +3,8 @@ targets = [
     "x86_64-unknown-linux-gnu",
     "x86_64-unknown-linux-musl",
     "x86_64-pc-windows-msvc",
+    "x86_64-apple-darwin",
+    "aarch64-apple-darwin",
 ]
 all-features = true
 # This crate is not published, exclude it since it triggers various warnings
@@ -33,10 +35,6 @@ skip = [
     { name = "crash-context" },
 ]
 skip-tree = [
-    # parking_lot uses an old version https://github.com/Amanieu/parking_lot/pull/425,
-    # my original PR didn't have windows-targets since it's not needed at all,
-    # but it is what it is
-    { name = "windows-targets", version = "=0.48.5" },
 ]
 
 [sources]
