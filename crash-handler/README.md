@@ -23,7 +23,7 @@
 
 On Linux this is done by handling [signals](https://man7.org/linux/man-pages/man7/signal.7.html), namely the following.
 
-One important detail of the Linux signal handling is that this crate hooks [`pthread_create`](https://man7.org/linux/man-pages/man3/pthread_create.3.html) so that an [alternate signal stack](https://man7.org/linux/man-pages/man2/sigaltstack.2.html) is always installed on every thread. [`std::thread::Thread`] already does this, however hooking `pthread_create` allows us to ensure this occurs for threads created from eg. C/C++ code as well. An alternate stack is necessary to reliably handle a [`SIGSEGV`](#SIGSEGV) caused by a [stack overflow](https://en.wikipedia.org/wiki/Stack_buffer_overflow), as signals are otherwise handled on the same stack that raised the signal.
+One important detail of the Linux signal handling is that this crate hooks [`pthread_create`](https://man7.org/linux/man-pages/man3/pthread_create.3.html) so that an [alternate signal stack](https://man7.org/linux/man-pages/man2/sigaltstack.2.html) is always installed on every thread. [`std::thread::Thread`] already does this, however hooking `pthread_create` allows us to ensure this occurs for threads created from eg. C/C++ code as well. An alternate stack is necessary to reliably handle a [`SIGSEGV`](#sigsegv) caused by a [stack overflow](https://en.wikipedia.org/wiki/Stack_buffer_overflow), as signals are otherwise handled on the same stack that raised the signal.
 
 ### `SIGABRT`
 
@@ -53,29 +53,29 @@ Signal sent to a process when a trap is raised, eg. a breakpoint or debug assert
 
 On Windows we catch [exceptions](https://docs.microsoft.com/en-us/windows/win32/debug/structured-exception-handling), which cover a wide range of crash reasons, as well as [invalid parameters](https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/set-invalid-parameter-handler-set-thread-local-invalid-parameter-handler?view=msvc-170) and [purecall](https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/get-purecall-handler-set-purecall-handler?view=msvc-170)
 
-## MacOS
+## `MacOS`
 
 On Macos we use [exception ports](https://flylib.com/books/en/3.126.1.109/1/). Exception ports are the first layer that exceptions are filtered, from a thread level, to a process (task) level, and finally to a host level.
 
-If no user ports have been registered, the default Macos implementation is to convert the Mach exception into an equivalent Unix signal and deliver it to any registered signal handlers before performing the default action for the exception/signal (ie process termination). This means that if you use this crate in conjunction with signal handling on MacOs, **you will not get the results you expect** as the exception port used by this crate will take precedence over the signal handler. See [this issue](https://github.com/bytecodealliance/wasmtime/issues/2456) for a concrete example.
+If no user ports have been registered, the default Macos implementation is to convert the Mach exception into an equivalent Unix signal and deliver it to any registered signal handlers before performing the default action for the exception/signal (ie process termination). This means that if you use this crate in conjunction with signal handling on `MacOS`, **you will not get the results you expect** as the exception port used by this crate will take precedence over the signal handler. See [this issue](https://github.com/bytecodealliance/wasmtime/issues/2456) for a concrete example.
 
 Note that there is one exception to the above, which is that `SIGABRT` is handled by a signal handler, as there is no equivalent Mach exception for it.
 
 ### `EXC_BAD_ACCESS`
 
-Covers similar crashes as [`SIGSEGV`](#SIGSEGV) and [`SIGBUS`](#SIGBUS)
+Covers similar crashes as [`SIGSEGV`](#sigsegv) and [`SIGBUS`](#sigbus)
 
 ### `EXC_BAD_INSTRUCTION`
 
-Covers similar crashes as [`SIGILL`](#SIGILL)
+Covers similar crashes as [`SIGILL`](#sigill)
 
 ### `EXC_ARITHMETIC`
 
-Covers similar crashes as [`SIGFPE`](#SIGFPE)
+Covers similar crashes as [`SIGFPE`](#sigfpe)
 
 ### `EXC_BREAKPOINT`
 
-Covers similar crashes as [`SIGTRAP`](#SIGTRAP)
+Covers similar crashes as [`SIGTRAP`](#sigtrap)
 
 ## Contribution
 
