@@ -60,6 +60,7 @@ jobs:
           #- { target: aarch64-unknown-linux-gnu, toolchain: stable }
           - { target: aarch64-unknown-linux-musl, toolchain: stable }
           - { target: aarch64-linux-android, toolchain: stable }
+          - { target: arm-unknown-linux-gnueabihf, toolchain: stable }
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust
@@ -75,7 +76,7 @@ jobs:
         # home, really?) have a higher MSRV...so...
         run: |
           cargo install cross --git https://github.com/cross-rs/cross --rev 185398b
-          cross build --target ${{ matrix.job.target }} --verbose --all-targets
+          cross build --release --target ${{ matrix.job.target }} --verbose --all-targets
 
   deny-check:
     name: cargo-deny
