@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#89](https://github.com/EmbarkStudios/crash-handling/pull/89) fixed compilation for `arm-unknown-linux-gnueabihf`...again.
+
 ## [0.6.2] - 2024-06-08
 ### Changed
 - Update MSRV to 1.62.0
