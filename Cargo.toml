@@ -10,3 +10,10 @@ members = [
 
 [profile.dev]
 debug = 2
+
+[workspace.dependencies]
+cfg-if = "1.0"
+crash-context = "0.6"
+libc = "0.2"
+mach2 = "0.4"
+parking_lot = "0.12"

@@ -37,6 +37,8 @@ skip = [
 skip-tree = [
 ]
 
+[bans.workspace-dependencies]
+
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
