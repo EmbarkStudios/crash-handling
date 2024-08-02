@@ -19,19 +19,19 @@ debug-print = []
 
 [dependencies]
 # Nicer handling of complex cfg expressions
-cfg-if = "1.0"
+cfg-if.workspace = true
 # Definition of a portable crash-context that can be shared between various
 # crates
-crash-context = "0.6"
+crash-context.workspace = true
 # Wrapper around libc
-libc = "0.2"
+libc.workspace = true
 # Nicer sync primitives
-parking_lot = "0.12"
+parking_lot.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # Bindings to MacOS specific APIs that are used. Note we don't use the `mach`
 # crate as it is unmaintained
-mach2 = "0.4"
+mach2.workspace = true
 
 [dev-dependencies]
 sadness-generator = { path = "../sadness-generator" }

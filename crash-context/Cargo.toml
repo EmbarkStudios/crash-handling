@@ -18,11 +18,11 @@ rust-version = "1.62.0" # We use `global_asm!`
 
 [dependencies]
 # Nicer cfg handling
-cfg-if = "1.0"
+cfg-if.workspace = true
 
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
-libc = "0.2"
+libc.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # provides bindings to mach specifics
-mach2 = "0.4"
+mach2.workspace = true

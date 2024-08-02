@@ -19,4 +19,4 @@ keywords = ["crash", "sadness", "signal", "exception"]
 rust-version = "1.71.0"
 
 [dependencies]
-libc = "0.2"
+libc.workspace = true

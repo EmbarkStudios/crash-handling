@@ -23,6 +23,7 @@ exceptions = [{ allow = ["Unicode-DFS-2016"], name = "unicode-ident" }]
 
 [bans]
 multiple-versions = "deny"
+workspace-duplicates = "deny"
 deny = [
     # Incredibly heavyweight, we should never have a dependency on this
     { name = "windows" },
