@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.6.3] - 2025-05-13
 ### Fixed
 - [PR#94](https://github.com/EmbarkStudios/crash-handling/pull/94) resolved a case of UB, resolving [#93](https://github.com/EmbarkStudios/crash-handling/issues/93). Thanks [@Chain-Fox](https://github.com/Chain-Fox)!
 - [PR#96](https://github.com/EmbarkStudios/crash-handling/pull/96) resolved [#92](https://github.com/EmbarkStudios/crash-handling/issues/92) by avoid creating a copy of the crash context on the stack, which on `aarch64-linux` would result in a stack overflow in the signal handler.
@@ -87,7 +88,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial pass of crash-context, Linux only
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.6.2...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.6.3...HEAD
+[0.6.3]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.6.2...crash-handler-0.6.3
 [0.6.2]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.6.1...crash-handler-0.6.2
 [0.6.1]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.6.0...crash-handler-0.6.1
 [0.6.0]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.5.1...crash-handler-0.6.0
