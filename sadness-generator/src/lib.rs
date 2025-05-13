@@ -385,11 +385,11 @@ pub unsafe fn raise_stack_overflow_in_non_rust_thread_longjmp() -> ! {
 /// This is not safe. It intentionally crashes.
 #[cfg(target_os = "windows")]
 pub unsafe fn raise_purecall() -> ! {
-    extern "C" {
+    unsafe extern "C" {
         fn _purecall() -> i32;
     }
 
-    _purecall();
+    unsafe { _purecall() };
 
     std::process::abort()
 }
@@ -401,11 +401,11 @@ pub unsafe fn raise_purecall() -> ! {
 /// This is not safe. It intentionally crashes.
 #[cfg(target_os = "windows")]
 pub unsafe fn raise_invalid_parameter() -> ! {
-    extern "C" {
+    unsafe extern "C" {
         fn _mbscmp(s1: *const u8, s2: *const u8) -> i32;
     }
 
-    _mbscmp(std::ptr::null(), std::ptr::null());
+    unsafe { _mbscmp(std::ptr::null(), std::ptr::null()) };
     std::process::abort()
 }
 
@@ -451,7 +451,7 @@ pub const GUARD_ID: u64 = 0x1234567890abcdef;
 /// This is not safe. It intentionally crashes.
 #[cfg(target_os = "macos")]
 pub unsafe fn raise_guard_exception() -> ! {
-    extern "C" {
+    unsafe extern "C" {
         /// <https://github.com/apple-oss-distributions/xnu/blob/e7776783b89a353188416a9a346c6cdb4928faad/bsd/sys/guarded.h#L48-L49>
         fn guarded_open_np(
             path: *const u8,
@@ -476,21 +476,23 @@ pub unsafe fn raise_guard_exception() -> ! {
     /// Forbid creating a fileport from a guarded fd
     const GUARD_FILEPORT: u32 = 1 << 3;
 
-    let fd = guarded_open_np(
-        b"/tmp/sadness-generator-guard.txt\0".as_ptr(),
-        &GUARD_ID,
-        GUARD_CLOSE | GUARD_DUP | GUARD_SOCKET_IPC | GUARD_FILEPORT,
-        libc::O_CREAT | libc::O_CLOEXEC | libc::O_RDWR,
-        0o666,
-    );
+    unsafe {
+        let fd = guarded_open_np(
+            b"/tmp/sadness-generator-guard.txt\0".as_ptr(),
+            &GUARD_ID,
+            GUARD_CLOSE | GUARD_DUP | GUARD_SOCKET_IPC | GUARD_FILEPORT,
+            libc::O_CREAT | libc::O_CLOEXEC | libc::O_RDWR,
+            0o666,
+        );
 
-    assert!(
-        fd != -1,
-        "failed to create guarded file descriptor, unable to crash"
-    );
+        assert!(
+            fd != -1,
+            "failed to create guarded file descriptor, unable to crash"
+        );
 
-    // Since this operation was guarded, this will raise an EXC_GUARD exception
-    libc::close(fd);
+        // Since this operation was guarded, this will raise an EXC_GUARD exception
+        libc::close(fd);
+    }
 
     std::process::abort()
 }
