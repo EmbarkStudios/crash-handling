@@ -110,7 +110,7 @@ pub struct ExceptionRaiseReply {
     pub ret_code: kern_return_t,
 }
 
-extern "C" {
+unsafe extern "C" {
     /// Set an exception handler for a thread on one or more exception types.
     /// At the same time, return the previously defined exception handlers for
     /// those types.

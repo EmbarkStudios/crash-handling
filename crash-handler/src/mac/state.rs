@@ -95,15 +95,17 @@ impl HandlerInner {
     ///
     /// SAFETY: syscalls
     unsafe fn uninstall(&self) -> Result<(), Error> {
-        super::signal::restore_abort_handler(self.previous_abort_action);
+        unsafe {
+            super::signal::restore_abort_handler(self.previous_abort_action);
 
-        let current_task = mach_task_self();
+            let current_task = mach_task_self();
 
-        // Restore the previous ports
-        for pp in &self.previous.ports[..self.previous.count] {
-            kern_ret(|| {
-                task_set_exception_ports(current_task, pp.mask, pp.port, pp.behavior, pp.flavor)
-            })?;
+            // Restore the previous ports
+            for pp in &self.previous.ports[..self.previous.count] {
+                kern_ret(|| {
+                    task_set_exception_ports(current_task, pp.mask, pp.port, pp.behavior, pp.flavor)
+                })?;
+            }
         }
 
         Ok(())
@@ -111,17 +113,19 @@ impl HandlerInner {
 
     /// SAFETY: syscalls
     unsafe fn shutdown(self, is_handler_thread: bool) -> Result<(), Error> {
-        self.uninstall()?;
+        unsafe {
+            self.uninstall()?;
 
-        let mut exc_msg: UserException = mem::zeroed();
-        exc_msg.header.msgh_id = MessageIds::Shutdown as i32;
+            let mut exc_msg: UserException = mem::zeroed();
+            exc_msg.header.msgh_id = MessageIds::Shutdown as i32;
 
-        if self.send_message(exc_msg) {
-            // We don't really care if there was some error in the thread, note
-            // that we check the thread in case we're being uninstalled from
-            // the handler thread itself
-            if !is_handler_thread {
-                let _res = self.handler_thread.join();
+            if self.send_message(exc_msg) {
+                // We don't really care if there was some error in the thread, note
+                // that we check the thread in case we're being uninstalled from
+                // the handler thread itself
+                if !is_handler_thread {
+                    let _res = self.handler_thread.join();
+                }
             }
         }
 
@@ -130,40 +134,42 @@ impl HandlerInner {
 
     /// SAFETY: syscalls
     unsafe fn send_message(&self, mut msg: UserException) -> bool {
-        msg.header.msgh_size = mem::size_of_val(&msg) as u32;
-        msg.header.msgh_remote_port = self.handler_port.port;
+        unsafe {
+            msg.header.msgh_size = mem::size_of_val(&msg) as u32;
+            msg.header.msgh_remote_port = self.handler_port.port;
 
-        // Reset the condition variable in case a user signal was already raised
-        {
-            let (lock, _cvar) = &*self.user_signal;
-            *lock.lock() = None;
-        }
-
-        if msg::mach_msg(
-            (&mut msg.header) as *mut _,
-            msg::MACH_SEND_MSG,
-            msg.header.msgh_size,
-            0,
-            0,
-            msg::MACH_MSG_TIMEOUT_NONE,
-            MACH_PORT_NULL,
-        ) != KERN_SUCCESS
-        {
-            return false;
-        }
-
-        if msg.header.msgh_id != MessageIds::SignalCrash as i32 {
-            true
-        } else {
-            // Wait on the handler thread to signal the user callback has finished
-            // with the exception
-            let (lock, cvar) = &*self.user_signal;
-            let mut processed = lock.lock();
-            if processed.is_none() {
-                cvar.wait(&mut processed);
+            // Reset the condition variable in case a user signal was already raised
+            {
+                let (lock, _cvar) = &*self.user_signal;
+                *lock.lock() = None;
             }
 
-            processed.unwrap_or(false)
+            if msg::mach_msg(
+                (&mut msg.header) as *mut _,
+                msg::MACH_SEND_MSG,
+                msg.header.msgh_size,
+                0,
+                0,
+                msg::MACH_MSG_TIMEOUT_NONE,
+                MACH_PORT_NULL,
+            ) != KERN_SUCCESS
+            {
+                return false;
+            }
+
+            if msg.header.msgh_id != MessageIds::SignalCrash as i32 {
+                true
+            } else {
+                // Wait on the handler thread to signal the user callback has finished
+                // with the exception
+                let (lock, cvar) = &*self.user_signal;
+                let mut processed = lock.lock();
+                if processed.is_none() {
+                    cvar.wait(&mut processed);
+                }
+
+                processed.unwrap_or(false)
+            }
         }
     }
 }
@@ -384,140 +390,144 @@ fn call_user_callback(cc: &crash_context::CrashContext) -> CrashEventResult {
 /// be exceptions sent by the kernel, or messages sent by the exception handler
 /// that this message loop is servicing.
 unsafe fn exception_handler(port: mach_port_t, us: UserSignal) {
-    let mut request: ExceptionMessage = mem::zeroed();
+    unsafe {
+        let mut request: ExceptionMessage = mem::zeroed();
 
-    loop {
-        request.header.local_port = port;
-        request.header.size = mem::size_of_val(&request) as _;
+        loop {
+            request.header.local_port = port;
+            request.header.size = mem::size_of_val(&request) as _;
 
-        let kret = msg::mach_msg(
-            ((&mut request.header) as *mut MachMsgHeader).cast(),
-            msg::MACH_RCV_MSG | msg::MACH_RCV_LARGE,
-            0,
-            mem::size_of_val(&request) as u32,
-            port,
-            msg::MACH_MSG_TIMEOUT_NONE,
-            MACH_PORT_NULL,
-        );
+            let kret = msg::mach_msg(
+                ((&mut request.header) as *mut MachMsgHeader).cast(),
+                msg::MACH_RCV_MSG | msg::MACH_RCV_LARGE,
+                0,
+                mem::size_of_val(&request) as u32,
+                port,
+                msg::MACH_MSG_TIMEOUT_NONE,
+                MACH_PORT_NULL,
+            );
 
-        if kret != KERN_SUCCESS {
-            eprintln!("mach_msg failed with {} ({0:x})", kret);
-            libc::abort();
-        }
+            if kret != KERN_SUCCESS {
+                eprintln!("mach_msg failed with {} ({0:x})", kret);
+                libc::abort();
+            }
 
-        match MessageIds::try_from(request.header.id) {
-            Ok(MessageIds::Exception | MessageIds::ExceptionStateIdentity) => {
-                // When forking a child process with the exception handler installed,
-                // if the child crashes, it will send the exception back to the parent
-                // process.  The check for task == self_task() ensures that only
-                // exceptions that occur in the parent process are caught and
-                // processed.  If the exception was not caused by this task, we
-                // still need to call into the exception server and have it return
-                // KERN_FAILURE (see catch_exception_raise) in order for the kernel
-                // to move onto the host exception handler for the child task
-                let ret_code = if request.task.name == mach_task_self() {
-                    let _ss = ScopedSuspend::new();
+            match MessageIds::try_from(request.header.id) {
+                Ok(MessageIds::Exception | MessageIds::ExceptionStateIdentity) => {
+                    // When forking a child process with the exception handler installed,
+                    // if the child crashes, it will send the exception back to the parent
+                    // process.  The check for task == self_task() ensures that only
+                    // exceptions that occur in the parent process are caught and
+                    // processed.  If the exception was not caused by this task, we
+                    // still need to call into the exception server and have it return
+                    // KERN_FAILURE (see catch_exception_raise) in order for the kernel
+                    // to move onto the host exception handler for the child task
+                    let ret_code = if request.task.name == mach_task_self() {
+                        let _ss = ScopedSuspend::new();
 
-                    let subcode = (request.code_count > 1).then_some(request.code[1]);
+                        let subcode = (request.code_count > 1).then_some(request.code[1]);
 
-                    let exc_info = crash_context::ExceptionInfo {
-                        kind: request.exception,
-                        code: request.code[0],
-                        subcode,
-                    };
-
-                    // Check if the exception is non-fatal, if it is we don't report it
-                    // and importantly _don't_ detach the exception handler like we
-                    // do for fatal exceptions
-                    if !is_exception_non_fatal(exc_info, request.task.name) {
-                        let cc = crash_context::CrashContext {
-                            thread: request.thread.name,
-                            task: request.task.name,
-                            handler_thread: mach_thread_self(),
-                            exception: Some(exc_info),
+                        let exc_info = crash_context::ExceptionInfo {
+                            kind: request.exception,
+                            code: request.code[0],
+                            subcode,
                         };
 
-                        let ret_code =
-                            if let CrashEventResult::Handled(true) = call_user_callback(&cc) {
-                                KERN_SUCCESS
-                            } else {
-                                mach2::kern_return::KERN_FAILURE
+                        // Check if the exception is non-fatal, if it is we don't report it
+                        // and importantly _don't_ detach the exception handler like we
+                        // do for fatal exceptions
+                        if !is_exception_non_fatal(exc_info, request.task.name) {
+                            let cc = crash_context::CrashContext {
+                                thread: request.thread.name,
+                                task: request.task.name,
+                                handler_thread: mach_thread_self(),
+                                exception: Some(exc_info),
                             };
 
-                        // Restores the previous exception ports, in most cases
-                        // this will be the default for the OS, which will kill this
-                        // process when we reply that we've handled the exception
-                        detach(true);
+                            let ret_code =
+                                if let CrashEventResult::Handled(true) = call_user_callback(&cc) {
+                                    KERN_SUCCESS
+                                } else {
+                                    mach2::kern_return::KERN_FAILURE
+                                };
 
-                        ret_code
+                            // Restores the previous exception ports, in most cases
+                            // this will be the default for the OS, which will kill this
+                            // process when we reply that we've handled the exception
+                            detach(true);
+
+                            ret_code
+                        } else {
+                            KERN_SUCCESS
+                        }
                     } else {
                         KERN_SUCCESS
-                    }
-                } else {
-                    KERN_SUCCESS
-                };
-
-                // This magic incantation to send a reply back to the kernel was
-                // derived from the exc_server generated by
-                // 'mig -v /usr/include/mach/mach_exc.defs', or you can look at
-                // https://github.com/doadam/xnu-4570.1.46/blob/2ad7fbf85ff567495a572cd4583961ffd8525083/BUILD/obj/RELEASE_X86_64/osfmk/RELEASE/mach/exc_server.c#L491-L520
-                let mut reply: ExceptionRaiseReply = mem::zeroed();
-                reply.header.bits =
-                    msg::MACH_MSGH_BITS(request.header.bits & msg::MACH_MSGH_BITS_REMOTE_MASK, 0);
-                reply.header.size = mem::size_of_val(&reply) as u32;
-                reply.header.remote_port = request.header.remote_port;
-                reply.header.local_port = MACH_PORT_NULL;
-                reply.header.id = request.header.id + 100;
-                reply.ndr = NDR_record;
-                reply.ret_code = ret_code;
-
-                msg::mach_msg(
-                    ((&mut reply.header) as *mut MachMsgHeader).cast(),
-                    msg::MACH_SEND_MSG,
-                    mem::size_of_val(&reply) as u32,
-                    0,
-                    MACH_PORT_NULL,
-                    msg::MACH_MSG_TIMEOUT_NONE,
-                    MACH_PORT_NULL,
-                );
-            }
-            Ok(MessageIds::Shutdown) => return,
-            Ok(MessageIds::SignalCrash) => {
-                let res = {
-                    let _ss = ScopedSuspend::new();
-
-                    let user_exception: &UserException = std::mem::transmute(&request);
-
-                    let exception = if user_exception.flags & FLAG_HAS_EXCEPTION != 0 {
-                        Some(crash_context::ExceptionInfo {
-                            kind: user_exception.exception_kind,
-                            code: user_exception.exception_code,
-                            subcode: (user_exception.flags & FLAG_HAS_SUBCODE != 0)
-                                .then_some(user_exception.exception_subcode),
-                        })
-                    } else {
-                        None
                     };
 
-                    // Reconstruct a crash context from the message we received
-                    let cc = crash_context::CrashContext {
-                        task: mach_task_self(),
-                        thread: user_exception.crash_thread.name,
-                        handler_thread: mach_thread_self(),
-                        exception,
-                    };
+                    // This magic incantation to send a reply back to the kernel was
+                    // derived from the exc_server generated by
+                    // 'mig -v /usr/include/mach/mach_exc.defs', or you can look at
+                    // https://github.com/doadam/xnu-4570.1.46/blob/2ad7fbf85ff567495a572cd4583961ffd8525083/BUILD/obj/RELEASE_X86_64/osfmk/RELEASE/mach/exc_server.c#L491-L520
+                    let mut reply: ExceptionRaiseReply = mem::zeroed();
+                    reply.header.bits = msg::MACH_MSGH_BITS(
+                        request.header.bits & msg::MACH_MSGH_BITS_REMOTE_MASK,
+                        0,
+                    );
+                    reply.header.size = mem::size_of_val(&reply) as u32;
+                    reply.header.remote_port = request.header.remote_port;
+                    reply.header.local_port = MACH_PORT_NULL;
+                    reply.header.id = request.header.id + 100;
+                    reply.ndr = NDR_record;
+                    reply.ret_code = ret_code;
 
-                    call_user_callback(&cc)
-                };
-
-                {
-                    let (lock, cvar) = &*us;
-                    let mut processed = lock.lock();
-                    *processed = Some(matches!(res, CrashEventResult::Handled(true)));
-                    cvar.notify_one();
+                    msg::mach_msg(
+                        ((&mut reply.header) as *mut MachMsgHeader).cast(),
+                        msg::MACH_SEND_MSG,
+                        mem::size_of_val(&reply) as u32,
+                        0,
+                        MACH_PORT_NULL,
+                        msg::MACH_MSG_TIMEOUT_NONE,
+                        MACH_PORT_NULL,
+                    );
                 }
+                Ok(MessageIds::Shutdown) => return,
+                Ok(MessageIds::SignalCrash) => {
+                    let res = {
+                        let _ss = ScopedSuspend::new();
+
+                        let user_exception: &UserException = std::mem::transmute(&request);
+
+                        let exception = if user_exception.flags & FLAG_HAS_EXCEPTION != 0 {
+                            Some(crash_context::ExceptionInfo {
+                                kind: user_exception.exception_kind,
+                                code: user_exception.exception_code,
+                                subcode: (user_exception.flags & FLAG_HAS_SUBCODE != 0)
+                                    .then_some(user_exception.exception_subcode),
+                            })
+                        } else {
+                            None
+                        };
+
+                        // Reconstruct a crash context from the message we received
+                        let cc = crash_context::CrashContext {
+                            task: mach_task_self(),
+                            thread: user_exception.crash_thread.name,
+                            handler_thread: mach_thread_self(),
+                            exception,
+                        };
+
+                        call_user_callback(&cc)
+                    };
+
+                    {
+                        let (lock, cvar) = &*us;
+                        let mut processed = lock.lock();
+                        *processed = Some(matches!(res, CrashEventResult::Handled(true)));
+                        cvar.notify_one();
+                    }
+                }
+                Err(unknown) => unreachable!("received unknown message {unknown}"),
             }
-            Err(unknown) => unreachable!("received unknown message {unknown}"),
         }
     }
 }
