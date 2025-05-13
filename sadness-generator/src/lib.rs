@@ -478,7 +478,7 @@ pub unsafe fn raise_guard_exception() -> ! {
 
     unsafe {
         let fd = guarded_open_np(
-            b"/tmp/sadness-generator-guard.txt\0".as_ptr(),
+            c"/tmp/sadness-generator-guard.txt".as_ptr().cast(),
             &GUARD_ID,
             GUARD_CLOSE | GUARD_DUP | GUARD_SOCKET_IPC | GUARD_FILEPORT,
             libc::O_CREAT | libc::O_CLOEXEC | libc::O_RDWR,

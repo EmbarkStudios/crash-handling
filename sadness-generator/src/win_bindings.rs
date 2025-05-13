@@ -27,4 +27,4 @@ pub mod HeapFlags {
 }
 pub type HeapHandle = isize;
 pub type Hmodule = isize;
-pub type Pcstr = *const u8;
+pub type Pcstr = *const i8;
