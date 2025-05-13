@@ -295,6 +295,7 @@ pub fn get_native_cpu() -> Cpu {
     }
 }
 
+#[allow(clippy::unnecessary_cast)]
 pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
     use minidump::CrashReason;
     use minidump_common::errors;
