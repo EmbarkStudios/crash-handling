@@ -251,10 +251,8 @@ pub unsafe fn install_handlers() {
 
         // Everything is initialized. Transmute the array to the
         // initialized type.
-        *ohl = Some(mem::transmute::<
-            [std::mem::MaybeUninit<libc::sigaction>; 6],
-            [libc::sigaction; 6],
-        >(old_handlers));
+        let old_handlers = old_handlers.map(|h| h.assume_init());
+        *ohl = Some(old_handlers);
     }
 }
 
