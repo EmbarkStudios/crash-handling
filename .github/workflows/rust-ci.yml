@@ -68,9 +68,9 @@ jobs:
         with:
           toolchain: ${{ matrix.job.toolchain }}
           target: ${{ matrix.job.target }}
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: "1.86.0"
+      # - uses: Swatinem/rust-cache@v2
+      #   with:
+      #     key: "1.86.0"
       - name: Build
         # We need to install cross from git, because https://github.com/cross-rs/cross/issues/1222
         # is still unreleased (it's been almost a year since the last release)
