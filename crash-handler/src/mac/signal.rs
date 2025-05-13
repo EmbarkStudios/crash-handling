@@ -8,18 +8,20 @@ use std::mem;
 ///
 /// Performs syscalls
 pub(crate) unsafe fn install_abort_handler() -> Result<libc::sigaction, std::io::Error> {
-    let mut sa: libc::sigaction = mem::zeroed();
-    libc::sigemptyset(&mut sa.sa_mask);
-    libc::sigaddset(&mut sa.sa_mask, libc::SIGABRT);
-    sa.sa_sigaction = signal_handler as usize;
-    sa.sa_flags = libc::SA_SIGINFO;
+    unsafe {
+        let mut sa: libc::sigaction = mem::zeroed();
+        libc::sigemptyset(&mut sa.sa_mask);
+        libc::sigaddset(&mut sa.sa_mask, libc::SIGABRT);
+        sa.sa_sigaction = signal_handler as usize;
+        sa.sa_flags = libc::SA_SIGINFO;
 
-    let mut old_action = mem::MaybeUninit::uninit();
+        let mut old_action = mem::MaybeUninit::uninit();
 
-    if libc::sigaction(libc::SIGABRT, &sa, old_action.as_mut_ptr()) != -1 {
-        Ok(old_action.assume_init())
-    } else {
-        Err(std::io::Error::last_os_error())
+        if libc::sigaction(libc::SIGABRT, &sa, old_action.as_mut_ptr()) != -1 {
+            Ok(old_action.assume_init())
+        } else {
+            Err(std::io::Error::last_os_error())
+        }
     }
 }
 
@@ -30,7 +32,7 @@ pub(crate) unsafe fn install_abort_handler() -> Result<libc::sigaction, std::io:
 /// Performs syscalls
 #[inline]
 pub(crate) unsafe fn restore_abort_handler(handler: libc::sigaction) {
-    libc::sigaction(libc::SIGABRT, &handler, std::ptr::null_mut());
+    unsafe { libc::sigaction(libc::SIGABRT, &handler, std::ptr::null_mut()) };
 }
 
 /// Our signal handler, transforms the signal into a [`crash_context::ExceptionInfo`]

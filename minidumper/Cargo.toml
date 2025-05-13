@@ -7,7 +7,7 @@ authors = [
     "Embark <opensource@embark-studios.com>",
     "Jake Shadle <jake.shadle@embark-studios.com>",
 ]
-edition = "2021"
+edition = "2024"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 documentation = "https://docs.rs/minidumper"
@@ -24,13 +24,13 @@ libc.workspace = true
 # Basic log emitting
 log = "0.4"
 # Minidump writing
-minidump-writer = "0.9"
+minidump-writer = "0.10"
 # Event loop
 polling = "3.2"
 # Nicer locking primitives
 parking_lot.workspace = true
 # Nicer error creation
-thiserror = "1.0"
+thiserror = "2.0"
 
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
 # Improved Unix domain socket support, includes features that are not available in std

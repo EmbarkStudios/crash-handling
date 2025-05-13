@@ -79,7 +79,7 @@ pub struct JmpBuf {
 }
 
 #[allow(improper_ctypes)] // u128 is actually ok on x86_64 :)
-extern "C" {
+unsafe extern "C" {
     #[link_name = "ehsetjmp"]
     pub fn setjmp(jb: *mut JmpBuf) -> i32;
     #[link_name = "ehlongjmp"]

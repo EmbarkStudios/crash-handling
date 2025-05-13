@@ -71,8 +71,9 @@ impl fmt::Display for Signal {
 use std::{
     path::PathBuf,
     sync::{
+        Arc, Mutex,
         atomic::{AtomicBool, Ordering},
-        mpsc, Arc, Mutex,
+        mpsc,
     },
 };
 
@@ -294,6 +295,7 @@ pub fn get_native_cpu() -> Cpu {
     }
 }
 
+#[allow(clippy::unnecessary_cast)]
 pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
     use minidump::CrashReason;
     use minidump_common::errors;
@@ -393,7 +395,7 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                     errors::ExceptionCodeWindowsAccessType::WRITE
                 ));
 
-                assert_eq!(crash_address, sadness_generator::SEGFAULT_ADDRESS as _);
+                assert_eq!(crash_address, sadness_generator::SEGFAULT_ADDRESS as u64);
             }
             Signal::StackOverflow | Signal::StackOverflowCThread => {
                 verify!(CrashReason::WindowsGeneral(
@@ -476,7 +478,7 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                     errors::ExceptionCodeMacBadAccessKernType::KERN_INVALID_ADDRESS,
                 ));
 
-                assert_eq!(crash_address, sadness_generator::SEGFAULT_ADDRESS as _);
+                assert_eq!(crash_address, sadness_generator::SEGFAULT_ADDRESS as u64);
             }
             Signal::StackOverflow | Signal::StackOverflowCThread => {
                 verify!(CrashReason::MacBadAccessKern(

@@ -12,29 +12,28 @@ all-features = true
 exclude = ["minidumper-test"]
 
 [advisories]
-version = 2
 ignore = []
 
 [licenses]
-version = 2
 allow = ["MIT", "Apache-2.0"]
 confidence-threshold = 0.8
-exceptions = [{ allow = ["Unicode-DFS-2016"], name = "unicode-ident" }]
+exceptions = [{ allow = ["Unicode-3.0"], name = "unicode-ident" }]
 
 [bans]
 multiple-versions = "deny"
 deny = [
     # Incredibly heavyweight, we should never have a dependency on this
-    { name = "windows" },
+    "windows",
     # We should never have a dependency on openssl
-    { name = "openssl-sys" },
+    "openssl-sys",
 ]
 skip = [
     # The crate is in the repo, so we have the path, but it's also a crates.io
     # dependency
-    { name = "crash-context" },
+    "crash-context",
 ]
 skip-tree = [
+    { crate = "polling@3.7.4", reason = "pulls in old rustix/linux-raw-sys" },
 ]
 
 [bans.workspace-dependencies]

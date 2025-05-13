@@ -3,10 +3,10 @@
 
 pub use mach2::{
     exception_types as et,
-    kern_return::{kern_return_t, KERN_SUCCESS},
+    kern_return::{KERN_SUCCESS, kern_return_t},
     mach_init::mach_thread_self,
     mach_port as mp, mach_types as mt, message as msg,
-    port::{self, mach_port_t, MACH_PORT_NULL},
+    port::{self, MACH_PORT_NULL, mach_port_t},
     task, thread_status as ts,
     traps::mach_task_self,
 };
@@ -110,7 +110,7 @@ pub struct ExceptionRaiseReply {
     pub ret_code: kern_return_t,
 }
 
-extern "C" {
+unsafe extern "C" {
     /// Set an exception handler for a thread on one or more exception types.
     /// At the same time, return the previously defined exception handlers for
     /// those types.

@@ -29,7 +29,7 @@ struct PthreadCreateParams {
 static mut THREAD_DESTRUCTOR_KEY: libc::pthread_key_t = 0;
 
 #[cfg(all(target_env = "musl", not(miri)))]
-extern "C" {
+unsafe extern "C" {
     /// This is the weak alias for `pthread_create`. We declare this so we can
     /// use its address when targeting musl, as we can't lookup the actual
     /// `pthread_create` symbol at runtime since we've interposed it.
@@ -51,7 +51,7 @@ extern "C" {
 /// libc `pthread_create`, or if we do find the address but it's actually the
 /// address of this interpose function which would result in infinte recursion
 #[cfg(not(miri))]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn pthread_create(
     thread: *mut libc::pthread_t,
     attr: *const libc::pthread_attr_t,
@@ -70,7 +70,7 @@ pub extern "C" fn pthread_create(
                 let ptr = __pthread_create as *mut c_void;
             } else {
                 const RTLD_NEXT: *mut c_void = -1isize as *mut c_void;
-                let ptr = libc::dlsym(RTLD_NEXT, b"pthread_create\0".as_ptr().cast());
+                let ptr = libc::dlsym(RTLD_NEXT, c"pthread_create".as_ptr().cast());
             }
         }
 
@@ -86,8 +86,15 @@ pub extern "C" fn pthread_create(
         );
     });
 
-    let real_pthread_create = unsafe { REAL_PTHREAD_CREATE.as_ref() }.expect("pthread_create() intercept failed but the intercept function is still being called, this won't work");
-    assert!(*real_pthread_create != pthread_create as pthread_create_t, "We could not obtain the real pthread_create(). Calling the symbol we got would make us enter an infinte loop so stop here instead.");
+    #[allow(static_mut_refs)]
+    let real_pthread_create = unsafe {
+        let real_pthread_create = REAL_PTHREAD_CREATE.as_ref().expect("pthread_create() intercept failed but the intercept function is still being called, this won't work");
+        assert!(
+            !std::ptr::fn_addr_eq(*real_pthread_create, pthread_create as pthread_create_t),
+            "We could not obtain the real pthread_create(). Calling the symbol we got would make us enter an infinte loop so stop here instead."
+        );
+        real_pthread_create
+    };
 
     let create_params = Box::new(PthreadCreateParams { main, arg });
     let create_params = Box::into_raw(create_params);
@@ -131,22 +138,24 @@ const SIG_STACK_SIZE: usize = get_stack_size();
 /// This is the replacment function for the user's thread entry, it installs
 /// the alternate stack before invoking the original thread entry, then cleans
 /// it up after the user's thread entry exits.
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn set_alt_signal_stack_and_start(params: *mut c_void) -> *mut libc::c_void {
     let (user_main, user_arg) = {
-        let params = Box::from_raw(params.cast::<PthreadCreateParams>());
+        let params = unsafe { Box::from_raw(params.cast::<PthreadCreateParams>()) };
 
         (params.main, params.arg)
     };
 
-    let alt_stack_mem = install_sig_alt_stack();
+    let alt_stack_mem = unsafe { install_sig_alt_stack() };
 
     // The original code was using pthread_cleanup_push/pop, however those are
     // macros in glibc/musl, so we instead use pthread_key_create as it works
     // functionally the same and can call a cleanup function/destructor on both
     // thread exit and cancel
-    libc::pthread_setspecific(THREAD_DESTRUCTOR_KEY, alt_stack_mem);
-    user_main(user_arg)
+    unsafe {
+        libc::pthread_setspecific(THREAD_DESTRUCTOR_KEY, alt_stack_mem);
+        user_main(user_arg)
+    }
 }
 
 /// Install the alternate signal stack
@@ -159,14 +168,16 @@ unsafe extern "C" fn set_alt_signal_stack_and_start(params: *mut c_void) -> *mut
 /// If we're able to map memory, but unable to install the alternate stack, we
 /// expect that we can unmap the memory
 unsafe fn install_sig_alt_stack() -> *mut libc::c_void {
-    let alt_stack_mem = libc::mmap(
-        ptr::null_mut(),
-        SIG_STACK_SIZE,
-        libc::PROT_READ | libc::PROT_WRITE,
-        libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
-        -1,
-        0,
-    );
+    let alt_stack_mem = unsafe {
+        libc::mmap(
+            ptr::null_mut(),
+            SIG_STACK_SIZE,
+            libc::PROT_READ | libc::PROT_WRITE,
+            libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
+            -1,
+            0,
+        )
+    };
 
     // Check that we successfully mapped some memory
     if alt_stack_mem.is_null() {
@@ -180,11 +191,15 @@ unsafe fn install_sig_alt_stack() -> *mut libc::c_void {
     };
 
     // Attempt to install the alternate stack
-    let rv = libc::sigaltstack(&alt_stack, ptr::null_mut());
+    let rv = unsafe { libc::sigaltstack(&alt_stack, ptr::null_mut()) };
 
     // Attempt to cleanup the mapping if we failed to install the alternate stack
     if rv != 0 {
-        assert_eq!(libc::munmap(alt_stack_mem, SIG_STACK_SIZE), 0, "failed to install an alternate signal stack, and failed to unmap the alternate stack memory");
+        assert_eq!(
+            unsafe { libc::munmap(alt_stack_mem, SIG_STACK_SIZE) },
+            0,
+            "failed to install an alternate signal stack, and failed to unmap the alternate stack memory"
+        );
         ptr::null_mut()
     } else {
         alt_stack_mem
@@ -197,7 +212,7 @@ unsafe fn install_sig_alt_stack() -> *mut libc::c_void {
 ///
 /// If the alternate stack is not `null`, it is expected that uninstalling and
 /// unmapping will not error
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn uninstall_sig_alt_stack(alt_stack_mem: *mut libc::c_void) {
     if alt_stack_mem.is_null() {
         return;
@@ -211,12 +226,12 @@ unsafe extern "C" fn uninstall_sig_alt_stack(alt_stack_mem: *mut libc::c_void) {
 
     // Attempt to uninstall the alternate stack
     assert_eq!(
-        libc::sigaltstack(&disable_stack, ptr::null_mut()),
+        unsafe { libc::sigaltstack(&disable_stack, ptr::null_mut()) },
         0,
         "failed to uninstall alternate signal stack"
     );
     assert_eq!(
-        libc::munmap(alt_stack_mem, SIG_STACK_SIZE),
+        unsafe { libc::munmap(alt_stack_mem, SIG_STACK_SIZE) },
         0,
         "failed to unmap alternate stack memory"
     );

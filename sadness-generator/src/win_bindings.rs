@@ -6,7 +6,7 @@
     clippy::upper_case_acronyms
 )]
 #[link(name = "kernel32", kind = "raw-dylib")]
-extern "system" {
+unsafe extern "system" {
     #[link_name = "GetProcAddress"]
     pub fn get_proc_address(module: Hmodule, proc_name: Pcstr) -> Farproc;
     #[link_name = "GetProcessHeap"]
@@ -27,4 +27,4 @@ pub mod HeapFlags {
 }
 pub type HeapHandle = isize;
 pub type Hmodule = isize;
-pub type Pcstr = *const u8;
+pub type Pcstr = *const i8;
