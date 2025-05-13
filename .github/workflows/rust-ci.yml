@@ -62,13 +62,15 @@ jobs:
           - { target: aarch64-linux-android, toolchain: stable }
           - { target: arm-unknown-linux-gnueabihf, toolchain: stable }
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.job.toolchain }}
           target: ${{ matrix.job.target }}
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: "1.86.0"
       - name: Build
         # We need to install cross from git, because https://github.com/cross-rs/cross/issues/1222
         # is still unreleased (it's been almost a year since the last release)
