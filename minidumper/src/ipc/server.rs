@@ -455,9 +455,15 @@ impl Server {
 
         cfg_if::cfg_if! {
             if #[cfg(any(target_os = "linux", target_os = "android"))] {
+                #[allow(unsafe_code)]
+                let crash_context = minidump_writer::crash_context::CrashContext {
+                    inner: unsafe { std::mem::transmute_copy(&crash_context) },
+                };
+
                 let mut writer =
-                    minidump_writer::minidump_writer::MinidumpWriter::new(crash_context.pid, crash_context.tid);
-                writer.set_crash_context(minidump_writer::crash_context::CrashContext { inner: crash_context });
+                    minidump_writer::minidump_writer::MinidumpWriter::new(crash_context.inner.pid, crash_context.inner.tid);
+
+                writer.set_crash_context(crash_context);
             } else if #[cfg(target_os = "windows")] {
                 // SAFETY: Unfortunately this is a bit dangerous since we are relying on the crashing process
                 // to still be alive and still have the interior pointers in the crash context still at the

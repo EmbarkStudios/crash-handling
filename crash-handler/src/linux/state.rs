@@ -430,31 +430,37 @@ impl HandlerInner {
             // that we require
             let nix_info = &*((info as *const libc::siginfo_t).cast::<libc::signalfd_siginfo>());
 
+            debug_print!("acquired siginfo");
+
             // Allow ourselves to be dumped, if that is what the user handler wishes to do
             let _set_dumpable = SetDumpable::new(self.dump_process);
+            debug_print!("set dumpable");
             let mut crash_ctx = CRASH_CONTEXT.lock();
 
             {
                 *crash_ctx = mem::MaybeUninit::zeroed();
+                debug_print!("zeroed crashctx");
                 let cc = &mut *crash_ctx.as_mut_ptr();
 
                 ptr::copy_nonoverlapping(nix_info, &mut cc.siginfo, 1);
+                debug_print!("copied siginfo");
 
                 let uc_ptr = &*(uc as *const libc::c_void).cast::<crash_context::ucontext_t>();
                 ptr::copy_nonoverlapping(uc_ptr, &mut cc.context, 1);
+                debug_print!("copied context");
 
                 cfg_if::cfg_if! {
                     if #[cfg(target_arch = "aarch64")] {
-                        let fp_ptr = uc_ptr.uc_mcontext.__reserved.as_ptr().cast::<crash_context::fpsimd_context>();
+                        // let fp_ptr = uc_ptr.uc_mcontext.__reserved.as_ptr().cast::<crash_context::fpsimd_context>();
 
-                        if (*fp_ptr).head.magic == crash_context::FPSIMD_MAGIC {
-                            ptr::copy_nonoverlapping(fp_ptr, &mut cc.float_state, 1);
-                        }
+                        // if (*fp_ptr).head.magic == crash_context::FPSIMD_MAGIC {
+                        //     ptr::copy_nonoverlapping(fp_ptr, &mut cc.float_state, 1);
+                        // }
                     } else if #[cfg(not(target_arch = "arm"))] {
-                        if !uc_ptr.uc_mcontext.fpregs.is_null() {
-                            ptr::copy_nonoverlapping(uc_ptr.uc_mcontext.fpregs, ((&mut cc.float_state) as *mut crash_context::fpregset_t).cast(), 1);
+                        // if !uc_ptr.uc_mcontext.fpregs.is_null() {
+                        //     ptr::copy_nonoverlapping(uc_ptr.uc_mcontext.fpregs, ((&mut cc.float_state) as *mut crash_context::fpregset_t).cast(), 1);
 
-                        }
+                        // }
                     }
                 }
 

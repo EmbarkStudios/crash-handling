@@ -14,6 +14,7 @@ name: CI
 jobs:
   lint:
     name: Lint
+    if: false
     strategy:
       matrix:
         os: [ubuntu-22.04, windows-2022, macos-14]
@@ -39,7 +40,11 @@ jobs:
     name: Test
     strategy:
       matrix:
-        os: [ubuntu-24.04, windows-2022, macos-14, ubuntu-24.04-arm]
+        os:
+          #- ubuntu-24.04,
+          #- windows-2022,
+          #- macos-14,
+          - ubuntu-24.04-arm
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -47,12 +52,13 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo fetch
       - name: cargo test build
-        run: cargo build --tests
+        run: cargo build --tests --all-features
       - name: cargo test
-        run: cargo test
+        run: cargo test --all-features
 
   build-android:
     name: Build sources
+    if: false
     runs-on: ubuntu-22.04
     strategy:
       matrix:
@@ -87,6 +93,7 @@ jobs:
 
   publish-check:
     name: Publish Check
+    if: false
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4

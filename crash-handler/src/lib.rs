@@ -9,7 +9,7 @@ pub use error::Error;
 #[macro_export]
 macro_rules! debug_print {
     ($s:literal) => {
-        let cstr = concat!($s, "\n");
+        let cstr = concat!(file!(), ":", line!(), " ", $s, "\n");
         $crate::write_stderr(cstr);
     };
 }
