@@ -393,7 +393,7 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                     errors::ExceptionCodeWindowsAccessType::WRITE
                 ));
 
-                assert_eq!(crash_address, sadness_generator::SEGFAULT_ADDRESS as _);
+                assert_eq!(crash_address, sadness_generator::SEGFAULT_ADDRESS);
             }
             Signal::StackOverflow | Signal::StackOverflowCThread => {
                 verify!(CrashReason::WindowsGeneral(
@@ -476,7 +476,7 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                     errors::ExceptionCodeMacBadAccessKernType::KERN_INVALID_ADDRESS,
                 ));
 
-                assert_eq!(crash_address, sadness_generator::SEGFAULT_ADDRESS as _);
+                assert_eq!(crash_address, sadness_generator::SEGFAULT_ADDRESS);
             }
             Signal::StackOverflow | Signal::StackOverflowCThread => {
                 verify!(CrashReason::MacBadAccessKern(

@@ -411,12 +411,12 @@ mod win_bindings;
 pub unsafe fn raise_heap_corruption() -> ! {
     use win_bindings::*;
 
-    let kernel32 = load_library_a(b"kernel32.dll\0".as_ptr());
+    let kernel32 = load_library_a(c"kernel32.dll".as_ptr());
 
     if kernel32 != 0 {
         let heap_free: Option<
             unsafe extern "system" fn(HeapHandle, u32, *const core::ffi::c_void) -> Bool,
-        > = std::mem::transmute(get_proc_address(kernel32, b"HeapFree\0".as_ptr()));
+        > = std::mem::transmute(get_proc_address(kernel32, c"HeapFree".as_ptr()));
 
         let heap_free = heap_free.expect("failed to acquire HeapFree function");
 
@@ -466,7 +466,7 @@ pub unsafe fn raise_guard_exception() -> ! {
     const GUARD_FILEPORT: u32 = 1 << 3;
 
     let fd = guarded_open_np(
-        b"/tmp/sadness-generator-guard.txt\0".as_ptr(),
+        c"/tmp/sadness-generator-guard.txt".as_ptr(),
         &GUARD_ID,
         GUARD_CLOSE | GUARD_DUP | GUARD_SOCKET_IPC | GUARD_FILEPORT,
         libc::O_CREAT | libc::O_CLOEXEC | libc::O_RDWR,

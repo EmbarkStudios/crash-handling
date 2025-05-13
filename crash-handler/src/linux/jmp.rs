@@ -20,18 +20,22 @@ cfg_if::cfg_if! {
     if #[cfg(target_arch = "x86_64")] {
         #[repr(C)]
         #[doc(hidden)]
+        #[allow(non_camel_case_types)]
         pub struct __jmp_buf([u64; 8]);
     } else if #[cfg(target_arch = "x86")] {
         #[repr(C)]
         #[doc(hidden)]
+        #[allow(non_camel_case_types)]
         pub struct __jmp_buf([u32; 6]);
     } else if #[cfg(target_arch = "arm")] {
         #[repr(C)]
         #[doc(hidden)]
+        #[allow(non_camel_case_types)]
         pub struct __jmp_buf([u64; 32]);
     } else if #[cfg(target_arch = "aarch64")] {
         #[repr(C)]
         #[doc(hidden)]
+        #[allow(non_camel_case_types)]
         pub struct __jmp_buf([u64; 22]);
     }
 }
@@ -51,7 +55,7 @@ pub struct JmpBuf {
     __ss: [u32; 32],
 }
 
-extern "C" {
+unsafe extern "C" {
     /// Set jump point for a non-local goto.
     ///
     /// The return value will be 0 if this is a direct invocation (ie the "first

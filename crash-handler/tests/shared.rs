@@ -100,7 +100,7 @@ pub fn handles_crash(flavor: SadnessFlavor) {
 
         #[inline(never)]
         unsafe fn indirect(flavor: SadnessFlavor) {
-            flavor.make_sad();
+            unsafe { flavor.make_sad() };
         }
 
         indirect(flavor);

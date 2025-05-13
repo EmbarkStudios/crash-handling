@@ -639,7 +639,7 @@ fn is_exception_non_fatal(exc_info: crash_context::ExceptionInfo, task: mt::task
                 ) -> i32;
 
                 let proc_get_wakemon_params =
-                    libc::dlsym(dl_handle, b"proc_get_wakemon_params\0".as_ptr().cast());
+                    libc::dlsym(dl_handle, c"proc_get_wakemon_params".as_ptr().cast());
                 if proc_get_wakemon_params.is_null() {
                     return true;
                 }
