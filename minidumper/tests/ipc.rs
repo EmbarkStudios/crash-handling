@@ -1,4 +1,4 @@
-use std::sync::{atomic, Arc};
+use std::sync::{Arc, atomic};
 
 /// Tests that the user can send and receive their own messages over IPC
 #[test]
