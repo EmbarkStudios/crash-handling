@@ -1,5 +1,5 @@
 use crate::{Error, Signal};
-use std::{mem, ptr};
+use std::{mem, ops::DerefMut, ptr};
 
 // std::cmp::max is not const :(
 const fn get_stack_size() -> usize {
@@ -402,8 +402,8 @@ unsafe extern "C" fn signal_handler(
 
 /// The size of `CrashContext` can be too big w.r.t the size of alternatate stack
 /// for `signal_handler`. Keep the crash context as a .bss field.
-static CRASH_CONTEXT: parking_lot::Mutex<mem::MaybeUninit<crash_context::CrashContext>> =
-    parking_lot::const_mutex(mem::MaybeUninit::uninit());
+static CRASH_CONTEXT: parking_lot::Mutex<crash_context::CrashContext> =
+    parking_lot::const_mutex(unsafe { mem::zeroed() });
 
 pub(super) struct HandlerInner {
     handler: Box<dyn crate::CrashEvent>,
@@ -435,12 +435,11 @@ impl HandlerInner {
             // Allow ourselves to be dumped, if that is what the user handler wishes to do
             let _set_dumpable = SetDumpable::new(self.dump_process);
             debug_print!("set dumpable");
-            let mut crash_ctx = CRASH_CONTEXT.lock();
+            let mut cc = CRASH_CONTEXT.lock();
 
             {
-                *crash_ctx = mem::MaybeUninit::zeroed();
+                ptr::write_bytes(cc.deref_mut(), 0, 1);
                 debug_print!("zeroed crashctx");
-                let cc = &mut *crash_ctx.as_mut_ptr();
 
                 ptr::copy_nonoverlapping(nix_info, &mut cc.siginfo, 1);
                 debug_print!("copied siginfo");
@@ -451,16 +450,15 @@ impl HandlerInner {
 
                 cfg_if::cfg_if! {
                     if #[cfg(target_arch = "aarch64")] {
-                        // let fp_ptr = uc_ptr.uc_mcontext.__reserved.as_ptr().cast::<crash_context::fpsimd_context>();
+                        let fp_ptr = uc_ptr.uc_mcontext.__reserved.as_ptr().cast::<crash_context::fpsimd_context>();
 
-                        // if (*fp_ptr).head.magic == crash_context::FPSIMD_MAGIC {
-                        //     ptr::copy_nonoverlapping(fp_ptr, &mut cc.float_state, 1);
-                        // }
+                        if (*fp_ptr).head.magic == crash_context::FPSIMD_MAGIC {
+                            ptr::copy_nonoverlapping(fp_ptr, &mut cc.float_state, 1);
+                        }
                     } else if #[cfg(not(target_arch = "arm"))] {
-                        // if !uc_ptr.uc_mcontext.fpregs.is_null() {
-                        //     ptr::copy_nonoverlapping(uc_ptr.uc_mcontext.fpregs, ((&mut cc.float_state) as *mut crash_context::fpregset_t).cast(), 1);
-
-                        // }
+                        if !uc_ptr.uc_mcontext.fpregs.is_null() {
+                            ptr::copy_nonoverlapping(uc_ptr.uc_mcontext.fpregs, ((&mut cc.float_state) as *mut crash_context::fpregset_t).cast(), 1);
+                        }
                     }
                 }
 
@@ -468,7 +466,7 @@ impl HandlerInner {
                 cc.tid = libc::syscall(libc::SYS_gettid) as i32;
             }
 
-            self.handler.on_crash(&*crash_ctx.as_ptr())
+            self.handler.on_crash(&cc)
         }
     }
 }

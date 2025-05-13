@@ -180,7 +180,7 @@ name = "crash-handler"
 version = "0.6.2"
 dependencies = [
  "cfg-if",
- "crash-context 0.6.3",
+ "crash-context 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc",
  "mach2",
  "parking_lot",
@@ -521,7 +521,7 @@ name = "minidumper"
 version = "0.8.3"
 dependencies = [
  "cfg-if",
- "crash-context 0.6.3",
+ "crash-context 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "crash-handler",
  "libc",
  "log",
