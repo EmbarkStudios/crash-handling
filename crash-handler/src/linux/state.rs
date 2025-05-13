@@ -1,5 +1,5 @@
 use crate::{Error, Signal};
-use std::{mem, ops::DerefMut, ptr};
+use std::{mem, ptr};
 
 // std::cmp::max is not const :(
 const fn get_stack_size() -> usize {
@@ -438,6 +438,8 @@ impl HandlerInner {
             let mut cc = CRASH_CONTEXT.lock();
 
             {
+                use std::ops::DerefMut;
+                #[allow(clippy::explicit_deref_methods)]
                 ptr::write_bytes(cc.deref_mut(), 0, 1);
                 debug_print!("zeroed crashctx");
 
