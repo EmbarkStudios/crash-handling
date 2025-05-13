@@ -315,8 +315,7 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
         ($expected:pat) => {
             assert!(
                 matches!(crash_reason, $expected),
-                "crash reason: {:?}",
-                crash_reason
+                "crash reason: {crash_reason:?}",
             );
         };
     }
@@ -336,14 +335,27 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                 ));
             }
             Signal::Fpe => {
-                verify!(CrashReason::LinuxSigfpe(
-                    errors::ExceptionCodeLinuxSigfpeKind::FPE_INTDIV
-                ));
+                if cfg!(not(any(target_arch = "aarch64", target_arch = "arm"))) {
+                    verify!(CrashReason::LinuxSigfpe(
+                        errors::ExceptionCodeLinuxSigfpeKind::FPE_INTDIV
+                    ));
+                } else {
+                    verify!(CrashReason::LinuxGeneral(
+                        errors::ExceptionCodeLinux::SIGFPE,
+                        4294967290
+                    ));
+                }
             }
             Signal::Illegal => {
-                verify!(CrashReason::LinuxSigill(
-                    errors::ExceptionCodeLinuxSigillKind::ILL_ILLOPN
-                ));
+                if cfg!(not(any(target_arch = "aarch64", target_arch = "arm"))) {
+                    verify!(CrashReason::LinuxSigill(
+                        errors::ExceptionCodeLinuxSigillKind::ILL_ILLOPN
+                    ));
+                } else {
+                    verify!(CrashReason::LinuxSigill(
+                        errors::ExceptionCodeLinuxSigillKind::ILL_ILLOPC
+                    ));
+                }
             }
             Signal::Segv => {
                 verify!(CrashReason::LinuxSigsegv(
@@ -362,10 +374,16 @@ pub fn assert_minidump(md_buf: &[u8], signal: Signal) {
                 ));
             }
             Signal::Trap => {
-                verify!(CrashReason::LinuxGeneral(
-                    errors::ExceptionCodeLinux::SIGTRAP,
-                    _
-                ));
+                if cfg!(not(any(target_arch = "aarch64", target_arch = "arm"))) {
+                    verify!(CrashReason::LinuxGeneral(
+                        errors::ExceptionCodeLinux::SIGTRAP,
+                        _
+                    ));
+                } else {
+                    verify!(CrashReason::LinuxSigtrap(
+                        errors::ExceptionCodeLinuxSigtrapKind::TRAP_BRKPT
+                    ));
+                }
             }
             #[cfg(windows)]
             Signal::Purecall | Signal::InvalidParameter | Signal::HeapCorruption => {

@@ -402,8 +402,8 @@ unsafe extern "C" fn signal_handler(
 
 /// The size of `CrashContext` can be too big w.r.t the size of alternatate stack
 /// for `signal_handler`. Keep the crash context as a .bss field.
-static CRASH_CONTEXT: parking_lot::Mutex<mem::MaybeUninit<crash_context::CrashContext>> =
-    parking_lot::const_mutex(mem::MaybeUninit::uninit());
+static CRASH_CONTEXT: parking_lot::Mutex<crash_context::CrashContext> =
+    parking_lot::const_mutex(unsafe { mem::zeroed() });
 
 pub(super) struct HandlerInner {
     handler: Box<dyn crate::CrashEvent>,
@@ -430,18 +430,25 @@ impl HandlerInner {
             // that we require
             let nix_info = &*((info as *const libc::siginfo_t).cast::<libc::signalfd_siginfo>());
 
+            debug_print!("acquired siginfo");
+
             // Allow ourselves to be dumped, if that is what the user handler wishes to do
             let _set_dumpable = SetDumpable::new(self.dump_process);
-            let mut crash_ctx = CRASH_CONTEXT.lock();
+            debug_print!("set dumpable");
+            let mut cc = CRASH_CONTEXT.lock();
 
             {
-                *crash_ctx = mem::MaybeUninit::zeroed();
-                let cc = &mut *crash_ctx.as_mut_ptr();
+                use std::ops::DerefMut;
+                #[allow(clippy::explicit_deref_methods)]
+                ptr::write_bytes(cc.deref_mut(), 0, 1);
+                debug_print!("zeroed crashctx");
 
                 ptr::copy_nonoverlapping(nix_info, &mut cc.siginfo, 1);
+                debug_print!("copied siginfo");
 
                 let uc_ptr = &*(uc as *const libc::c_void).cast::<crash_context::ucontext_t>();
                 ptr::copy_nonoverlapping(uc_ptr, &mut cc.context, 1);
+                debug_print!("copied context");
 
                 cfg_if::cfg_if! {
                     if #[cfg(target_arch = "aarch64")] {
@@ -453,7 +460,6 @@ impl HandlerInner {
                     } else if #[cfg(not(target_arch = "arm"))] {
                         if !uc_ptr.uc_mcontext.fpregs.is_null() {
                             ptr::copy_nonoverlapping(uc_ptr.uc_mcontext.fpregs, ((&mut cc.float_state) as *mut crash_context::fpregset_t).cast(), 1);
-
                         }
                     }
                 }
@@ -462,7 +468,7 @@ impl HandlerInner {
                 cc.tid = libc::syscall(libc::SYS_gettid) as i32;
             }
 
-            self.handler.on_crash(&*crash_ctx.as_ptr())
+            self.handler.on_crash(&cc)
         }
     }
 }
