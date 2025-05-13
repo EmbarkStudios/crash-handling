@@ -78,12 +78,12 @@ mod bindings {
     pub const WSAESHUTDOWN: WSA_ERROR = 10058;
 
     #[link(name = "kernel32")]
-    extern "system" {
+    unsafe extern "system" {
         pub fn SetHandleInformation(hObject: HANDLE, dwMask: u32, dwFlags: HANDLE_FLAGS) -> BOOL;
     }
 
     #[link(name = "ws2_32")]
-    extern "system" {
+    unsafe extern "system" {
         pub fn socket(af: i32, type_: i32, protocol: i32) -> SOCKET;
         pub fn closesocket(s: SOCKET) -> i32;
         pub fn accept(s: SOCKET, addr: *mut SOCKADDR, addrlen: *mut i32) -> SOCKET;
@@ -428,7 +428,7 @@ impl AsSocket for UnixListener {
 
 impl FromRawSocket for UnixListener {
     unsafe fn from_raw_socket(sock: RawSocket) -> Self {
-        Self(Socket::from_raw_socket(sock))
+        Self(unsafe { Socket::from_raw_socket(sock) })
     }
 }
 
@@ -505,7 +505,7 @@ impl AsSocket for UnixStream {
 
 impl FromRawSocket for UnixStream {
     unsafe fn from_raw_socket(sock: RawSocket) -> Self {
-        Self(Socket::from_raw_socket(sock))
+        Self(unsafe { Socket::from_raw_socket(sock) })
     }
 }
 

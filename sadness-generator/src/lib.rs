@@ -422,19 +422,21 @@ mod win_bindings;
 pub unsafe fn raise_heap_corruption() -> ! {
     use win_bindings::*;
 
-    let kernel32 = load_library_a(c"kernel32.dll".as_ptr());
+    unsafe {
+        let kernel32 = load_library_a(c"kernel32.dll".as_ptr());
 
-    if kernel32 != 0 {
-        let heap_free: Option<
-            unsafe extern "system" fn(HeapHandle, u32, *const core::ffi::c_void) -> Bool,
-        > = std::mem::transmute(get_proc_address(kernel32, c"HeapFree".as_ptr()));
+        if kernel32 != 0 {
+            let heap_free: Option<
+                unsafe extern "system" fn(HeapHandle, u32, *const core::ffi::c_void) -> Bool,
+            > = std::mem::transmute(get_proc_address(kernel32, c"HeapFree".as_ptr()));
 
-        let heap_free = heap_free.expect("failed to acquire HeapFree function");
+            let heap_free = heap_free.expect("failed to acquire HeapFree function");
 
-        let bad_pointer = 3 as *mut core::ffi::c_void;
-        heap_free(get_process_heap(), 0, bad_pointer);
-    } else {
-        panic!("Can't corrupt heap: failed to load kernel32");
+            let bad_pointer = 3 as *mut core::ffi::c_void;
+            heap_free(get_process_heap(), 0, bad_pointer);
+        } else {
+            panic!("Can't corrupt heap: failed to load kernel32");
+        }
     }
     std::process::abort()
 }

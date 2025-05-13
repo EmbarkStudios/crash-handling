@@ -11,7 +11,7 @@ type PVECTORED_EXCEPTION_HANDLER = Option<
     unsafe extern "system" fn(exceptioninfo: *const crash_context::EXCEPTION_POINTERS) -> i32,
 >;
 
-extern "system" {
+unsafe extern "system" {
     fn GetCurrentThreadId() -> u32;
     fn SetUnhandledExceptionFilter(
         filter: LPTOP_LEVEL_EXCEPTION_FILTER,
@@ -27,7 +27,7 @@ struct VehHandler(std::ptr::NonNull<libc::c_void>);
 unsafe impl Send for VehHandler {}
 unsafe impl Sync for VehHandler {}
 
-extern "C" {
+unsafe extern "C" {
     /// MSVCRT has its own error handling function for invalid parameters to crt functions
     /// (eg printf) which instead of returning error codes from the function itself,
     /// like one would want, call a handler if specified, or, worse, throw up a dialog
@@ -149,31 +149,33 @@ pub(super) fn detach() {
 pub(super) unsafe fn simulate_exception(exception_code: Option<i32>) -> crate::CrashEventResult {
     let lock = HANDLER.lock();
     if let Some(handler) = &*lock {
-        let mut exception_record: crash_context::EXCEPTION_RECORD = std::mem::zeroed();
-        let mut exception_context = std::mem::MaybeUninit::zeroed();
+        unsafe {
+            let mut exception_record: crash_context::EXCEPTION_RECORD = std::mem::zeroed();
+            let mut exception_context = std::mem::MaybeUninit::zeroed();
 
-        crash_context::capture_context(exception_context.as_mut_ptr());
+            crash_context::capture_context(exception_context.as_mut_ptr());
 
-        let mut exception_context = exception_context.assume_init();
+            let mut exception_context = exception_context.assume_init();
 
-        let exception_ptrs = crash_context::EXCEPTION_POINTERS {
-            ExceptionRecord: &mut exception_record,
-            ContextRecord: &mut exception_context,
-        };
+            let exception_ptrs = crash_context::EXCEPTION_POINTERS {
+                ExceptionRecord: &mut exception_record,
+                ContextRecord: &mut exception_context,
+            };
 
-        // https://github.com/chromium/crashpad/blob/fca8871ca3fb721d3afab370ca790122f9333bfd/util/win/exception_codes.h#L32
-        let exception_code = exception_code.unwrap_or(ExceptionCode::User as i32);
-        exception_record.ExceptionCode = exception_code;
+            // https://github.com/chromium/crashpad/blob/fca8871ca3fb721d3afab370ca790122f9333bfd/util/win/exception_codes.h#L32
+            let exception_code = exception_code.unwrap_or(ExceptionCode::User as i32);
+            exception_record.ExceptionCode = exception_code;
 
-        let cc = crash_context::CrashContext {
-            exception_pointers: (&exception_ptrs as *const crash_context::EXCEPTION_POINTERS)
-                .cast(),
-            process_id: std::process::id(),
-            thread_id: GetCurrentThreadId(),
-            exception_code,
-        };
+            let cc = crash_context::CrashContext {
+                exception_pointers: (&exception_ptrs as *const crash_context::EXCEPTION_POINTERS)
+                    .cast(),
+                process_id: std::process::id(),
+                thread_id: GetCurrentThreadId(),
+                exception_code,
+            };
 
-        handler.user_handler.on_crash(&cc)
+            handler.user_handler.on_crash(&cc)
+        }
     } else {
         crate::CrashEventResult::Handled(false)
     }
@@ -211,7 +213,7 @@ fn set_handlers() {
     }
 }
 
-impl<'scope> std::ops::Deref for AutoHandler<'scope> {
+impl std::ops::Deref for AutoHandler<'_> {
     type Target = HandlerInner;
 
     fn deref(&self) -> &Self::Target {
@@ -219,7 +221,7 @@ impl<'scope> std::ops::Deref for AutoHandler<'scope> {
     }
 }
 
-impl<'scope> Drop for AutoHandler<'scope> {
+impl Drop for AutoHandler<'_> {
     fn drop(&mut self) {
         // Restore our handlers
         set_handlers();
@@ -238,7 +240,7 @@ use crate::CrashEventResult;
 pub(super) unsafe extern "system" fn handle_exception(
     except_info: *const crash_context::EXCEPTION_POINTERS,
 ) -> i32 {
-    let _jump = {
+    let _jump = unsafe {
         let lock = HANDLER.lock();
         if let Some(current_handler) = AutoHandler::new(lock) {
             let code = (*(*except_info).ExceptionRecord).ExceptionCode;
@@ -281,7 +283,9 @@ pub(super) unsafe extern "system" fn handle_exception(
     };
 
     #[cfg(target_arch = "x86_64")]
-    super::jmp::longjmp(_jump.0, _jump.1);
+    unsafe {
+        super::jmp::longjmp(_jump.0, _jump.1)
+    };
 }
 
 const STATUS_HEAP_CORRUPTION: u32 = 0xc0000374;
@@ -291,11 +295,13 @@ const STATUS_HEAP_CORRUPTION: u32 = 0xc0000374;
 pub(super) unsafe extern "system" fn vectored_handle_exception(
     except_info: *const crash_context::EXCEPTION_POINTERS,
 ) -> i32 {
-    let exception_code = (*(*except_info).ExceptionRecord).ExceptionCode as u32;
-    if exception_code == STATUS_HEAP_CORRUPTION {
-        handle_exception(except_info)
-    } else {
-        EXCEPTION_CONTINUE_SEARCH
+    unsafe {
+        let exception_code = (*(*except_info).ExceptionRecord).ExceptionCode as u32;
+        if exception_code == STATUS_HEAP_CORRUPTION {
+            handle_exception(except_info)
+        } else {
+            EXCEPTION_CONTINUE_SEARCH
+        }
     }
 }
 
@@ -308,7 +314,7 @@ pub(super) unsafe extern "system" fn vectored_handle_exception(
 /// and you can't really link both the regular and debug CRT in the same application
 /// as that results in sadness, so this function just ignores the parameters,
 /// unlike the original Breakpad code.
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn handle_invalid_parameter(
     expression: *const u16,
     function: *const u16,
@@ -316,7 +322,7 @@ unsafe extern "C" fn handle_invalid_parameter(
     line: u32,
     reserved: usize,
 ) {
-    let _jump = {
+    let _jump = unsafe {
         let lock = HANDLER.lock();
         if let Some(current_handler) = AutoHandler::new(lock) {
             // Make up an exception record for the current thread and CPU context
@@ -383,14 +389,16 @@ unsafe extern "C" fn handle_invalid_parameter(
     };
 
     #[cfg(target_arch = "x86_64")]
-    super::jmp::longjmp(_jump.0, _jump.1);
+    unsafe {
+        super::jmp::longjmp(_jump.0, _jump.1)
+    };
 }
 
 /// Handler for pure virtual function calls, this is not an exception so the
 /// context (shouldn't be) isn't compromised
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn handle_pure_virtual_call() {
-    let _jump = {
+    let _jump = unsafe {
         let lock = HANDLER.lock();
         if let Some(current_handler) = AutoHandler::new(lock) {
             // Make up an exception record for the current thread and CPU context
@@ -445,5 +453,7 @@ unsafe extern "C" fn handle_pure_virtual_call() {
     };
 
     #[cfg(target_arch = "x86_64")]
-    super::jmp::longjmp(_jump.0, _jump.1);
+    unsafe {
+        super::jmp::longjmp(_jump.0, _jump.1)
+    };
 }
