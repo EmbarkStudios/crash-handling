@@ -39,7 +39,7 @@ jobs:
     name: Test
     strategy:
       matrix:
-        os: [ubuntu-22.04, windows-2022, macos-14]
+        os: [ubuntu-24.04, windows-2022, macos-14, ubuntu-24.04-arm]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -57,8 +57,6 @@ jobs:
     strategy:
       matrix:
         job:
-          #- { target: aarch64-unknown-linux-gnu, toolchain: stable }
-          - { target: aarch64-unknown-linux-musl, toolchain: stable }
           - { target: aarch64-linux-android, toolchain: stable }
           - { target: arm-unknown-linux-gnueabihf, toolchain: stable }
     steps:
