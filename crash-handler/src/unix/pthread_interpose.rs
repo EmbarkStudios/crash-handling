@@ -29,7 +29,7 @@ struct PthreadCreateParams {
 static mut THREAD_DESTRUCTOR_KEY: libc::pthread_key_t = 0;
 
 #[cfg(all(target_env = "musl", not(miri)))]
-extern "C" {
+unsafe extern "C" {
     /// This is the weak alias for `pthread_create`. We declare this so we can
     /// use its address when targeting musl, as we can't lookup the actual
     /// `pthread_create` symbol at runtime since we've interposed it.

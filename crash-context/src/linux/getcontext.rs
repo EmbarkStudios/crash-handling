@@ -1,6 +1,6 @@
 //! Implementation of [`getcontext`](https://man7.org/linux/man-pages/man3/getcontext.3.html)
 
-extern "C" {
+unsafe extern "C" {
     /// A portable implementation of [`getcontext`](https://man7.org/linux/man-pages/man3/getcontext.3.html)
     /// since it is not supported by all libc implementations, namely `musl`, as
     /// it has been deprecated from POSIX for over a decade
