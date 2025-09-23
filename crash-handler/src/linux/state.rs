@@ -457,6 +457,8 @@ impl HandlerInner {
                         if (*fp_ptr).head.magic == crash_context::FPSIMD_MAGIC {
                             ptr::copy_nonoverlapping(fp_ptr, &mut cc.float_state, 1);
                         }
+                    } else if #[cfg(target_arch = "riscv64")] {
+                        cc.float_state = uc_ptr.uc_mcontext.__fpregs;
                     } else if #[cfg(not(target_arch = "arm"))] {
                         if !uc_ptr.uc_mcontext.fpregs.is_null() {
                             ptr::copy_nonoverlapping(uc_ptr.uc_mcontext.fpregs, ((&mut cc.float_state) as *mut crash_context::fpregset_t).cast(), 1);
