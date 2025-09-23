@@ -20,5 +20,7 @@ cfg_if::cfg_if! {
         mod aarch64;
     } else if #[cfg(target_arch = "arm")] {
         mod arm;
+    } else if #[cfg(target_arch = "riscv64")] {
+        mod riscv64;
     }
 }
