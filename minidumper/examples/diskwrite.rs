@@ -22,9 +22,10 @@ fn main() {
                 let dump_path = std::path::PathBuf::from(format!("dumps/{uuid}.dmp"));
 
                 if let Some(dir) = dump_path.parent()
-                    && !dir.try_exists()? {
-                        std::fs::create_dir_all(dir)?;
-                    }
+                    && !dir.try_exists()?
+                {
+                    std::fs::create_dir_all(dir)?;
+                }
                 let file = std::fs::File::create(&dump_path)?;
                 Ok((file, dump_path))
             }
