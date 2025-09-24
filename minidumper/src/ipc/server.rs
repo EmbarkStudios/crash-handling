@@ -461,9 +461,10 @@ impl Server {
                 };
 
                 let mut writer =
-                    minidump_writer::minidump_writer::MinidumpWriter::new(crash_context.inner.pid, crash_context.inner.tid);
+                    minidump_writer::minidump_writer::MinidumpWriterConfig::new(crash_context.inner.pid, crash_context.inner.tid);
 
                 writer.set_crash_context(crash_context);
+                let result = writer.write(&mut minidump_file);
             } else if #[cfg(target_os = "windows")] {
                 // SAFETY: Unfortunately this is a bit dangerous since we are relying on the crashing process
                 // to still be alive and still have the interior pointers in the crash context still at the
@@ -471,14 +472,12 @@ impl Server {
                 // many layers, so really, we are falling back on Windows to actually correctly handle
                 // if the interior pointers have become invalid which it should? do ok with
                 let result =
-                    minidump_writer::minidump_writer::MinidumpWriter::dump_crash_context(crash_context, None, &mut minidump_file);
+                    minidump_writer::minidump_writer::MinidumpWriter::dump_crash_context(&crash_context, None, &mut minidump_file);
             } else if #[cfg(target_os = "macos")] {
                 let mut writer = minidump_writer::minidump_writer::MinidumpWriter::with_crash_context(crash_context);
+                let result = writer.dump(&mut minidump_file);
             }
         }
-
-        #[cfg(not(target_os = "windows"))]
-        let result = writer.dump(&mut minidump_file);
 
         // Notify the user handler about the minidump, even if we failed to write it
         Ok(handler.on_minidump_created(
