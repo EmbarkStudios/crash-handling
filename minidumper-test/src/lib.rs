@@ -101,15 +101,14 @@ fn make_dump_path(id: &str) -> PathBuf {
 pub fn spinup_server(id: &str, dump_path: Option<PathBuf>) -> Server {
     let dump_path = dump_path.unwrap_or_else(|| make_dump_path(id));
 
-    if dump_path.exists() {
-        if let Err(e) = std::fs::remove_file(&dump_path) {
+    if dump_path.exists()
+        && let Err(e) = std::fs::remove_file(&dump_path) {
             panic!(
                 "failed to remove existing dump file {}: {}",
                 dump_path.display(),
                 e
             );
         }
-    }
 
     let mut server = minidumper::Server::with_name(id).expect("failed to start server");
 

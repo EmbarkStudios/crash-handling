@@ -36,9 +36,9 @@ pub fn write_stderr(s: &'static str) {
 
 cfg_if::cfg_if! {
     if #[cfg(all(unix, not(target_os = "macos")))] {
-        /// The sole purpose of the unix module is to hook pthread_create to ensure
+        /// The sole purpose of the unix module is to hook `pthread_create` to ensure
         /// an alternate stack is installed for every native thread in case of a
-        /// stack overflow. This doesn't apply to MacOS as it uses exception ports,
+        /// stack overflow. This doesn't apply to `MacOS` as it uses exception ports,
         /// which are always delivered to a specific thread owned by the exception
         /// handler
         pub mod unix;
