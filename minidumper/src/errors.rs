@@ -23,7 +23,7 @@ pub enum Error {
     /// An error occurred during minidump generation
     #[cfg(any(target_os = "linux", target_os = "android"))]
     #[error(transparent)]
-    Writer(Box<minidump_writer::errors::WriterError>),
+    Writer(Box<minidump_writer::minidump_writer::errors::WriterError>),
     /// An error occurred during minidump generation
     #[cfg(target_os = "windows")]
     #[error(transparent)]
@@ -41,8 +41,8 @@ pub enum Error {
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-impl From<minidump_writer::errors::WriterError> for Error {
-    fn from(we: minidump_writer::errors::WriterError) -> Self {
+impl From<minidump_writer::minidump_writer::errors::WriterError> for Error {
+    fn from(we: minidump_writer::minidump_writer::errors::WriterError) -> Self {
         Self::Writer(Box::new(we))
     }
 }
