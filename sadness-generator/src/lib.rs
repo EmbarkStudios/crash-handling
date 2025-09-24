@@ -159,10 +159,11 @@ pub unsafe fn raise_floating_point_exception() -> ! {
             );
             divisor
         }
-        #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+        #[cfg(any(target_arch = "arm", target_arch = "aarch64", target_arch = "riscv64"))]
         {
-            // Unfortunately ARM by default will not raise SIGFPE on divide
-            // by 0 and just return 0, so we just explicitly raise here for now
+            // Unfortunately ARM and RISC-V by default will not raise SIGFPE on
+            // divide by 0 and just return 0, so we just explicitly raise here
+            // for now
             libc::raise(libc::SIGFPE);
             0
         }
@@ -184,6 +185,8 @@ pub unsafe fn raise_illegal_instruction() -> ! {
         asm!("ud2");
         #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
         asm!("udf #0");
+        #[cfg(target_arch = "riscv64")]
+        asm!(".word 0x00000000");
     }
 
     std::process::abort()
@@ -247,6 +250,8 @@ pub unsafe fn raise_trap() -> ! {
         asm!(".inst 0xe7f001f0");
         #[cfg(target_arch = "aarch64")]
         asm!(".inst 0xd4200000");
+        #[cfg(target_arch = "riscv64")]
+        asm!("ebreak");
     }
 
     std::process::abort()

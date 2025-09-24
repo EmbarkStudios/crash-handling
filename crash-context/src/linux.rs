@@ -256,6 +256,61 @@ cfg_if::cfg_if! {
             pub arm_cpsr: u32,
             pub fault_address: u32,
         }
+    } else if #[cfg(target_arch = "riscv64")] {
+        #[repr(C)]
+        #[derive(Clone)]
+        #[doc(hidden)]
+        pub struct ucontext_t {
+            pub __uc_flags: u64,
+            pub uc_link: *mut ucontext_t,
+            pub uc_stack: stack_t,
+            pub uc_sigmask: sigset_t,
+            pub uc_mcontext: mcontext_t,
+        }
+
+        #[repr(C, align(16))]
+        #[derive(Clone)]
+        #[doc(hidden)]
+        pub struct mcontext_t {
+            pub __gregs: [u64; 32],
+            pub __fpregs: __riscv_mc_fp_state,
+        }
+
+        #[repr(C)]
+        #[derive(Clone, Copy)]
+        #[doc(hidden)]
+        pub union __riscv_mc_fp_state {
+            pub __f: __riscv_mc_f_ext_state,
+            pub __d: __riscv_mc_d_ext_state,
+            pub __q: __riscv_mc_q_ext_state,
+        }
+
+        #[repr(C)]
+        #[derive(Clone, Copy)]
+        #[doc(hidden)]
+        pub struct __riscv_mc_f_ext_state {
+            pub __f: [u32; 32],
+            pub __fcsr: u32,
+        }
+
+        #[repr(C)]
+        #[derive(Clone, Copy)]
+        #[doc(hidden)]
+        pub struct __riscv_mc_d_ext_state {
+            pub __f: [u64; 32],
+            pub __fcsr: u32,
+        }
+
+        #[repr(C, align(16))]
+        #[derive(Clone, Copy)]
+        #[doc(hidden)]
+        pub struct __riscv_mc_q_ext_state {
+            pub __f: [u64; 64],
+            pub __fcsr: u32,
+            pub __reserved: [u32; 3],
+        }
+
+        pub type fpregset_t = __riscv_mc_fp_state;
     }
 }
 
