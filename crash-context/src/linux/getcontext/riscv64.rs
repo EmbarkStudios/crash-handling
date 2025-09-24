@@ -4,6 +4,7 @@
 
 std::arch::global_asm! {
     ".text",
+    ".attribute arch, \"rv64gc\"",
     ".globl crash_context_getcontext",
     ".hidden crash_context_getcontext",
     ".type crash_context_getcontext, @function",
