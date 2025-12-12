@@ -159,6 +159,14 @@ pub unsafe fn raise_floating_point_exception() -> ! {
             );
             divisor
         }
+        #[cfg(target_arch = "s390x")] 
+        {
+            asm!(
+                "lhi 2,0",
+                "lhi 3,0",
+                "dr  2,2");
+            0
+        }
         #[cfg(any(target_arch = "arm", target_arch = "aarch64", target_arch = "riscv64"))]
         {
             // Unfortunately ARM and RISC-V by default will not raise SIGFPE on
@@ -187,6 +195,8 @@ pub unsafe fn raise_illegal_instruction() -> ! {
         asm!("udf #0");
         #[cfg(target_arch = "riscv64")]
         asm!(".word 0x00000000");
+        #[cfg(target_arch = "s390x")]
+        asm!(".word 0x0000");
     }
 
     std::process::abort()
@@ -252,6 +262,8 @@ pub unsafe fn raise_trap() -> ! {
         asm!(".inst 0xd4200000");
         #[cfg(target_arch = "riscv64")]
         asm!("ebreak");
+        #[cfg(target_arch = "s390x")]
+        asm!("trap2")
     }
 
     std::process::abort()

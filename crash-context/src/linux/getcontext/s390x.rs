@@ -5,8 +5,8 @@ std::arch::global_asm! {
     ".text",
     ".global crash_context_getcontext",
     ".hidden crash_context_getcontext",
-    ".type crash_context_getcontext, #function",
-    ".align 4",
+    ".type crash_context_getcontext, @function",
+    ".align 8",
     ".cfi_startproc",
     "crash_context_getcontext:",
 

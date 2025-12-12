@@ -47,6 +47,14 @@ cfg_if::cfg_if! {
             __sp: u64,
             __fpregs: [f64; 12],
         }
+    } else if #[cfg(target_arch = "s390x" )] {
+        #[repr(C)]
+        #[doc(hidden)]
+        #[allow(non_camel_case_types)]
+        pub struct __jmp_buf{
+            __gregs: [u64; 10],
+            __fpregs: [f64; 8],
+        }
     }
 }
 
