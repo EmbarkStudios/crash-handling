@@ -1,6 +1,3 @@
-// this is a copy of the getcontext in glibc
-// DO NOT MERGE AS THIS IS CURRENTLY GPL !!!
-
 std::arch::global_asm! {
     ".text",
     ".global crash_context_getcontext",
