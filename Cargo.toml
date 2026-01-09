@@ -25,5 +25,8 @@ debug = 2
 cfg-if = "1.0"
 crash-context = "0.6"
 libc = "0.2"
+# This is an older version, but most of the larger dependents (eg wasmtime) are
+# still using 0.4 as well, so we don't want to bump this until someone actually
+# opens a PR to avoid unnecessary duplicates
 mach2 = "0.4"
 parking_lot = "0.12"
