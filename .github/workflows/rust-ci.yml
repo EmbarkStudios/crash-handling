@@ -67,7 +67,8 @@ jobs:
         job:
           - { target: aarch64-linux-android, toolchain: stable }
           - { target: arm-unknown-linux-gnueabihf, toolchain: stable }
-          - { target: s390x-unknown-linux-gnu, toolchain: stable }
+          # TODO: add this back after cutting a crash-context release and updating minidump-writer
+          #- { target: s390x-unknown-linux-gnu, toolchain: stable }
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust
