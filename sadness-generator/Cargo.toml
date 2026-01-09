@@ -2,21 +2,18 @@
 name = "sadness-generator"
 version = "0.6.0"
 description = "Provides various ways to make your program sad"
-repository = "https://github.com/EmbarkStudios/crash-handling"
-authors = [
-    "Embark <opensource@embark-studios.com>",
-    "Jake Shadle <jake.shadle@embark-studios.com>",
-]
-edition = "2024"
-license = "MIT OR Apache-2.0"
+repository.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
 documentation = "https://docs.rs/sadness-generator"
 homepage = "https://github.com/EmbarkStudios/crash-handling/tree/main/sadness-generator"
+# We use `asm!` and rawdylib Windows bindings
+rust-version.workspace = true
 # Unfortunately there is no good category for this on crates.io atm,
 # so we use simulation, the simulation is so good it's real!
 categories = ["simulation"]
 keywords = ["crash", "sadness", "signal", "exception"]
-# We use `asm!` and rawdylib Windows bindings
-rust-version = "1.85.0"
 
 [dependencies]
 libc.workspace = true
