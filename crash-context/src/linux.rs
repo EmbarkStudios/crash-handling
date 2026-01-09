@@ -311,6 +311,52 @@ cfg_if::cfg_if! {
         }
 
         pub type fpregset_t = __riscv_mc_fp_state;
+    } else if #[cfg(target_arch = "s390x")] {
+        #[repr(C)]
+        #[derive(Clone)]
+        #[doc(hidden)]
+        pub struct ucontext_t {
+            pub uc_flags: u64,
+            pub uc_link: *mut ucontext_t,
+            pub uc_stack: stack_t,
+            pub uc_mcontext: mcontext_t,
+            pub uc_sigmask: sigset_t,
+        }
+
+        #[repr(C, align(8))]
+        #[derive(Clone,Copy)]
+        #[doc(hidden)]
+        pub struct mcontext_t {
+            pub psw: psw_t,
+            pub gregs: [u64; 16],
+            pub aregs: [u32; 16],
+            pub __fpregs: fpregset_t,
+        }
+
+        #[repr(C)]
+        #[derive(Clone,Copy)]
+        #[doc(hidden)]
+        pub struct fpregset_t {
+            pub fpc: u32,
+            __pad: u32,
+            pub fprs: [fpreg_t; 16],
+        }
+
+        #[repr(C)]
+        #[derive(Clone,Copy)]
+        #[doc(hidden)]
+        pub struct fpreg_t {
+            pub d: f64,
+            // pub f: f32,
+        }
+
+        #[repr(C)]
+        #[derive(Clone,Copy)]
+        #[doc(hidden)]
+        pub struct psw_t {
+            pub mask: u64,
+            pub addr: u64,
+        }
     }
 }
 
