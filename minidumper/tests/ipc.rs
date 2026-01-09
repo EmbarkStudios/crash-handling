@@ -3,7 +3,7 @@ use std::sync::{Arc, atomic};
 /// Tests that the user can send and receive their own messages over IPC
 #[test]
 fn ipc_messages() {
-    let name = "ipc_messages";
+    let name = minidumper::SocketName::path("ipc_messages");
 
     let mut server = minidumper::Server::with_name(name).unwrap();
 
@@ -73,7 +73,7 @@ fn inactive_reap() {
         return;
     }
 
-    let name = "inactive_reap";
+    let name = minidumper::SocketName::path("inactive_reap");
 
     let mut server = minidumper::Server::with_name(name).unwrap();
 
@@ -166,7 +166,7 @@ fn ping() {
         return;
     }
 
-    let name = "ping";
+    let name = minidumper::SocketName::from(std::path::Path::new("ping"));
 
     let mut server = minidumper::Server::with_name(name).unwrap();
 

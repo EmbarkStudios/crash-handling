@@ -43,7 +43,7 @@ fn real_main() -> anyhow::Result<()> {
     }
 
     let md_client = loop {
-        match minidumper::Client::with_name(&cmd.id) {
+        match minidumper::Client::with_name(minidumper::SocketName::path(&cmd.id)) {
             Ok(md_client) => break md_client,
             Err(e) => {
                 if std::time::Instant::now() - start > connect_timeout {

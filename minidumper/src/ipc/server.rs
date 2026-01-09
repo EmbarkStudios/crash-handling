@@ -80,7 +80,7 @@ impl Server {
     ///
     /// The provided socket name is invalid, or the listener socket was unable
     /// to be bound to the specified socket name.
-    pub fn with_name<'scope>(name: impl Into<SocketName<'scope>>) -> Result<Self, Error> {
+    pub fn with_name<'scope>(name: SocketName<'scope>) -> Result<Self, Error> {
         let sn = name.into();
 
         #[allow(irrefutable_let_patterns)]

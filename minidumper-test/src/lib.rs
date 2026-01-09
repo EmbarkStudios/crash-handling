@@ -95,7 +95,7 @@ impl Drop for Server {
 
 #[inline]
 fn make_dump_path(id: &str) -> PathBuf {
-    PathBuf::from(format!(".dumps/{}.dmp", id))
+    PathBuf::from(format!(".dumps/{id}.dmp"))
 }
 
 pub fn spinup_server(id: &str, dump_path: Option<PathBuf>) -> Server {
@@ -105,13 +105,13 @@ pub fn spinup_server(id: &str, dump_path: Option<PathBuf>) -> Server {
         && let Err(e) = std::fs::remove_file(&dump_path)
     {
         panic!(
-            "failed to remove existing dump file {}: {}",
+            "failed to remove existing dump file {}: {e}",
             dump_path.display(),
-            e
         );
     }
 
-    let mut server = minidumper::Server::with_name(id).expect("failed to start server");
+    let mut server = minidumper::Server::with_name(minidumper::SocketName::path(id))
+        .expect("failed to start server");
 
     struct Inner {
         _id: String,

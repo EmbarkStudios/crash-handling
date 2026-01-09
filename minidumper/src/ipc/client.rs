@@ -21,7 +21,7 @@ impl Client {
     ///
     /// The specified socket name is invalid, or a connection cannot be made
     /// with a server
-    pub fn with_name<'scope>(name: impl Into<SocketName<'scope>>) -> Result<Self, Error> {
+    pub fn with_name<'scope>(name: SocketName<'scope>) -> Result<Self, Error> {
         let sn = name.into();
 
         cfg_if::cfg_if! {
