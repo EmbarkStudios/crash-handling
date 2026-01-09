@@ -159,12 +159,9 @@ pub unsafe fn raise_floating_point_exception() -> ! {
             );
             divisor
         }
-        #[cfg(target_arch = "s390x")] 
+        #[cfg(target_arch = "s390x")]
         {
-            asm!(
-                "lhi 2,0",
-                "lhi 3,0",
-                "dr  2,2");
+            asm!("lhi 2,0", "lhi 3,0", "dr  2,2");
             0
         }
         #[cfg(any(target_arch = "arm", target_arch = "aarch64", target_arch = "riscv64"))]
