@@ -28,7 +28,7 @@ struct PthreadCreateParams {
 /// in the `pthread_key` destructor
 static mut THREAD_DESTRUCTOR_KEY: libc::pthread_key_t = 0;
 
-#[cfg(all(target_env = "musl", not(miri)))]
+#[cfg(all(target_env = "musl", target_feature = "crt-static", not(miri)))]
 unsafe extern "C" {
     /// This is the weak alias for `pthread_create`. We declare this so we can
     /// use its address when targeting musl, as we can't lookup the actual
@@ -66,7 +66,7 @@ pub extern "C" fn pthread_create(
     // used to uninstall and unmap the alternate stack
     INIT.call_once(|| unsafe {
         cfg_if::cfg_if! {
-            if #[cfg(target_env = "musl")] {
+            if #[cfg(all(target_env = "musl", target_feature = "crt-static"))] {
                 let ptr = __pthread_create as *mut c_void;
             } else {
                 const RTLD_NEXT: *mut c_void = -1isize as *mut c_void;
