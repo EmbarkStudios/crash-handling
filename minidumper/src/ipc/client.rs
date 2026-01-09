@@ -21,9 +21,7 @@ impl Client {
     ///
     /// The specified socket name is invalid, or a connection cannot be made
     /// with a server
-    pub fn with_name<'scope>(name: SocketName<'scope>) -> Result<Self, Error> {
-        let sn = name.into();
-
+    pub fn with_name<'scope>(sn: SocketName<'scope>) -> Result<Self, Error> {
         cfg_if::cfg_if! {
             if #[cfg(any(target_os = "linux", target_os = "android"))] {
                 let socket_addr = match sn {
