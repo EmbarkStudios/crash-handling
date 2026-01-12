@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - ReleaseDate
 ### Changed
 - [PR#103](https://github.com/EmbarkStudios/crash-handling/pull/103) updated `minidump-writer` to 0.11.
+- [PR#111](https://github.com/EmbarkStudios/crash-handling/pull/111) made `SocketName` public and removed the `From<&str>` implementation, resolving [#106](https://github.com/EmbarkStudios/crash-handling/issues/106).
 - [PR#111](https://github.com/EmbarkStudios/crash-handling/pull/111) updated MSRV to 1.85.0.
 
 ## [0.8.3] - 2024-06-08
