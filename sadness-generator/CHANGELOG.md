@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#111](https://github.com/EmbarkStudios/crash-handling/pull/111) updated MSRV to 1.85.0.
+
 ## [0.6.0] - 2024-06-08
 ### Changed
 - Update MSRV to 1.62.0

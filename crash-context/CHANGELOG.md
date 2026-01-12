@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Added
+- [PR#102](https://github.com/EmbarkStudios/crash-handling/pull/102) added support for RISCV64 `getcontext`.
+- [PR#109](https://github.com/EmbarkStudios/crash-handling/pull/102) added support for s390x `getcontext`.
+
+### Changed
+- [PR#111](https://github.com/EmbarkStudios/crash-handling/pull/111) updated MSRV to 1.85.0.
+
 ## [0.6.3] - 2024-07-25
 ### Fixed
 - [PR#89](https://github.com/EmbarkStudios/crash-handling/pull/89) fixed compilation for `arm-unknown-linux-gnueabihf`...again.

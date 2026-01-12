@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#105](https://github.com/EmbarkStudios/crash-handling/pull/105) fixed pthread interposition when statically linking `musl`.
+
+### Changed
+- [PR#111](https://github.com/EmbarkStudios/crash-handling/pull/111) updated MSRV to 1.85.0.
+
 ## [0.6.3] - 2025-05-13
 ### Fixed
 - [PR#94](https://github.com/EmbarkStudios/crash-handling/pull/94) resolved a case of UB, resolving [#93](https://github.com/EmbarkStudios/crash-handling/issues/93). Thanks [@Chain-Fox](https://github.com/Chain-Fox)!
