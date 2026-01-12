@@ -87,6 +87,8 @@ cfg_if::cfg_if! {
             pub uc_mcontext: mcontext_t,
             pub uc_sigmask: sigset_t,
             __private: [u8; 512],
+            /// Shadow stack
+            __ssp: [u64; 4],
         }
 
         #[repr(C)]

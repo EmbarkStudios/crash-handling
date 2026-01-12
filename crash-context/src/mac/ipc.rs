@@ -487,21 +487,23 @@ impl AckReceiver {
     /// Performs syscalls. Only used internally hence the entire function being
     /// marked unsafe.
     unsafe fn new() -> Result<Self, Error> {
-        let mut port = 0;
-        kern!(mach_port::mach_port_allocate(
-            mach_task_self(),
-            port::MACH_PORT_RIGHT_RECEIVE,
-            &mut port
-        ));
+        unsafe {
+            let mut port = 0;
+            kern!(mach_port::mach_port_allocate(
+                mach_task_self(),
+                port::MACH_PORT_RIGHT_RECEIVE,
+                &mut port
+            ));
 
-        kern!(mach_port::mach_port_insert_right(
-            mach_task_self(),
-            port,
-            port,
-            msg::MACH_MSG_TYPE_MAKE_SEND
-        ));
+            kern!(mach_port::mach_port_insert_right(
+                mach_task_self(),
+                port,
+                port,
+                msg::MACH_MSG_TYPE_MAKE_SEND
+            ));
 
-        Ok(Self { port })
+            Ok(Self { port })
+        }
     }
 
     /// Waits for the specified duration to receive a result from the [`Server`]
@@ -516,30 +518,32 @@ impl AckReceiver {
     /// Performs syscalls. Only used internally hence the entire function being
     /// marked unsafe.
     unsafe fn recv_ack(&mut self, timeout: Option<Duration>) -> Result<u32, Error> {
-        let mut ack = AcknowledgementMessage {
-            head: MachMsgHeader {
-                bits: 0,
-                size: std::mem::size_of::<AcknowledgementMessage>() as u32,
-                remote_port: port::MACH_PORT_NULL,
-                local_port: self.port,
-                voucher_port: port::MACH_PORT_NULL,
-                id: 0,
-            },
-            result: 0,
-        };
+        unsafe {
+            let mut ack = AcknowledgementMessage {
+                head: MachMsgHeader {
+                    bits: 0,
+                    size: std::mem::size_of::<AcknowledgementMessage>() as u32,
+                    remote_port: port::MACH_PORT_NULL,
+                    local_port: self.port,
+                    voucher_port: port::MACH_PORT_NULL,
+                    id: 0,
+                },
+                result: 0,
+            };
 
-        // Wait for a response from the Server
-        msg!(msg::mach_msg(
-            ((&mut ack.head) as *mut MachMsgHeader).cast(),
-            msg::MACH_RCV_MSG | msg::MACH_RCV_TIMEOUT,
-            0,
-            ack.head.size,
-            self.port,
-            timeout.map(|t| t.as_millis() as u32).unwrap_or_default(),
-            port::MACH_PORT_NULL
-        ));
+            // Wait for a response from the Server
+            msg!(msg::mach_msg(
+                ((&mut ack.head) as *mut MachMsgHeader).cast(),
+                msg::MACH_RCV_MSG | msg::MACH_RCV_TIMEOUT,
+                0,
+                ack.head.size,
+                self.port,
+                timeout.map(|t| t.as_millis() as u32).unwrap_or_default(),
+                port::MACH_PORT_NULL
+            ));
 
-        Ok(ack.result)
+            Ok(ack.result)
+        }
     }
 }
 

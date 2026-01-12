@@ -80,9 +80,7 @@ impl Server {
     ///
     /// The provided socket name is invalid, or the listener socket was unable
     /// to be bound to the specified socket name.
-    pub fn with_name<'scope>(name: impl Into<SocketName<'scope>>) -> Result<Self, Error> {
-        let sn = name.into();
-
+    pub fn with_name<'scope>(sn: SocketName<'scope>) -> Result<Self, Error> {
         #[allow(irrefutable_let_patterns)]
         let socket_path = if let SocketName::Path(path) = &sn {
             // There seems to be a bug, at least on Windows, where checking for

@@ -8,12 +8,25 @@ members = [
     "sadness-generator",
 ]
 
+[workspace.package]
+repository = "https://github.com/EmbarkStudios/crash-handling"
+authors = [
+    "Embark <opensource@embark-studios.com>",
+    "Jake Shadle <jake.shadle@embark-studios.com>",
+]
+edition = "2024"
+license = "MIT OR Apache-2.0"
+rust-version = "1.85.0"
+
 [profile.dev]
 debug = 2
 
 [workspace.dependencies]
 cfg-if = "1.0"
 crash-context = "0.6"
-libc = "0.2"
+libc = ">=0.2.180"
+# This is an older version, but most of the larger dependents (eg wasmtime) are
+# still using 0.4 as well, so we don't want to bump this until someone actually
+# opens a PR to avoid unnecessary duplicates
 mach2 = "0.4"
 parking_lot = "0.12"

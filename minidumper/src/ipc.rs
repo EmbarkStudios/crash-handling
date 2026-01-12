@@ -156,33 +156,33 @@ const USER: u32 = 4;
 /// Apple doesn't have good/any documentation for mach port service names, but
 /// they are allowed to be longer than the path for a socket name. We also
 /// require that the path be utf-8.
+#[derive(Copy, Clone)]
 pub enum SocketName<'scope> {
+    /// The path to the domain socket
     Path(&'scope std::path::Path),
+    /// An abstract Linux socket
     #[cfg(any(target_os = "linux", target_os = "android"))]
     Abstract(&'scope str),
+}
+
+impl<'scope> SocketName<'scope> {
+    /// Create an abstract Linux socket name
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[inline]
+    pub fn abstract_namespace(name: &'scope str) -> Self {
+        Self::Abstract(name)
+    }
+
+    /// Convenience function to create a [`Self::Path`] from a string
+    #[inline]
+    pub fn path(path: &'scope str) -> Self {
+        Self::Path(std::path::Path::new(path))
+    }
 }
 
 impl<'scope> From<&'scope std::path::Path> for SocketName<'scope> {
     fn from(s: &'scope std::path::Path) -> Self {
         Self::Path(s)
-    }
-}
-
-impl<'scope> From<&'scope str> for SocketName<'scope> {
-    fn from(s: &'scope str) -> Self {
-        cfg_if::cfg_if! {
-            if #[cfg(any(target_os = "linux", target_os = "android"))] {
-                Self::Abstract(s)
-            } else {
-                Self::Path(std::path::Path::new(s))
-            }
-        }
-    }
-}
-
-impl<'scope> From<&'scope String> for SocketName<'scope> {
-    fn from(s: &'scope String) -> Self {
-        Self::from(s.as_str())
     }
 }
 

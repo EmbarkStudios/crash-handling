@@ -4,8 +4,10 @@ use minidumper::{Client, Server};
 
 fn main() {
     pretty_env_logger::init();
+    let socket_name = minidumper::SocketName::path(SOCKET_NAME);
+
     if std::env::args().any(|a| a == "--server") {
-        let mut server = Server::with_name(SOCKET_NAME).expect("failed to create server");
+        let mut server = Server::with_name(socket_name).expect("failed to create server");
 
         let ab = std::sync::atomic::AtomicBool::new(false);
 
@@ -70,7 +72,7 @@ fn main() {
 
     // Attempt to connect to the server
     let (client, _server) = loop {
-        if let Ok(client) = Client::with_name(SOCKET_NAME) {
+        if let Ok(client) = Client::with_name(socket_name) {
             break (client, server.unwrap());
         }
 

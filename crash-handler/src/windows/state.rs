@@ -150,7 +150,12 @@ pub(super) unsafe fn simulate_exception(exception_code: Option<i32>) -> crate::C
     let lock = HANDLER.lock();
     if let Some(handler) = &*lock {
         unsafe {
-            let mut exception_record: crash_context::EXCEPTION_RECORD = std::mem::zeroed();
+            // https://github.com/chromium/crashpad/blob/fca8871ca3fb721d3afab370ca790122f9333bfd/util/win/exception_codes.h#L32
+            let exception_code = exception_code.unwrap_or(ExceptionCode::User as i32);
+            let mut exception_record = crash_context::EXCEPTION_RECORD {
+                ExceptionCode: exception_code,
+                ..std::mem::zeroed()
+            };
             let mut exception_context = std::mem::MaybeUninit::zeroed();
 
             crash_context::capture_context(exception_context.as_mut_ptr());
@@ -161,10 +166,6 @@ pub(super) unsafe fn simulate_exception(exception_code: Option<i32>) -> crate::C
                 ExceptionRecord: &mut exception_record,
                 ContextRecord: &mut exception_context,
             };
-
-            // https://github.com/chromium/crashpad/blob/fca8871ca3fb721d3afab370ca790122f9333bfd/util/win/exception_codes.h#L32
-            let exception_code = exception_code.unwrap_or(ExceptionCode::User as i32);
-            exception_record.ExceptionCode = exception_code;
 
             let cc = crash_context::CrashContext {
                 exception_pointers: (&exception_ptrs as *const crash_context::EXCEPTION_POINTERS)
@@ -329,7 +330,11 @@ unsafe extern "C" fn handle_invalid_parameter(
             // to make it possible for the crash processor to classify these
             // as do regular crashes, and to make it humane for developers to
             // analyze them.
-            let mut exception_record: crash_context::EXCEPTION_RECORD = std::mem::zeroed();
+            let exception_code = ExceptionCode::InvalidParameter as i32;
+            let mut exception_record = crash_context::EXCEPTION_RECORD {
+                ExceptionCode: exception_code,
+                ..std::mem::zeroed()
+            };
             let mut exception_context = std::mem::MaybeUninit::zeroed();
 
             crash_context::capture_context(exception_context.as_mut_ptr());
@@ -340,9 +345,6 @@ unsafe extern "C" fn handle_invalid_parameter(
                 ExceptionRecord: &mut exception_record,
                 ContextRecord: &mut exception_context,
             };
-
-            let exception_code = ExceptionCode::InvalidParameter as i32;
-            exception_record.ExceptionCode = exception_code;
 
             match current_handler.user_handler.on_crash(&crate::CrashContext {
                 exception_pointers: (&exception_ptrs as *const crash_context::EXCEPTION_POINTERS)
@@ -405,7 +407,11 @@ unsafe extern "C" fn handle_pure_virtual_call() {
             // to make it possible for the crash processor to classify these
             // as do regular crashes, and to make it humane for developers to
             // analyze them.
-            let mut exception_record: crash_context::EXCEPTION_RECORD = std::mem::zeroed();
+            let exception_code = ExceptionCode::Purecall as i32;
+            let mut exception_record = crash_context::EXCEPTION_RECORD {
+                ExceptionCode: exception_code,
+                ..std::mem::zeroed()
+            };
             let mut exception_context = std::mem::MaybeUninit::zeroed();
 
             crash_context::capture_context(exception_context.as_mut_ptr());
@@ -416,9 +422,6 @@ unsafe extern "C" fn handle_pure_virtual_call() {
                 ExceptionRecord: &mut exception_record,
                 ContextRecord: &mut exception_context,
             };
-
-            let exception_code = ExceptionCode::Purecall as i32;
-            exception_record.ExceptionCode = exception_code;
 
             match current_handler.user_handler.on_crash(&crate::CrashContext {
                 exception_pointers: (&exception_ptrs as *const crash_context::EXCEPTION_POINTERS)
