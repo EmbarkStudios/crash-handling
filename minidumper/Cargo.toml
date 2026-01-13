@@ -1,6 +1,6 @@
 [package]
 name = "minidumper"
-version = "0.8.3"
+version = "0.9.0"
 description = "IPC impl for creating a minidump for a crashed process"
 repository.workspace = true
 authors.workspace = true

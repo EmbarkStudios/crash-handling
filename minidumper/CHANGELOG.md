@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.9.0] - 2026-01-13
 ### Changed
 - [PR#103](https://github.com/EmbarkStudios/crash-handling/pull/103) updated `minidump-writer` to 0.11.
 - [PR#111](https://github.com/EmbarkStudios/crash-handling/pull/111) made `SocketName` public and removed the `From<&str>` implementation, resolving [#106](https://github.com/EmbarkStudios/crash-handling/issues/106).
@@ -73,7 +74,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial pass of crash-context, Linux only
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/minidumper-0.8.3...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/minidumper-0.9.0...HEAD
+[0.9.0]: https://github.com/EmbarkStudios/crash-handling/compare/minidumper-0.8.3...minidumper-0.9.0
 [0.8.3]: https://github.com/EmbarkStudios/crash-handling/compare/minidumper-0.8.2...minidumper-0.8.3
 [0.8.2]: https://github.com/EmbarkStudios/crash-handling/compare/minidumper-0.8.1...minidumper-0.8.2
 [0.8.1]: https://github.com/EmbarkStudios/crash-handling/compare/minidumper-0.8.0...minidumper-0.8.1

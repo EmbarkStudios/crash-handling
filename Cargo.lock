@@ -170,15 +170,6 @@ dependencies = [
 [[package]]
 name = "crash-context"
 version = "0.6.3"
-dependencies = [
- "cfg-if",
- "libc",
- "mach2",
-]
-
-[[package]]
-name = "crash-context"
-version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "031ed29858d90cfdf27fe49fae28028a1f20466db97962fa2f4ea34809aeebf3"
 dependencies = [
@@ -188,11 +179,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "crash-handler"
-version = "0.6.3"
+name = "crash-context"
+version = "0.7.0"
 dependencies = [
  "cfg-if",
- "crash-context 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc",
+ "mach2",
+]
+
+[[package]]
+name = "crash-handler"
+version = "0.7.0"
+dependencies = [
+ "cfg-if",
+ "crash-context 0.6.3",
  "libc",
  "mach2",
  "parking_lot",
@@ -501,7 +501,7 @@ dependencies = [
  "bitflags",
  "byteorder",
  "cfg-if",
- "crash-context 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "crash-context 0.6.3",
  "error-graph",
  "failspot",
  "goblin",
@@ -522,10 +522,10 @@ dependencies = [
 
 [[package]]
 name = "minidumper"
-version = "0.8.3"
+version = "0.9.0"
 dependencies = [
  "cfg-if",
- "crash-context 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "crash-context 0.6.3",
  "crash-handler",
  "libc",
  "log",
@@ -825,7 +825,7 @@ checksum = "b39cdef0fa800fc44525c84ccb54a029961a8215f9619753635a9c0d2538d46d"
 
 [[package]]
 name = "sadness-generator"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "libc",
 ]

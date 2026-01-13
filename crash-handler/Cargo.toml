@@ -2,7 +2,7 @@
 name = "crash-handler"
 description = "Allows running of user code during crash events"
 repository = "https://github.com/EmbarkStudios/crash-handling"
-version = "0.6.3"
+version = "0.7.0"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true

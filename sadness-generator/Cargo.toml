@@ -1,6 +1,6 @@
 [package]
 name = "sadness-generator"
-version = "0.6.0"
+version = "0.7.0"
 description = "Provides various ways to make your program sad"
 repository.workspace = true
 authors.workspace = true
