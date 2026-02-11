@@ -31,6 +31,8 @@
 - `i686-linux-android`
 - `i686-unknown-linux-gnu`
 - `i686-unknown-linux-musl`
+- `loongarch64-unknown-linux-gnu`
+- `loongarch64-unknown-linux-musl`
 - `x86_64-apple-darwin`
 - `x86_64-linux-android`
 - `x86_64-pc-windows-msvc`

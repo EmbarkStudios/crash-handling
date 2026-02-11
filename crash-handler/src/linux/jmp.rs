@@ -55,6 +55,18 @@ cfg_if::cfg_if! {
             __gregs: [u64; 10],
             __fpregs: [f64; 8],
         }
+    } else if #[cfg(target_arch = "loongarch64")] {
+        #[repr(C)]
+        #[doc(hidden)]
+        #[allow(non_camel_case_types)]
+        pub struct __jmp_buf {
+            __pc: u64,
+            __sp: u64,
+            __x: u64,
+            __fp: u64,
+            __regs: [u64; 9],
+            __fpregs: [f64; 8],
+        }
     }
 }
 

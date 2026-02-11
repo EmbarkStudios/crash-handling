@@ -24,5 +24,7 @@ cfg_if::cfg_if! {
         mod riscv64;
     } else if #[cfg(target_arch = "s390x")] {
         mod s390x;
+    } else if #[cfg(target_arch = "loongarch64")] {
+        mod loongarch64;
     }
 }

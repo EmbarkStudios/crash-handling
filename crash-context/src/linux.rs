@@ -359,6 +359,74 @@ cfg_if::cfg_if! {
             pub mask: u64,
             pub addr: u64,
         }
+    } else if #[cfg(target_arch = "loongarch64")] {
+        pub const SC_USED_FP: u32 = 1;
+        pub const FPU_CTX_MAGIC: u32 = 0x46505501;
+        pub const FPU_CTX_ALIGN: usize = 8;
+        pub const LSX_CTX_MAGIC: u32 = 0x53580001;
+        pub const LSX_CTX_ALIGN: usize = 16;
+        pub const LASX_CTX_MAGIC: u32 = 0x41535801;
+        pub const LASX_CTX_ALIGN: usize = 32;
+
+        #[repr(C)]
+        #[derive(Clone)]
+        #[doc(hidden)]
+        pub struct ucontext_t {
+            pub uc_flags: u64,
+            pub uc_link: *mut ucontext_t,
+            pub uc_stack: stack_t,
+            pub uc_sigmask: sigset_t,
+            pub uc_mcontext: mcontext_t,
+        }
+
+        #[repr(C, align(16))]
+        #[derive(Clone,Copy)]
+        #[doc(hidden)]
+        pub struct mcontext_t {
+            pub __pc: u64,
+            pub __gregs: [u64; 32],
+            pub __flags: u32,
+            pub __extcontext: [u64; 0],
+        }
+
+        #[repr(C, align(16))]
+        #[derive(Clone,Copy)]
+        #[doc(hidden)]
+        pub struct sctx_info {
+            pub magic: u32,
+            pub size: u32,
+            padding: u64,
+        }
+
+        #[repr(C, align(8))]
+        #[derive(Clone,Copy)]
+        #[doc(hidden)]
+        pub struct fpu_context {
+            pub regs: [u64; 32],
+            pub fcc: u64,
+            pub fcsr: u32,
+        }
+
+        #[repr(C, align(16))]
+        #[derive(Clone,Copy)]
+        #[doc(hidden)]
+        pub struct lsx_context {
+            pub regs: [u64; 2*32],
+            pub fcc: u64,
+            pub fcsr: u32,
+        }
+
+        #[repr(C, align(32))]
+        #[derive(Clone,Copy)]
+        #[doc(hidden)]
+        pub struct lasx_context {
+            pub regs: [u64; 4*32],
+            pub fcc: u64,
+            pub fcsr: u32,
+        }
+
+        #[doc(hidden)]
+        pub type fpregset_t = fpu_context;
     }
 }
 
