@@ -99,7 +99,7 @@ struct CrashContextMessage {
     /// The optional exception subcode
     exception_subcode: u64,
     /// We don't actually send this, but it's tacked on by the kernel :(
-    trailer: MachMsgTrailer,
+    _trailer: MachMsgTrailer,
 }
 
 const FLAG_HAS_EXCEPTION: u32 = 0x1;
@@ -110,6 +110,7 @@ const FLAG_HAS_SUBCODE: u32 = 0x2;
 struct AcknowledgementMessage {
     head: MachMsgHeader,
     result: u32,
+    _trailer: MachMsgTrailer,
 }
 
 /// An error that can occur while interacting with mach ports
@@ -235,7 +236,8 @@ impl Client {
                 head: MachMsgHeader {
                     bits: msg::MACH_MSG_TYPE_COPY_SEND | msg::MACH_MSGH_BITS_COMPLEX,
                     // We don't send the trailer, that's added by the kernel
-                    size: std::mem::size_of::<CrashContextMessage>() as u32 - 8,
+                    size: std::mem::size_of::<CrashContextMessage>() as u32
+                        - std::mem::size_of::<MachMsgTrailer>() as u32,
                     remote_port: self.port,
                     local_port: port::MACH_PORT_NULL,
                     voucher_port: port::MACH_PORT_NULL,
@@ -257,7 +259,7 @@ impl Client {
                 exception_subcode,
                 // We don't actually send this but I didn't feel like making
                 // two types
-                trailer: MachMsgTrailer { kind: 0, size: 8 },
+                _trailer: MachMsgTrailer { kind: 0, size: 8 },
             };
 
             // Try to actually send the message to the Server
@@ -441,13 +443,15 @@ impl Acknowledger {
                 let mut msg = AcknowledgementMessage {
                     head: MachMsgHeader {
                         bits: msg::MACH_MSG_TYPE_COPY_SEND,
-                        size: std::mem::size_of::<AcknowledgementMessage>() as u32,
+                        size: std::mem::size_of::<AcknowledgementMessage>() as u32
+                            - std::mem::size_of::<MachMsgTrailer>() as u32,
                         remote_port: port,
                         local_port: port::MACH_PORT_NULL,
                         voucher_port: port::MACH_PORT_NULL,
                         id: 0,
                     },
                     result: ack,
+                    _trailer: MachMsgTrailer { kind: 0, size: 8 },
                 };
 
                 // Try to actually send the message
@@ -529,6 +533,7 @@ impl AckReceiver {
                     id: 0,
                 },
                 result: 0,
+                _trailer: MachMsgTrailer { kind: 0, size: 8 },
             };
 
             // Wait for a response from the Server

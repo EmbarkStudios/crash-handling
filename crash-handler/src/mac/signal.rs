@@ -12,7 +12,7 @@ pub(crate) unsafe fn install_abort_handler() -> Result<libc::sigaction, std::io:
         let mut sa: libc::sigaction = mem::zeroed();
         libc::sigemptyset(&mut sa.sa_mask);
         libc::sigaddset(&mut sa.sa_mask, libc::SIGABRT);
-        sa.sa_sigaction = signal_handler as usize;
+        sa.sa_sigaction = signal_handler as *const () as usize;
         sa.sa_flags = libc::SA_SIGINFO;
 
         let mut old_action = mem::MaybeUninit::uninit();
