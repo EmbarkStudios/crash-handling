@@ -10,7 +10,7 @@ pub(crate) unsafe fn install_abort_handler() -> Result<libc::sighandler_t, std::
     // It would be nice to use sigaction here since it's better, but it isn't
     // supported on Windows :p
     unsafe {
-        let old_handler = libc::signal(libc::SIGABRT, signal_handler as usize);
+        let old_handler = libc::signal(libc::SIGABRT, signal_handler as *const () as usize);
         if old_handler != usize::MAX {
             Ok(old_handler)
         } else {
