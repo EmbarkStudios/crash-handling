@@ -236,7 +236,8 @@ impl Client {
                 head: MachMsgHeader {
                     bits: msg::MACH_MSG_TYPE_COPY_SEND | msg::MACH_MSGH_BITS_COMPLEX,
                     // We don't send the trailer, that's added by the kernel
-                    size: std::mem::size_of::<CrashContextMessage>() as u32 - std::mem::size_of::<MachMsgTrailer>() as u32,
+                    size: std::mem::size_of::<CrashContextMessage>() as u32
+                        - std::mem::size_of::<MachMsgTrailer>() as u32,
                     remote_port: self.port,
                     local_port: port::MACH_PORT_NULL,
                     voucher_port: port::MACH_PORT_NULL,
@@ -442,7 +443,8 @@ impl Acknowledger {
                 let mut msg = AcknowledgementMessage {
                     head: MachMsgHeader {
                         bits: msg::MACH_MSG_TYPE_COPY_SEND,
-                        size: std::mem::size_of::<AcknowledgementMessage>() as u32 - std::mem::size_of::<MachMsgTrailer>() as u32,
+                        size: std::mem::size_of::<AcknowledgementMessage>() as u32
+                            - std::mem::size_of::<MachMsgTrailer>() as u32,
                         remote_port: port,
                         local_port: port::MACH_PORT_NULL,
                         voucher_port: port::MACH_PORT_NULL,
