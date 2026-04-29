@@ -239,7 +239,7 @@ pub unsafe fn install_handlers() {
             libc::sigaddset(&mut sa.sa_mask, sig as i32);
         }
 
-        sa.sa_sigaction = signal_handler as usize;
+        sa.sa_sigaction = signal_handler as *const () as usize;
         sa.sa_flags = libc::SA_ONSTACK | libc::SA_SIGINFO;
 
         // Use our signal_handler for all of the signals we wish to catch
@@ -322,14 +322,14 @@ unsafe extern "C" fn signal_handler(
             {
                 let mut cur_handler = mem::zeroed();
                 if libc::sigaction(sig as i32, ptr::null_mut(), &mut cur_handler) == 0
-                    && cur_handler.sa_sigaction == signal_handler as usize
+                    && cur_handler.sa_sigaction == signal_handler as *const () as usize
                     && cur_handler.sa_flags & libc::SA_SIGINFO == 0
                 {
                     // Reset signal handler with the correct flags.
                     libc::sigemptyset(&mut cur_handler.sa_mask);
                     libc::sigaddset(&mut cur_handler.sa_mask, sig as i32);
 
-                    cur_handler.sa_sigaction = signal_handler as usize;
+                    cur_handler.sa_sigaction = signal_handler as *const () as usize;
                     cur_handler.sa_flags = libc::SA_ONSTACK | libc::SA_SIGINFO;
 
                     if libc::sigaction(sig as i32, &cur_handler, ptr::null_mut()) == -1 {
