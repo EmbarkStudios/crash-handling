@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Changed
+- [PR#116](https://github.com/EmbarkStudios/crash-handling/pull/116) updated `minidump-writer` to 0.12.
+
 ## [0.9.0] - 2026-01-13
 ### Changed
 - [PR#103](https://github.com/EmbarkStudios/crash-handling/pull/103) updated `minidump-writer` to 0.11.
