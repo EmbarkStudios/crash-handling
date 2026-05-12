@@ -164,7 +164,12 @@ pub unsafe fn raise_floating_point_exception() -> ! {
             asm!("lhi 2,0", "lhi 3,0", "dr  2,2");
             0
         }
-        #[cfg(any(target_arch = "arm", target_arch = "aarch64", target_arch = "riscv64"))]
+        #[cfg(any(
+            target_arch = "arm",
+            target_arch = "aarch64",
+            target_arch = "riscv64",
+            target_arch = "loongarch64"
+        ))]
         {
             // Unfortunately ARM and RISC-V by default will not raise SIGFPE on
             // divide by 0 and just return 0, so we just explicitly raise here
@@ -194,6 +199,8 @@ pub unsafe fn raise_illegal_instruction() -> ! {
         asm!(".word 0x00000000");
         #[cfg(target_arch = "s390x")]
         asm!(".word 0x0000");
+        #[cfg(target_arch = "loongarch64")]
+        asm!("amswap.w $zero, $ra, $zero");
     }
 
     std::process::abort()
@@ -260,7 +267,9 @@ pub unsafe fn raise_trap() -> ! {
         #[cfg(target_arch = "riscv64")]
         asm!("ebreak");
         #[cfg(target_arch = "s390x")]
-        asm!("trap2")
+        asm!("trap2");
+        #[cfg(target_arch = "loongarch64")]
+        asm!("break 0");
     }
 
     std::process::abort()

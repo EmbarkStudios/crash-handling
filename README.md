@@ -37,6 +37,7 @@ Name | Description | crates.io | docs.rs
 `i686` | ✅ | ✅ | ❌ | ❌ | ❌ |
 `arm` | ✅ | ✅ | ✅ | ❌ | ❌
 `aarch64` | ✅ | ✅ | ✅ | ❌ | ✅
+`loongarch64` | ✅ | ✅ | ❌ | ❌ | ❌
 
 ## Contribution
 

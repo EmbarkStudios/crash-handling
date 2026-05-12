@@ -459,6 +459,37 @@ impl HandlerInner {
                         }
                     } else if #[cfg(any(target_arch = "riscv64", target_arch = "s390x"))] {
                         cc.float_state = uc_ptr.uc_mcontext.__fpregs;
+                    } else if #[cfg(target_arch = "loongarch64")] {
+                        let mut si = uc_ptr.uc_mcontext.__extcontext.as_ptr().cast::<crash_context::sctx_info>();
+                        while (*si).magic != 0 && (*si).size != 0 {
+                            match (*si).magic {
+                                crash_context::FPU_CTX_MAGIC => {
+                                    let ctx = si.add(1).cast::<crash_context::fpu_context>();
+                                    let ctx = ctx.byte_add(ctx.align_offset(crash_context::FPU_CTX_ALIGN));
+                                    ptr::copy_nonoverlapping(ctx, &mut cc.float_state, 1);
+                                }
+                                crash_context::LSX_CTX_MAGIC => {
+                                    let ctx = si.add(1).cast::<crash_context::lsx_context>();
+                                    let ctx = ctx.byte_add(ctx.align_offset(crash_context::LSX_CTX_ALIGN));
+                                    for i in 0..32 {
+                                        cc.float_state.regs[i] = (*ctx).regs[i * 2];
+                                    }
+                                    cc.float_state.fcc = (*ctx).fcc;
+                                    cc.float_state.fcsr = (*ctx).fcsr;
+                                }
+                                crash_context::LASX_CTX_MAGIC => {
+                                    let ctx = si.add(1).cast::<crash_context::lasx_context>();
+                                    let ctx = ctx.byte_add(ctx.align_offset(crash_context::LASX_CTX_ALIGN));
+                                    for i in 0..32 {
+                                        cc.float_state.regs[i] = (*ctx).regs[i * 4];
+                                    }
+                                    cc.float_state.fcc = (*ctx).fcc;
+                                    cc.float_state.fcsr = (*ctx).fcsr;
+                                }
+                                _ => {}
+                            }
+                            si = si.byte_add((*si).size as usize);
+                        }
                     } else if #[cfg(not(target_arch = "arm"))] {
                         if !uc_ptr.uc_mcontext.fpregs.is_null() {
                             ptr::copy_nonoverlapping(uc_ptr.uc_mcontext.fpregs, ((&mut cc.float_state) as *mut crash_context::fpregset_t).cast(), 1);
