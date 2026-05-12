@@ -475,7 +475,7 @@ impl HandlerInner {
     }
 }
 
-/// We define these constans ourselves rather than use libc as they are missing
+/// We define these constants ourselves rather than use libc as they are missing
 /// from eg. Android
 const PR_GET_DUMPABLE: i32 = 3;
 const PR_SET_DUMPABLE: i32 = 4;

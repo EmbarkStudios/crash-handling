@@ -52,7 +52,7 @@ impl CrashContext {
             return None;
         }
 
-        unsafe { Some((*bytes.as_ptr().cast::<Self>()).clone()) }
+        unsafe { Some(std::ptr::read_unaligned(bytes.as_ptr().cast::<Self>())) }
     }
 }
 
