@@ -211,7 +211,7 @@ impl Header {
 
         #[allow(unsafe_code)]
         unsafe {
-            Some(*buf.as_ptr().cast::<Self>())
+            Some(std::ptr::read_unaligned(buf.as_ptr().cast::<Self>()))
         }
     }
 }
