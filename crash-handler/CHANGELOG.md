@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#118](https://github.com/EmbarkStudios/crash-handling/pull/118) made alternate signal stack teardown non-fatal on Linux/Android.
+- [PR#118](https://github.com/EmbarkStudios/crash-handling/pull/118) fixed `mmap` failure check to compare against `MAP_FAILED` rather than null.
+
 ## [0.7.0] - 2026-01-13
 ### Fixed
 - [PR#105](https://github.com/EmbarkStudios/crash-handling/pull/105) fixed pthread interposition when statically linking `musl`.

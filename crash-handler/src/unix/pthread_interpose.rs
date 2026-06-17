@@ -165,8 +165,9 @@ unsafe extern "C" fn set_alt_signal_stack_and_start(params: *mut c_void) -> *mut
 ///
 /// # Errors
 ///
-/// If we're able to map memory, but unable to install the alternate stack, we
-/// expect that we can unmap the memory
+/// Returns `null` if memory can't be mapped or the alternate stack can't be
+/// installed; a failed cleanup `munmap` is logged and the mapping leaked rather
+/// than treated as fatal.
 unsafe fn install_sig_alt_stack() -> *mut libc::c_void {
     let alt_stack_mem = unsafe {
         libc::mmap(
@@ -180,8 +181,8 @@ unsafe fn install_sig_alt_stack() -> *mut libc::c_void {
     };
 
     // Check that we successfully mapped some memory
-    if alt_stack_mem.is_null() {
-        return alt_stack_mem;
+    if alt_stack_mem == libc::MAP_FAILED {
+        return ptr::null_mut();
     }
 
     let alt_stack = libc::stack_t {
@@ -195,11 +196,12 @@ unsafe fn install_sig_alt_stack() -> *mut libc::c_void {
 
     // Attempt to cleanup the mapping if we failed to install the alternate stack
     if rv != 0 {
-        assert_eq!(
-            unsafe { libc::munmap(alt_stack_mem, SIG_STACK_SIZE) },
-            0,
-            "failed to install an alternate signal stack, and failed to unmap the alternate stack memory"
-        );
+        if unsafe { libc::munmap(alt_stack_mem, SIG_STACK_SIZE) } != 0 {
+            eprintln!(
+                "failed to install an alternate signal stack, and failed to unmap the alternate stack memory: {}",
+                std::io::Error::last_os_error()
+            );
+        }
         ptr::null_mut()
     } else {
         alt_stack_mem
@@ -210,8 +212,8 @@ unsafe fn install_sig_alt_stack() -> *mut libc::c_void {
 ///
 /// # Errors
 ///
-/// If the alternate stack is not `null`, it is expected that uninstalling and
-/// unmapping will not error
+/// If the alternate stack is not `null`, uninstalling and unmapping may
+/// still error; such errors are logged rather than fatal
 #[unsafe(no_mangle)]
 unsafe extern "C" fn uninstall_sig_alt_stack(alt_stack_mem: *mut libc::c_void) {
     if alt_stack_mem.is_null() {
@@ -224,15 +226,21 @@ unsafe extern "C" fn uninstall_sig_alt_stack(alt_stack_mem: *mut libc::c_void) {
         ss_size: 0,
     };
 
-    // Attempt to uninstall the alternate stack
-    assert_eq!(
-        unsafe { libc::sigaltstack(&disable_stack, ptr::null_mut()) },
-        0,
-        "failed to uninstall alternate signal stack"
-    );
-    assert_eq!(
-        unsafe { libc::munmap(alt_stack_mem, SIG_STACK_SIZE) },
-        0,
-        "failed to unmap alternate stack memory"
-    );
+    // If disabling fails the kernel may still reference this memory as the
+    // active alternate stack (e.g. EPERM when it's in use), so deliberately
+    // leak the mapping rather than unmap a stack the kernel will still use.
+    if unsafe { libc::sigaltstack(&disable_stack, ptr::null_mut()) } != 0 {
+        eprintln!(
+            "failed to uninstall alternate signal stack: {}",
+            std::io::Error::last_os_error()
+        );
+        return;
+    }
+
+    if unsafe { libc::munmap(alt_stack_mem, SIG_STACK_SIZE) } != 0 {
+        eprintln!(
+            "failed to unmap alternate stack memory: {}",
+            std::io::Error::last_os_error()
+        );
+    }
 }
