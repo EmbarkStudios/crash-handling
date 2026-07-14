@@ -28,14 +28,14 @@ deny = [
     "openssl-sys",
 ]
 skip = [
-    # The crate is in the repo, so we have the path, but it's also a crates.io
-    # dependency
-    "crash-context",
 ]
 skip-tree = [
 ]
 
 [bans.workspace-dependencies]
+
+[bans.std-replacements]
+ignore = [ { crate = "cfg-if", reason = "requires 1.95 which is a bit too new to require as of now" } ]
 
 [sources]
 unknown-registry = "deny"
