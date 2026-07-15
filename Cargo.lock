@@ -192,7 +192,7 @@ name = "crash-handler"
 version = "0.7.0"
 dependencies = [
  "cfg-if",
- "crash-context 0.7.0",
+ "crash-context 0.6.3",
  "libc",
  "mach2",
  "parking_lot",
@@ -508,7 +508,7 @@ name = "minidumper"
 version = "0.9.0"
 dependencies = [
  "cfg-if",
- "crash-context 0.7.0",
+ "crash-context 0.6.3",
  "crash-handler",
  "libc",
  "log",
