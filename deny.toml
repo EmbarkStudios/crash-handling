@@ -33,7 +33,6 @@ skip = [
     "crash-context",
 ]
 skip-tree = [
-    { crate = "polling@3.7.4", reason = "pulls in old rustix/linux-raw-sys" },
 ]
 
 [bans.workspace-dependencies]

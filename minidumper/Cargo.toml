@@ -21,7 +21,7 @@ libc.workspace = true
 # Basic log emitting
 log = "0.4"
 # Minidump writing
-minidump-writer = "0.11"
+minidump-writer = "0.12"
 # Event loop
 polling = "3.2"
 # Nicer locking primitives
