@@ -454,7 +454,7 @@ impl Server {
         cfg_if::cfg_if! {
             if #[cfg(any(target_os = "linux", target_os = "android"))] {
                 #[allow(unsafe_code)]
-                let crash_context = minidump_writer::crash_context::CrashContext {
+                let crash_context = minidump_writer::CrashContextExt {
                     inner: unsafe { std::mem::transmute_copy(&crash_context) },
                 };
 

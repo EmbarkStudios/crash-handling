@@ -1,7 +1,6 @@
 [workspace]
 resolver = "2"
 members = [
-    "crash-context",
     "crash-handler",
     "minidumper",
     "minidumper-test",
@@ -23,10 +22,8 @@ debug = 2
 
 [workspace.dependencies]
 cfg-if = "1.0"
-crash-context = "0.6"
+# Must be kept aligned with the version used by minidump-writer
+crash-context = "0.8"
 libc = ">=0.2.180"
-# This is an older version, but most of the larger dependents (eg wasmtime) are
-# still using 0.4 as well, so we don't want to bump this until someone actually
-# opens a PR to avoid unnecessary duplicates
-mach2 = "0.4"
+mach2 = "0.6"
 parking_lot = "0.12"
