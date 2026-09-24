@@ -10,8 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
 ### Fixed
-- [PR#TBD](https://github.com/EmbarkStudios/crash-handling/pull/TBD) fixed child processes on macOS spinning forever when they crash. Child processes inherit the task exception port, and exceptions from them were replied to as handled, resuming the faulting thread. They are now replied to with `KERN_FAILURE` so the kernel continues on to the host exception handler and the default signal delivery.
-- [PR#TBD](https://github.com/EmbarkStudios/crash-handling/pull/TBD) fixed leaking the send rights for the task and thread received with every exception on macOS, which for exceptions from child processes left two dead names in the port space per crash.
+- [PR#126](https://github.com/EmbarkStudios/crash-handling/pull/126) fixed child processes on macOS spinning forever when they crash. Child processes inherit the task exception port, and exceptions from them were replied to as handled, resuming the faulting thread. They are now replied to with `KERN_FAILURE` so the kernel continues on to the host exception handler and the default signal delivery.
+- [PR#126](https://github.com/EmbarkStudios/crash-handling/pull/126) fixed leaking the send rights for the task and thread received with every exception on macOS, which for exceptions from child processes left two dead names in the port space per crash.
 
 ## [0.8.0] - 2026-07-20
 ### Changed
