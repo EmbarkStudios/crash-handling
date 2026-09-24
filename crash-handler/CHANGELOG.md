@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#TBD](https://github.com/EmbarkStudios/crash-handling/pull/TBD) fixed child processes on macOS spinning forever when they crash. Child processes inherit the task exception port, and exceptions from them were replied to as handled, resuming the faulting thread. They are now replied to with `KERN_FAILURE` so the kernel continues on to the host exception handler and the default signal delivery.
+
 ## [0.8.0] - 2026-07-20
 ### Changed
 - [PR#122](https://github.com/EmbarkStudios/crash-handling/pull/122) updated `crash-context` to 0.8.0.

@@ -419,9 +419,10 @@ unsafe fn exception_handler(port: mach_port_t, us: UserSignal) {
                     // process.  The check for task == self_task() ensures that only
                     // exceptions that occur in the parent process are caught and
                     // processed.  If the exception was not caused by this task, we
-                    // still need to call into the exception server and have it return
-                    // KERN_FAILURE (see catch_exception_raise) in order for the kernel
-                    // to move onto the host exception handler for the child task
+                    // still need to reply with KERN_FAILURE in order for the kernel
+                    // to move onto the host exception handler for the child task,
+                    // replying with KERN_SUCCESS would resume the faulting thread
+                    // and it would fault again, forever
                     let ret_code = if request.task.name == mach_task_self() {
                         let _ss = ScopedSuspend::new();
 
@@ -461,7 +462,7 @@ unsafe fn exception_handler(port: mach_port_t, us: UserSignal) {
                             KERN_SUCCESS
                         }
                     } else {
-                        KERN_SUCCESS
+                        mach2::kern_return::KERN_FAILURE
                     };
 
                     // This magic incantation to send a reply back to the kernel was
