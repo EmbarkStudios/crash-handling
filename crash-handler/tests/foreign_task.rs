@@ -63,6 +63,8 @@ fn passes_on_foreign_task_exceptions() {
         ("trap", Expected::Signal(&[libc::SIGTRAP])),
     ];
 
+    let dead_names_before = dead_port_names();
+
     let failures: Vec<_> = cases
         .iter()
         .filter_map(|(case, expected)| match spawn_child(case) {
@@ -81,6 +83,13 @@ fn passes_on_foreign_task_exceptions() {
     assert!(
         !PARENT_CALLBACK_INVOKED.load(Ordering::SeqCst),
         "the parent's crash callback was invoked for a child's exception"
+    );
+    // Each exception message carries send rights for the child's task and
+    // thread, which become dead names once the child exits unless released
+    assert_eq!(
+        dead_names_before,
+        dead_port_names(),
+        "port rights received with the children's exceptions were leaked"
     );
 }
 
@@ -179,4 +188,68 @@ unsafe fn inherited_exception_port() -> bool {
                 && ports[i] != MACH_PORT_NULL
                 && behaviors[i] as u32 == et::EXCEPTION_DEFAULT | et::MACH_EXCEPTION_CODES
         })
+}
+
+/// Counts the dead names in this task's port space
+fn dead_port_names() -> usize {
+    use mach2::{
+        kern_return::{KERN_SUCCESS, kern_return_t},
+        mach_types::task_t,
+        message::mach_msg_type_number_t,
+        port::{MACH_PORT_RIGHT_DEAD_NAME, mach_port_name_t, mach_port_type_t},
+        traps::mach_task_self,
+        vm::mach_vm_deallocate,
+    };
+
+    /// `MACH_PORT_TYPE(MACH_PORT_RIGHT_DEAD_NAME)` from `<mach/port.h>`
+    const MACH_PORT_TYPE_DEAD_NAME: mach_port_type_t = 1 << (MACH_PORT_RIGHT_DEAD_NAME + 16);
+
+    unsafe extern "C" {
+        /// Returns the names and types of all rights in the task's port space,
+        /// in arrays allocated in the task that must be deallocated by the caller
+        fn mach_port_names(
+            task: task_t,
+            names: *mut *mut mach_port_name_t,
+            names_count: *mut mach_msg_type_number_t,
+            types: *mut *mut mach_port_type_t,
+            types_count: *mut mach_msg_type_number_t,
+        ) -> kern_return_t;
+    }
+
+    // SAFETY: syscalls
+    unsafe {
+        let mut names = std::ptr::null_mut();
+        let mut names_count = 0;
+        let mut types = std::ptr::null_mut();
+        let mut types_count = 0;
+
+        assert_eq!(
+            mach_port_names(
+                mach_task_self(),
+                &mut names,
+                &mut names_count,
+                &mut types,
+                &mut types_count,
+            ),
+            KERN_SUCCESS
+        );
+
+        let dead = std::slice::from_raw_parts(types, types_count as usize)
+            .iter()
+            .filter(|ty| **ty & MACH_PORT_TYPE_DEAD_NAME != 0)
+            .count();
+
+        mach_vm_deallocate(
+            mach_task_self(),
+            names as _,
+            (names_count as usize * size_of::<mach_port_name_t>()) as _,
+        );
+        mach_vm_deallocate(
+            mach_task_self(),
+            types as _,
+            (types_count as usize * size_of::<mach_port_type_t>()) as _,
+        );
+
+        dead
+    }
 }

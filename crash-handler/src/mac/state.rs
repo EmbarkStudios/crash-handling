@@ -490,6 +490,11 @@ unsafe fn exception_handler(port: mach_port_t, us: UserSignal) {
                         msg::MACH_MSG_TIMEOUT_NONE,
                         MACH_PORT_NULL,
                     );
+
+                    // The kernel gave us send rights to the task and thread that raised
+                    // the exception, which we are responsible for releasing
+                    mp::mach_port_deallocate(mach_task_self(), request.task.name);
+                    mp::mach_port_deallocate(mach_task_self(), request.thread.name);
                 }
                 Ok(MessageIds::Shutdown) => return,
                 Ok(MessageIds::SignalCrash) => {
