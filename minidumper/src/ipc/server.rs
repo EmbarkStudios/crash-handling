@@ -531,6 +531,13 @@ impl Server {
                 log::error!("failed to deregister socket: {err}");
             }
 
+            // Match the socket platforms, which invoke the disconnect callback
+            // whenever a client is dropped, including after a crash dump
+            if handler.on_client_disconnected(clients.len()) == LoopAction::Exit {
+                log::debug!("on_client_disconnected exited message loop");
+                return Ok(LoopAction::Exit);
+            }
+
             Ok(action)
         } else {
             Ok(LoopAction::Continue)

@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+### Fixed
+- [PR#119](https://github.com/EmbarkStudios/crash-handling/pull/119) fixed the macOS server not invoking `ServerHandler::on_client_disconnected` matching other platforms.
+
 ## [0.11.0] - 2026-07-20
 ### Changed
 - [PR#122](https://github.com/EmbarkStudios/crash-handling/pull/122) updated `minidump-writer` to 0.13 and `crash-context` to 0.8.0.

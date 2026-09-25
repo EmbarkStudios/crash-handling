@@ -72,7 +72,7 @@ use std::{
     path::PathBuf,
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         mpsc,
     },
 };
@@ -80,6 +80,7 @@ use std::{
 pub struct Server {
     pub id: String,
     pub dump_rx: mpsc::Receiver<PathBuf>,
+    pub disconnects: Arc<AtomicUsize>,
     exit_run_loop: Arc<AtomicBool>,
     run_loop: Option<std::thread::JoinHandle<()>>,
 }
@@ -117,6 +118,7 @@ pub fn spinup_server(id: &str, dump_path: Option<PathBuf>) -> Server {
         _id: String,
         dump_tx: Mutex<mpsc::Sender<PathBuf>>,
         dump_path: PathBuf,
+        disconnects: Arc<AtomicUsize>,
     }
 
     impl minidumper::ServerHandler for Inner {
@@ -152,14 +154,21 @@ pub fn spinup_server(id: &str, dump_path: Option<PathBuf>) -> Server {
         fn on_message(&self, _kind: u32, _buffer: Vec<u8>) {
             unreachable!("we only test crashes");
         }
+
+        fn on_client_disconnected(&self, _num_clients: usize) -> minidumper::LoopAction {
+            self.disconnects.fetch_add(1, Ordering::Relaxed);
+            minidumper::LoopAction::Continue
+        }
     }
 
     let (tx, rx) = mpsc::channel();
+    let disconnects = Arc::new(AtomicUsize::new(0));
 
     let inner = Inner {
         _id: id.to_owned(),
         dump_tx: Mutex::new(tx),
         dump_path,
+        disconnects: disconnects.clone(),
     };
 
     let exit = Arc::new(AtomicBool::new(false));
@@ -174,6 +183,7 @@ pub fn spinup_server(id: &str, dump_path: Option<PathBuf>) -> Server {
     Server {
         id: id.to_owned(),
         dump_rx: rx,
+        disconnects,
         exit_run_loop,
         run_loop: Some(run_loop),
     }
@@ -252,6 +262,22 @@ pub fn generate_minidump(
         .dump_rx
         .recv_timeout(std::time::Duration::from_secs(1))
         .expect("failed to receive dump path");
+
+    // The server should drop the crashed client and inform the handler on
+    // every platform, the callback fires shortly after the dump is written
+    // so give it a moment
+    let disconnected = (0..100).any(|_| {
+        if server.disconnects.load(Ordering::Relaxed) > 0 {
+            true
+        } else {
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            false
+        }
+    });
+    assert!(
+        disconnected,
+        "on_client_disconnected was not invoked after the crash dump"
+    );
 
     match std::fs::read(&dump_path) {
         Ok(buf) => buf,
