@@ -35,3 +35,6 @@ mach2.workspace = true
 
 [dev-dependencies]
 sadness-generator = { path = "../sadness-generator" }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(sanitizer_compat)'] }

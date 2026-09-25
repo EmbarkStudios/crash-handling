@@ -41,6 +41,13 @@ unsafe extern "C" {
     ) -> i32;
 }
 
+#[cfg(all(sanitizer_compat, not(miri)))]
+unsafe extern "C" {
+    /// This is the weak symbol exported by sanitizers, if it's available we use it instead
+    #[linkage = "extern_weak"]
+    static __interceptor_pthread_create: Option<pthread_create_t>;
+}
+
 /// This interposer replaces `pthread_create` so that we can inject an
 /// alternate signal stack in every new thread, regardless of whether the
 /// thread is created directly in Rust's std library or not
@@ -65,14 +72,25 @@ pub extern "C" fn pthread_create(
     // Finds the real pthread_create and specifies the pthread_key that is
     // used to uninstall and unmap the alternate stack
     INIT.call_once(|| unsafe {
-        cfg_if::cfg_if! {
-            if #[cfg(all(target_env = "musl", target_feature = "crt-static"))] {
-                let ptr = __pthread_create as *mut c_void;
-            } else {
-                const RTLD_NEXT: *mut c_void = -1isize as *mut c_void;
-                let ptr = libc::dlsym(RTLD_NEXT, c"pthread_create".as_ptr().cast());
+        fn real_pthread() -> *mut c_void {
+            cfg_if::cfg_if! {
+                if #[cfg(all(target_env = "musl", target_feature = "crt-static"))] {
+                    __pthread_create as *mut c_void
+                } else {
+                    const RTLD_NEXT: *mut c_void = -1isize as *mut c_void;
+                    unsafe { libc::dlsym(RTLD_NEXT, c"pthread_create".as_ptr().cast()) }
+                }
             }
         }
+
+        cfg_if::cfg_if! {
+            if #[cfg(all(sanitizer_compat, not(miri)))] {
+                // Use the sanitizer pthread_create if it exists
+                let ptr = __interceptor_pthread_create.map_or_else(real_pthread, |interceptor| interceptor as usize as *mut c_void);
+            } else {
+                let ptr = real_pthread();
+            }
+        };
 
         if !ptr.is_null() {
             REAL_PTHREAD_CREATE = Some(std::mem::transmute::<*mut libc::c_void, pthread_create_t>(

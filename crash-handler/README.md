@@ -25,6 +25,8 @@ On Linux this is done by handling [signals](https://man7.org/linux/man-pages/man
 
 One important detail of the Linux signal handling is that this crate hooks [`pthread_create`](https://man7.org/linux/man-pages/man3/pthread_create.3.html) so that an [alternate signal stack](https://man7.org/linux/man-pages/man2/sigaltstack.2.html) is always installed on every thread. [`std::thread::Thread`] already does this, however hooking `pthread_create` allows us to ensure this occurs for threads created from eg. C/C++ code as well. An alternate stack is necessary to reliably handle a [`SIGSEGV`](#sigsegv) caused by a [stack overflow](https://en.wikipedia.org/wiki/Stack_buffer_overflow), as signals are otherwise handled on the same stack that raised the signal.
 
+Note that if you are using a sanitizer you need to pass `--cfg sanitizer_compat` via rustflags for crash handling to interact well with the sanitizer.
+
 ### `SIGABRT`
 
 Signal sent to a process to tell it to abort, i.e. to terminate. The signal is usually initiated by the process itself when it calls `std::process::abort` or `libc::abort`, but it can be sent to the process from outside itself like any other signal.

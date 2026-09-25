@@ -1,4 +1,5 @@
 #![doc = include_str!("../README.md")]
+#![cfg_attr(sanitizer_compat, feature(linkage))]
 #![allow(unsafe_code)]
 
 mod error;
