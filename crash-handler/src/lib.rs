@@ -1,9 +1,5 @@
 #![doc = include_str!("../README.md")]
-// Only under the opt-in `sanitizer-compat` feature (nightly-only) do we enable
-// `feature(linkage)`, used for the weak `__interceptor_pthread_create` reference
-// in the pthread interposer (see issue #123). Gating it here keeps stable builds
-// off nightly when the feature is disabled (the default).
-#![cfg_attr(feature = "sanitizer-compat", feature(linkage))]
+#![cfg_attr(sanitizer_compat, feature(linkage))]
 #![allow(unsafe_code)]
 
 mod error;

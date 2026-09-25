@@ -16,15 +16,6 @@ default = []
 # If enabled, will log out information when a signal is raised/exception thrown
 # but logged in a manner that is safe.
 debug-print = []
-# Opt-in cooperation with a sanitizer's (ASan/LSan/TSan/...) `pthread_create`
-# interceptor. When a sanitizer is linked, the interposed `pthread_create` chains
-# to `__interceptor_pthread_create` instead of resolving libc directly, so the
-# sanitizer's thread bookkeeping stays in sync (see issue #123).
-#
-# NIGHTLY-ONLY: it enables `#![feature(linkage)]`. This adds no new toolchain
-# constraint in practice, since a `-Zsanitizer` build is already nightly-only
-# (it needs `-Zbuild-std`). Off by default, so stable builds are unaffected.
-sanitizer-compat = []
 
 [dependencies]
 # Nicer handling of complex cfg expressions
@@ -44,3 +35,6 @@ mach2.workspace = true
 
 [dev-dependencies]
 sadness-generator = { path = "../sadness-generator" }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(sanitizer_compat)'] }

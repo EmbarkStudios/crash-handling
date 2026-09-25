@@ -41,29 +41,9 @@ unsafe extern "C" {
     ) -> i32;
 }
 
-#[cfg(all(feature = "sanitizer-compat", not(miri)))]
+#[cfg(all(sanitizer_compat, not(miri)))]
 unsafe extern "C" {
-    /// A link-time weak reference to a sanitizer's `pthread_create` interceptor.
-    ///
-    /// A sanitizer (ASan/LSan/TSan/...) exports a *strong*
-    /// `__interceptor_pthread_create` plus a *weak* `pthread_create` alias. Our
-    /// strong `#[no_mangle] pthread_create` shadows that weak alias, so resolving
-    /// the "real" `pthread_create` via `dlsym(RTLD_NEXT, ...)` jumps straight to
-    /// libc and bypasses the sanitizer's create-side bookkeeping — while its
-    /// `pthread_join` interceptor stays active, desyncing its thread registry and
-    /// aborting at teardown (issue #123).
-    ///
-    /// Declared `extern_weak` so it resolves to the interceptor when a sanitizer
-    /// is linked and to `None` (a null address) otherwise, leaving non-sanitizer
-    /// builds untouched. When present we chain to it instead of libc, keeping the
-    /// sanitizer in the loop — the call becomes `pthread_create` ->
-    /// `__interceptor_pthread_create` -> libc. The sanitizer resolves its own real
-    /// `pthread_create` via `RTLD_NEXT` from the runtime's position, so there is no
-    /// recursion.
-    ///
-    /// `dlsym(RTLD_DEFAULT, "__interceptor_pthread_create")` is *not* a substitute:
-    /// the interceptor is statically linked and absent from the executable's
-    /// dynamic symbol table, so `dlsym` returns null.
+    /// This is the weak symbol exported by sanitizers, if it's available we use it instead
     #[linkage = "extern_weak"]
     static __interceptor_pthread_create: Option<pthread_create_t>;
 }
@@ -92,27 +72,23 @@ pub extern "C" fn pthread_create(
     // Finds the real pthread_create and specifies the pthread_key that is
     // used to uninstall and unmap the alternate stack
     INIT.call_once(|| unsafe {
-        // Under `sanitizer-compat`, if a sanitizer's interceptor is linked, chain
-        // to it rather than resolving the real `pthread_create` directly, so the
-        // sanitizer's thread bookkeeping stays in sync (issue #123). The weak
-        // reference is `None` when no sanitizer is present, so we fall through to
-        // the normal resolution below.
-        #[cfg(feature = "sanitizer-compat")]
-        let sanitizer_interceptor =
-            __interceptor_pthread_create.map(|interceptor| interceptor as usize as *mut c_void);
-        #[cfg(not(feature = "sanitizer-compat"))]
-        let sanitizer_interceptor: Option<*mut c_void> = None;
-
-        let ptr = if let Some(interceptor) = sanitizer_interceptor {
-            interceptor
-        } else {
+        fn real_pthread() -> *mut c_void {
             cfg_if::cfg_if! {
                 if #[cfg(all(target_env = "musl", target_feature = "crt-static"))] {
                     __pthread_create as *mut c_void
                 } else {
                     const RTLD_NEXT: *mut c_void = -1isize as *mut c_void;
-                    libc::dlsym(RTLD_NEXT, c"pthread_create".as_ptr().cast())
+                    unsafe { libc::dlsym(RTLD_NEXT, c"pthread_create".as_ptr().cast()) }
                 }
+            }
+        }
+
+        cfg_if::cfg_if! {
+            if #[cfg(all(sanitizer_compat, not(miri)))] {
+                // Use the sanitizer pthread_create if it exists
+                let ptr = __interceptor_pthread_create.map_or_else(real_pthread, |interceptor| interceptor as usize as *mut c_void);
+            } else {
+                let ptr = real_pthread();
             }
         };
 
