@@ -174,7 +174,7 @@ dependencies = [
 
 [[package]]
 name = "crash-handler"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "cfg-if",
  "crash-context",

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
+## [0.8.1] - 2026-09-25
 ### Fixed
 - [PR#124](https://github.com/EmbarkStudios/crash-handling/pull/124) added code to allow crash handling to interact better with sanitizers. It requires the nightly [`linkage`](https://github.com/rust-lang/rust/issues/29603) feature, just as sanitizers require nightly, so this code is gated behind the `sanitizer_compat` cfg that must be passed via rustflags.
 - [PR#126](https://github.com/EmbarkStudios/crash-handling/pull/126) fixed child processes on macOS spinning forever when they crash. Child processes inherit the task exception port, and exceptions from them were replied to as handled, resuming the faulting thread. They are now replied to with `KERN_FAILURE` so the kernel continues on to the host exception handler and the default signal delivery.
@@ -104,7 +105,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial pass of crash-context, Linux only
 
 <!-- next-url -->
-[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.8.0...HEAD
+[Unreleased]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.8.1...HEAD
+[0.8.1]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.8.0...crash-handler-0.8.1
 [0.8.0]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.7.0...crash-handler-0.8.0
 [0.7.0]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.6.3...crash-handler-0.7.0
 [0.6.3]: https://github.com/EmbarkStudios/crash-handling/compare/crash-handler-0.6.2...crash-handler-0.6.3
