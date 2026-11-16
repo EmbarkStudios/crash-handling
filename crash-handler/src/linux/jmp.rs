@@ -67,6 +67,11 @@ cfg_if::cfg_if! {
             __regs: [u64; 9],
             __fpregs: [f64; 8],
         }
+    } else if #[cfg(target_arch = "powerpc64")] {
+        #[repr(C)]
+        #[doc(hidden)]
+        #[allow(non_camel_case_types)]
+        pub struct __jmp_buf([u64; 101]);
     }
 }
 
